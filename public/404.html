@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manifester</title>
+    <!--
+      Manifester uses hash routing, so this file should almost never be reached.
+      It exists so that an old-style deep link (or a stray path under the
+      GitHub Pages sub-path) lands back on the app instead of a 404 page.
+    -->
+    <script>
+      var base = location.pathname.split('/').slice(0, 2).join('/') + '/'
+      location.replace(base + '#/create')
+    </script>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #f7f1e8;
+        color: #3a322c;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Taking you back to Manifester…</p>
+  </body>
+</html>
