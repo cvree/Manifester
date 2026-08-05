@@ -30,6 +30,29 @@ export function useReducedMotion(): boolean {
 }
 
 /**
+ * True below the desktop breakpoint, where navigation lives in the floating
+ * bar rather than the header. Immersive mode keys off this: hiding the header
+ * on a desktop would take away the only way out of the player.
+ */
+export function useIsCompact(): boolean {
+  const [compact, setCompact] = useState(() =>
+    typeof window === 'undefined' || !window.matchMedia
+      ? false
+      : window.matchMedia('(max-width: 1023px)').matches,
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const media = window.matchMedia('(max-width: 1023px)')
+    const onChange = () => setCompact(media.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
+
+  return compact
+}
+
+/**
  * A conservative guess at whether continuous canvas animation is a good idea.
  * Used to drop the drifting particle layer on modest phones.
  */

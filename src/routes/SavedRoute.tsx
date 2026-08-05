@@ -26,24 +26,26 @@ export function SavedRoute() {
   }
 
   return (
-    <div className="space-y-5">
-      <section data-rise className="pt-2 pb-1">
-        <h1 className="font-display text-[2rem] leading-tight text-ink">
-          Saved loops
-        </h1>
-        <p className="mt-2 max-w-[42ch] text-[1rem] leading-relaxed text-ink-muted">
-          Your rituals, kept on this device.
+    <div className="mx-auto max-w-2xl space-y-6 md:max-w-5xl">
+      <header data-rise className="pt-2">
+        <h1 className="type-display">Saved loops</h1>
+        <p className="type-body mt-3">
+          Your rituals, kept on this device. Tap one to hear it again.
         </p>
-      </section>
+      </header>
 
       {!ready ? (
-        <Card data-rise>
-          <p className="py-6 text-center text-[0.95rem] text-ink-muted">
+        <Card data-rise level="panel">
+          <p
+            className="type-meta py-8 text-center"
+            role="status"
+            aria-live="polite"
+          >
             Opening your library…
           </p>
         </Card>
       ) : loops.length === 0 ? (
-        <Card data-rise>
+        <Card data-rise level="stage">
           <EmptyState
             icon={<LeafIcon />}
             title="No saved loops yet"
@@ -56,7 +58,7 @@ export function SavedRoute() {
           />
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2">
           {loops.map((loop) => (
             <SavedLoopCard
               key={loop.id}

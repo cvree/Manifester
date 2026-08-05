@@ -63,10 +63,17 @@ interface SessionContextValue {
   resolvedDeviceVoice: RankedVoice | null
 
   /** Speak a short sample with whatever voice the settings resolve to. */
-  previewVoice: (style?: 'feminine' | 'masculine') => void
+  previewVoice: (style?: 'feminine' | 'masculine', text?: string) => void
+  stopPreview: () => void
   previewState: 'idle' | 'loading' | 'playing'
 
   session: SessionSnapshot
+  /**
+   * Opens the audio hardware from inside a user gesture. The Start button
+   * animates for a beat before it navigates, and by then the tap is over as
+   * far as Safari is concerned — so the unlock has to happen first.
+   */
+  prime: () => void
   start: (source?: SavedLoop) => void
   pause: () => void
   resume: () => void
@@ -214,7 +221,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /* ── Voice preview ── */
 
   const previewVoice = useCallback(
-    (style?: 'feminine' | 'masculine') => {
+    (style?: 'feminine' | 'masculine', text?: string) => {
       const settings = draft.settings
       const wantedStyle = style ?? settings.voiceStyle
 
@@ -222,8 +229,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       window.speechSynthesis.cancel()
 
       const synth = window.speechSynthesis
+      const sample = text?.trim() || 'This is how your words will sound.'
+      // Long drafts would tie up the preview for a minute; one line is enough
+      // to hear the voice.
       const utterance = new SpeechSynthesisUtterance(
-        'This is how your words will sound.',
+        sample.length > 180 ? `${sample.slice(0, 180)}…` : sample,
       )
       const target =
         (settings.voiceURI && !style
@@ -248,6 +258,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     },
     [draft.settings, voices],
   )
+
+  const stopPreview = useCallback(() => {
+    if (isSpeechSupported()) window.speechSynthesis.cancel()
+    setPreviewState('idle')
+  }, [])
 
   /* ── Screen wake lock: speech stops when a phone sleeps ── */
 
@@ -317,6 +332,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const stop = useCallback(() => finish('idle', null), [finish])
 
   /* ── Start ── */
+
+  const prime = useCallback(() => {
+    busRef.current?.ensure()
+    musicRef.current?.unlock()
+  }, [])
 
   const start = useCallback(
     (source?: SavedLoop) => {
@@ -497,8 +517,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       speechSupported,
       resolvedDeviceVoice,
       previewVoice,
+      stopPreview,
       previewState,
       session,
+      prime,
       start,
       pause,
       resume,
@@ -519,8 +541,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       speechSupported,
       resolvedDeviceVoice,
       previewVoice,
+      stopPreview,
       previewState,
       session,
+      prime,
       start,
       pause,
       resume,

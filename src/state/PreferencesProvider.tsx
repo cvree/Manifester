@@ -30,7 +30,10 @@ export interface Preferences {
 }
 
 const DEFAULTS: Preferences = {
-  breathingEnabled: false,
+  // The guide is now the visual centre of both the preview and the player,
+  // so it is on by default. Its cues stay off: nothing should make a sound
+  // or vibrate until it has been asked to.
+  breathingEnabled: true,
   breathPattern: DEFAULT_PATTERN,
   breathSoundCues: false,
   breathHapticCues: true,

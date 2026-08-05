@@ -12,8 +12,10 @@
 
 export type Cue =
   | 'tap'
+  | 'select'
   | 'start'
   | 'stop'
+  | 'save'
   | 'inhale'
   | 'exhale'
   | 'hold'
@@ -32,6 +34,9 @@ interface CueShape {
 
 const CUES: Record<Cue, CueShape> = {
   tap: { notes: [660], duration: 0.07, gain: 0.05, type: 'sine', vibrate: 8 },
+  // A selection tick is quieter and shorter than a tap: you are choosing,
+  // not committing, and this fires far more often.
+  select: { notes: [880], duration: 0.045, gain: 0.03, type: 'sine', vibrate: 5 },
   start: {
     notes: [523.25, 784],
     duration: 0.18,
@@ -40,6 +45,14 @@ const CUES: Record<Cue, CueShape> = {
     vibrate: [14, 40, 22],
   },
   stop: { notes: [523.25, 392], duration: 0.2, gain: 0.06, type: 'sine', vibrate: 18 },
+  // A sparkle: a bright, quick major arpeggio that lands and gets out.
+  save: {
+    notes: [659.25, 987.77, 1318.51],
+    duration: 0.13,
+    gain: 0.05,
+    type: 'sine',
+    vibrate: [10, 30, 14],
+  },
   // The breathing cues are the softest things in the app on purpose.
   inhale: { notes: [523.25], duration: 0.5, gain: 0.045, type: 'sine', vibrate: 12 },
   exhale: { notes: [392], duration: 0.7, gain: 0.045, type: 'sine', vibrate: 20 },

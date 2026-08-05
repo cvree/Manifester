@@ -12,27 +12,25 @@ export function AboutRoute() {
   const reducedMotion = useReducedMotion()
 
   const content = (
-    <div className="space-y-5">
-      <section data-rise className="pt-2 pb-1">
-        <h1 className="font-display text-[2rem] leading-tight text-ink">
-          About Manifester
-        </h1>
-        <p className="mt-2 max-w-[44ch] text-[1rem] leading-relaxed text-ink-muted">
+    <div className="mx-auto max-w-2xl space-y-6 lg:max-w-3xl">
+      <header data-rise className="pt-2">
+        <h1 className="type-display">About Manifester</h1>
+        <p className="type-body mt-3">
           A small, quiet place to hear your own words back. Write an intention,
           choose a voice, and let it loop for as long as you like.
         </p>
-      </section>
+      </header>
 
-      <Card data-rise title="Add it to your phone">
+      <Card data-rise level="stage" title="Add it to your phone">
         <InstallInstructions />
       </Card>
 
       <Card data-rise title="Your privacy">
-        <p className="text-[0.95rem] leading-relaxed text-ink-muted">
+        <p className="type-body">
           Your saved loops stay on this device. Manifester does not require an
           account and does not send your text to a server.
         </p>
-        <ul className="mt-4 space-y-2 text-[0.95rem] leading-relaxed text-ink-muted">
+        <ul className="type-body mt-4 space-y-2.5">
           <Bullet>
             Text, settings and imported audio are stored in your browser's own
             storage.
@@ -50,12 +48,12 @@ export function AboutRoute() {
       </Card>
 
       <Card data-rise title="About downloading audio">
-        <p className="text-[0.95rem] leading-relaxed text-ink-muted">
+        <p className="type-body">
           A downloaded file can contain your background sound and{' '}
           <em className="not-italic text-ink">a recording of your own voice</em>,
           repeated with your chosen delay.
         </p>
-        <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-muted">
+        <p className="type-body mt-3">
           It cannot contain the app's speaking voice, and no web app can manage
           that. Your device generates that speech outside the page entirely —
           there is no way for a website to listen to it. Rather than pretend
@@ -63,14 +61,14 @@ export function AboutRoute() {
           around that. Many people find their own voice works better for this
           anyway.
         </p>
-        <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-muted">
+        <p className="type-body mt-3">
           Files are rendered on your device, in the background, and never
           uploaded anywhere.
         </p>
       </Card>
 
       <Card data-rise title="How the sound works">
-        <p className="text-[0.95rem] leading-relaxed text-ink-muted">
+        <p className="type-body">
           The two built-in ambiences, Moon Garden and Soft Horizon, are not audio
           files. They are generated live from oscillators and filtered noise in
           your browser, which is why they load instantly and keep working with no
@@ -79,13 +77,13 @@ export function AboutRoute() {
       </Card>
 
       <Card data-rise title="Getting the best voice">
-        <p className="text-[0.95rem] leading-relaxed text-ink-muted">
+        <p className="type-body">
           Manifester automatically picks the nicest voice your device has, and
           labels how good it is. If that label says <em className="not-italic text-ink">Basic</em>,
           your device is falling back to an old robotic synthesiser — and there is
           a free fix.
         </p>
-        <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-muted">
+        <p className="type-body mt-3">
           On iPhone: <strong className="text-ink">Settings → Accessibility → Spoken
           Content → Voices → English</strong>, then download one marked{' '}
           <strong className="text-ink">Premium</strong>. Ava, Zoe, Evan and Nathan
@@ -93,14 +91,15 @@ export function AboutRoute() {
           phone's own hardware, and they cost nothing. Open Manifester again
           afterwards and it will find them by itself.
         </p>
-        <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-muted">
-          The Create screen has the same instructions for Android, Windows and Mac,
-          tucked under the voice picker.
+        <p className="type-body mt-3">
+          The same instructions for Android, Windows and Mac are in the Voice
+          panel, under <em className="not-italic text-ink">Customize your ritual</em>{' '}
+          on the Create screen.
         </p>
       </Card>
 
       <Card data-rise title="What browsers can and cannot do">
-        <ul className="space-y-3 text-[0.95rem] leading-relaxed text-ink-muted">
+        <ul className="type-body space-y-3">
           <Bullet>
             The list of voices comes from your device. iPhone, Android, Windows and
             Mac all offer different ones, and Manifester cannot add to that list —
@@ -126,7 +125,7 @@ export function AboutRoute() {
       </Card>
 
       <Card data-rise title="A gentle note">
-        <p className="text-[0.95rem] leading-relaxed text-ink-muted">
+        <p className="type-body">
           Manifester is a listening tool, not advice, treatment or a promise about
           what will happen in your life. It is here to help you build a calm ritual
           around words you have chosen for yourself. If something is weighing on
@@ -134,7 +133,7 @@ export function AboutRoute() {
         </p>
       </Card>
 
-      <p className="px-1 pb-2 text-center text-[0.82rem] leading-relaxed text-ink-faint">
+      <p className="type-meta px-1 pb-2 text-center">
         Made with care. No accounts, no servers, no subscriptions.
       </p>
     </div>

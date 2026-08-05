@@ -44,7 +44,7 @@ export function SegmentedControl<T extends string>({
             aria-label={segment.ariaLabel}
             onClick={() => onChange(segment.value)}
             className={cx(
-              'min-h-10 flex-1 rounded-[0.85rem] px-3 text-[0.92rem] font-medium',
+              'min-h-11 flex-1 rounded-[0.85rem] px-3 text-[0.92rem] font-medium',
               'transition-[background-color,color,box-shadow] duration-200 ease-[var(--ease-calm)]',
               selected
                 ? 'bg-[var(--surface-strong)] text-ink shadow-[0_1px_3px_rgb(0_0_0/0.08)]'

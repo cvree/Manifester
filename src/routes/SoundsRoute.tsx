@@ -157,37 +157,39 @@ export function SoundsRoute() {
   }
 
   return (
-    <div className="space-y-5">
-      <section data-rise className="pt-2 pb-1">
-        <h1 className="font-display text-[2rem] leading-tight text-ink">Sounds</h1>
-        <p className="mt-2 max-w-[42ch] text-[1rem] leading-relaxed text-ink-muted">
+    <div className="mx-auto max-w-2xl space-y-6 lg:grid lg:max-w-none lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start lg:gap-8 lg:space-y-0">
+      <header data-rise className="pt-2 lg:col-span-2">
+        <h1 className="type-display">Sounds</h1>
+        <p className="type-body mt-3">
           Two ambiences come built in. You can also bring your own audio — it stays
           on this device.
         </p>
-      </section>
+      </header>
 
-      <Card
-        data-rise
-        title="Built in"
-        description="Generated live in your browser, so they always work offline."
-      >
-        <div className="space-y-2">
-          {builtinTracks.map((track) => (
-            <TrackRow
-              key={track.id}
-              track={track}
-              playing={previewId === track.id}
-              selected={sound.mode === 'single' && sound.trackId === track.id}
-              inPlaylist={inPlaylist(track.id)}
-              onPreview={() => void togglePreview(track)}
-              onSelect={() =>
-                updateSettings({
-                  sound: { ...sound, mode: 'single', trackId: track.id },
-                })
-              }
-              onTogglePlaylist={() => togglePlaylist(track.id)}
-            />
-          ))}
+      <div className="space-y-6 lg:col-start-1">
+        <Card
+          data-rise
+          level="stage"
+          title="Built in"
+          description="Generated live in your browser, so they always work offline."
+        >
+          <div className="space-y-2">
+            {builtinTracks.map((track) => (
+              <TrackRow
+                key={track.id}
+                track={track}
+                playing={previewId === track.id}
+                selected={sound.mode === 'single' && sound.trackId === track.id}
+                inPlaylist={inPlaylist(track.id)}
+                onPreview={() => void togglePreview(track)}
+                onSelect={() =>
+                  updateSettings({
+                    sound: { ...sound, mode: 'single', trackId: track.id },
+                  })
+                }
+                onTogglePlaylist={() => togglePlaylist(track.id)}
+              />
+            ))}
         </div>
       </Card>
 
@@ -291,9 +293,11 @@ export function SoundsRoute() {
           <p className="mt-4 text-[0.82rem] text-ink-faint">{usage}</p>
         )}
       </Card>
+      </div>
 
       <Card
         data-rise
+        className="lg:sticky lg:top-6 lg:col-start-2"
         title="Playlist"
         description="Plays in this order behind your words."
       >

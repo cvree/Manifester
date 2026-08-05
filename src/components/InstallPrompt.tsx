@@ -1,75 +1,116 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router'
+import {
+  dismissInstall,
+  engagementCount,
+  ENGAGEMENT_THRESHOLD,
+  isInstallDismissed,
+  subscribeEngagement,
+} from '../lib/engagement'
+import { cue } from '../lib/feedback'
 import { useInstallPrompt } from '../lib/install'
-import { readLocal, writeLocal } from '../lib/storage'
 import { useSession } from '../state/SessionProvider'
 import { Button } from './Button'
 import { CloseIcon, DownloadIcon, ShareIcon } from './Icons'
 
-const DISMISS_KEY = 'installDismissed'
-const APPEAR_DELAY_MS = 6000
+/** A short beat after the qualifying action, so it never interrupts it. */
+const APPEAR_DELAY_MS = 2500
 
-/** A quiet, one-time nudge that the app can live on the home screen. */
+/**
+ * A compact, contextual suggestion that Manifester can live on the home
+ * screen — not a banner parked over the controls.
+ *
+ * It waits until someone has actually started or saved a loop, appears once
+ * as a small card, remembers being dismissed, and never renders while a
+ * session is running. The full instructions live on the About screen, which
+ * is where it sends you if the browser has no native prompt to offer.
+ */
 export function InstallPrompt() {
   const navigate = useNavigate()
   const { session } = useSession()
   const { platform, installed, canPrompt, install } = useInstallPrompt()
-  const [visible, setVisible] = useState(false)
+  const [ready, setReady] = useState(false)
+
+  const engaged = useSyncExternalStore(
+    subscribeEngagement,
+    () => engagementCount() >= ENGAGEMENT_THRESHOLD && !isInstallDismissed(),
+    () => false,
+  )
 
   useEffect(() => {
-    if (installed || readLocal(DISMISS_KEY) === '1') return
-    const timeout = window.setTimeout(() => setVisible(true), APPEAR_DELAY_MS)
-    return () => clearTimeout(timeout)
-  }, [installed])
+    if (!engaged || installed) {
+      setReady(false)
+      return
+    }
+    const timeout = window.setTimeout(() => setReady(true), APPEAR_DELAY_MS)
+    return () => window.clearTimeout(timeout)
+  }, [engaged, installed])
 
-  const dismiss = () => {
-    writeLocal(DISMISS_KEY, '1')
-    setVisible(false)
+  const close = () => {
+    cue('tap')
+    dismissInstall()
+    setReady(false)
   }
 
-  // Never cover the mini-player during a session.
-  if (!visible || installed || session.status !== 'idle') return null
+  // Never on top of a live session, and never before it has been earned.
+  if (!ready || !engaged || installed || session.status !== 'idle') return null
 
   return (
-    <div className="fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 px-4">
-      <div className="surface-sheet mx-auto flex w-full max-w-2xl items-center gap-3 rounded-[1.25rem] px-4 py-3.5 shadow-[var(--shadow-lift)]">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--sage-soft)] text-[1.1rem] text-[var(--sage)]">
+    <div
+      role="status"
+      className="animate-sheet-in pointer-events-none fixed inset-x-0 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-40 px-4 lg:inset-x-auto lg:right-6 lg:bottom-6 lg:px-0"
+    >
+      <div className="surface-sheet pointer-events-auto mx-auto flex w-full max-w-md items-start gap-3 rounded-[1.25rem] p-4 lg:mx-0 lg:w-[22rem]">
+        <span
+          aria-hidden="true"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.85rem] bg-[var(--sage-soft)] text-[1.05rem] text-[var(--sage)]"
+        >
           <DownloadIcon />
         </span>
+
         <div className="min-w-0 grow">
           <p className="text-[0.95rem] font-medium text-ink">
-            Keep Manifester on your home screen
+            Keep it on your home screen
           </p>
-          <p className="text-[0.84rem] leading-snug text-ink-muted">
-            It opens full screen and works without a connection.
+          <p className="mt-0.5 text-[0.85rem] leading-snug text-ink-muted">
+            It opens full screen and works with no connection.
           </p>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {canPrompt ? (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  void install()
+                  close()
+                }}
+              >
+                Install
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  navigate('/about')
+                  close()
+                }}
+              >
+                {platform === 'ios' ? 'Show me how' : 'How to install'}
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={close}>
+              Not now
+            </Button>
+          </div>
         </div>
-        {canPrompt ? (
-          <Button
-            variant="primary"
-            onClick={() => {
-              void install()
-              dismiss()
-            }}
-          >
-            Install
-          </Button>
-        ) : (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              navigate('/about')
-              dismiss()
-            }}
-          >
-            {platform === 'ios' ? 'How' : 'Show me'}
-          </Button>
-        )}
+
         <button
           type="button"
-          onClick={dismiss}
+          onClick={close}
           aria-label="Dismiss the install suggestion"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-faint transition-colors hover:text-ink"
+          className="interactive -mt-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-faint hover:text-ink"
         >
           <CloseIcon />
         </button>
@@ -84,7 +125,7 @@ export function InstallInstructions() {
 
   if (installed) {
     return (
-      <p className="text-[0.95rem] leading-relaxed text-ink-muted">
+      <p className="type-body">
         Manifester is already running from your home screen. Nothing else to do —
         enjoy it.
       </p>
@@ -92,7 +133,7 @@ export function InstallInstructions() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {canPrompt && (
         <Button variant="primary" block size="lg" onClick={() => void install()}>
           Install Manifester
@@ -100,10 +141,10 @@ export function InstallInstructions() {
       )}
 
       <div className="space-y-3">
-        <h3 className="font-display text-[1.15rem] text-ink">
+        <h3 className="type-subheading">
           iPhone and iPad{platform === 'ios' && ' — you are here'}
         </h3>
-        <ol className="space-y-2 text-[0.95rem] leading-relaxed text-ink-muted">
+        <ol className="type-body space-y-2">
           <li>
             <strong className="font-medium text-ink">1.</strong> Open this page in
             Safari (not Chrome — only Safari can add to the home screen on iOS).
@@ -128,10 +169,10 @@ export function InstallInstructions() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="font-display text-[1.15rem] text-ink">
+        <h3 className="type-subheading">
           Android{platform === 'android' && ' — you are here'}
         </h3>
-        <ol className="space-y-2 text-[0.95rem] leading-relaxed text-ink-muted">
+        <ol className="type-body space-y-2">
           <li>
             <strong className="font-medium text-ink">1.</strong> Open this page in
             Chrome.
@@ -149,8 +190,8 @@ export function InstallInstructions() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="font-display text-[1.15rem] text-ink">Desktop</h3>
-        <p className="text-[0.95rem] leading-relaxed text-ink-muted">
+        <h3 className="type-subheading">Desktop</h3>
+        <p className="type-body">
           In Chrome or Edge, look for the install icon at the right-hand end of the
           address bar.
         </p>

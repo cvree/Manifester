@@ -41,6 +41,17 @@ app.
 
 **Create**
 
+- A **ritual-building workspace**: on a desktop the editor sits on the left and a
+  live preview of the finished ritual on the right; on a phone the same pieces
+  stack into one focused column.
+- The **live preview** breathes with your chosen pattern, cycles your lines the
+  way the loop will read them, takes its colour from the ambience you picked, and
+  states the voice, sound, length and delay in one glance. A *Hear a line* button
+  speaks your own first line in your chosen voice.
+- Only five things stay on screen: title, words, session length, Start and Save.
+  Everything else lives in **Customize your ritual** — a list of rows that each
+  state their own value (*Moon Garden · 40%*, *Calm · 4 in / 6 out*, *3-second
+  delay*) and open in a sheet.
 - A large text box that takes anything from one line to a twenty-minute script.
 - Long text is split into short passages behind the scenes so browsers do not cut
   it off part-way through, then spoken end to end.
@@ -67,9 +78,14 @@ app.
 
 **Player**
 
-- One large play/pause control with a soft breathing animation while it runs.
-- A **breathing guide**: a glowing orb that expands as you breathe in and
-  settles as you breathe out, with the phase name and a countdown underneath.
+- The calmest screen in the app: a large breathing guide, the words being
+  spoken, the two controls that matter, and nothing that looks like a mixing
+  desk. On a phone the navigation slides away while a session runs, and a strip
+  at the bottom edge brings it straight back.
+- One large play/pause control, with a smaller *End session* below it.
+- A **breathing guide**: a seed of light opening into six petals inside a
+  moonlit halo, with a thin ring reporting progress through the phase, the phase
+  name and a countdown in the centre.
   Default 4 seconds in, 6 seconds out — presets for Calm, Even, Box and Unwind,
   plus custom timing for every phase. Optional soft tone and vibration cues at
   each change of phase. It pauses and resumes with the session.
@@ -111,7 +127,18 @@ app.
 - Day and night colour themes.
 - Full `prefers-reduced-motion` support — every animation is skipped, not just
   shortened.
-- Large touch targets, labelled controls, visible focus rings.
+- Large touch targets (44 px minimum everywhere), labelled controls, visible
+  focus rings, a skip link, and no state communicated by colour alone.
+- Nothing fixed ever covers a control: the quick-start bar on a phone only
+  appears once the real Start button has scrolled away, and the page reserves
+  room under the floating navigation and mini-player.
+- The install suggestion waits until you have actually started or saved a loop,
+  appears once as a small card, and remembers being dismissed. The full
+  instructions live on the About screen.
+- Original procedural interface sounds and haptics — a tap, a selection tick, a
+  rising start tone, a settling pause tone, a save sparkle, a completion chime,
+  breathing cues and a quiet error tone. All off until you turn them on, and
+  sliders never vibrate.
 - Works offline after the first visit.
 
 ---
@@ -261,11 +288,27 @@ redirect for any stray path.
 **No Vanta.** Vanta's effects require `three.js`, which would add roughly half a
 megabyte and a continuous WebGL render loop to an app whose entire point is to
 run quietly on a phone for thirty minutes. Instead
-[`CosmicBackground.tsx`](src/components/CosmicBackground.tsx) layers a CSS
-gradient wash, slow-drifting radial "aurora" pools (plain gradients, no blur
-filters — large blurred elements are the classic way to melt a mobile GPU), and a
-small 2D-canvas field of drifting lights that is skipped entirely under reduced
-motion or on low-memory / low-core devices.
+[`CosmicBackground.tsx`](src/components/CosmicBackground.tsx) builds the Cosmic
+Garden from five cheap layers: a twilight wash, a moonlit glow, slow-drifting
+radial "aurora" pools (plain gradients, no blur filters — large blurred elements
+are the classic way to melt a mobile GPU), two static SVG garden curves, and a
+small 2D-canvas field of drifting pollen and fireflies. The canvas is skipped
+entirely under reduced motion or on low-memory / low-core devices, and the
+pointer parallax only ever binds on a device that reports a fine pointer, so it
+never competes with touch scrolling.
+
+**No headless dialog library.** [`Sheet.tsx`](src/components/Sheet.tsx) is the
+one modal surface in the app — a bottom sheet on a phone, a centred dialog from
+`md` up — with a focus trap, escape handling, scroll locking and focus return in
+about sixty lines. A headless UI package would be ~15 kB for behaviour we need
+exactly one variant of.
+
+**No animation library for the breathing guide.** Every layer of the visualiser
+is driven by two CSS custom properties (`--e` for expansion, `--p` for phase
+progress) that [`useBreathing`](src/lib/useBreathing.ts) writes straight onto the
+element each frame. React re-renders once a second, for the countdown, and never
+for the animation itself — so the browser only ever composites transforms,
+opacity and one dash offset.
 
 **No React Bits or Skiper UI packages.** Both were used as *reference* for the
 kind of polish worth aiming at. The two effects that survived — a shimmer sweep
@@ -276,14 +319,22 @@ treatment take their cues from modern refined-minimal design practice (clean
 surfaces, generous spacing, restrained type scale) rather than copying any
 specific design.
 
-**No web fonts.** Georgia and the system UI stack were chosen deliberately: they
-are warm, they are already on the device, and they cost zero bytes and zero
-layout shift. The app renders identically on a plane.
+**No web fonts.** The display face is `ui-serif` first — which resolves to New
+York on iOS and macOS, the warmest serif already on the device — then Iowan Old
+Style, Palatino and Georgia for everything else; the UI face is the system sans
+stack. They cost zero bytes and zero layout shift, and the app renders
+identically on a plane.
 
-**GSAP and Lenis, used sparingly.** GSAP handles one entrance stagger per screen
-and the play button's breathing pulse. Lenis is mounted only on the About screen,
-which is the one long-scrolling page — it never wraps the player controls. Both
-bow out completely when `prefers-reduced-motion` is set.
+**Three surface levels, not one pane of glass.** Canvas, elevated panel, and
+sunken interactive control, with one `stage` per route for the surface that
+defines the screen. The rule this replaces is the one the redesign existed to
+fix: when every card shares the same opacity, border, shadow and radius, there is
+no hierarchy left for the eye to use.
+
+**GSAP and Lenis, used sparingly.** GSAP handles one entrance stagger per screen.
+Lenis is mounted only on the About screen, which is the one long-scrolling page —
+it never wraps the player, the sheets, the sliders or any input. Both bow out
+completely when `prefers-reduced-motion` is set.
 
 ---
 
@@ -324,6 +375,11 @@ are committed, so a plain `npm ci && npm run build` never needs to run it.
 ```
 src/
   components/     design system + composed UI
+    Sheet.tsx             the one modal surface: bottom sheet / centred dialog
+    BreathingVisualizer   the orb, petals, phase ring and halo
+    RitualPreview.tsx     the live picture of the finished ritual
+    CustomizePanel.tsx    the advanced settings, as summarised rows + sheets
+    SettingRow.tsx        one row of that list, stating its own value
   routes/         Create, Player, Saved, Sounds, About
   state/          Theme, Library (IndexedDB), Session (playback engines)
   lib/
@@ -339,11 +395,13 @@ src/
     ambient.ts      the two generated ambiences
     storage.ts      IndexedDB + localStorage
     timer.ts        wall-clock session countdown
-    motion.ts       reduced motion, low-power and platform detection
+    motion.ts       reduced motion, low-power, breakpoint and platform detection
+    summaries.ts    the one-line summary of every advanced setting
+    engagement.ts   when the install suggestion has been earned
   workers/
     encode.worker.ts  mixes the timeline and encodes MP3/WAV
   styles/
-    theme.css     Cosmic Garden Minimal — the whole design system
+    theme.css     Cosmic Garden — surfaces, type scale, states, the visualiser
 ```
 
 ---

@@ -26,6 +26,9 @@ interface ExportPanelProps {
   settings: LoopSettings
   title: string
   hasRecording: boolean
+  /** Shown in the manifest, so the file's contents are stated before rendering. */
+  soundLabel: string
+  voiceLabel: string
 }
 
 type Stage =
@@ -35,7 +38,13 @@ type Stage =
   | { kind: 'done'; url: string; filename: string; bytes: number; format: 'mp3' | 'wav' }
   | { kind: 'error'; message: string }
 
-export function ExportPanel({ settings, title, hasRecording }: ExportPanelProps) {
+export function ExportPanel({
+  settings,
+  title,
+  hasRecording,
+  soundLabel,
+  voiceLabel,
+}: ExportPanelProps) {
   const [minutes, setMinutes] = useState<number>(10)
   const [custom, setCustom] = useState('')
   const [usingCustom, setUsingCustom] = useState(false)
@@ -250,30 +259,52 @@ export function ExportPanel({ settings, title, hasRecording }: ExportPanelProps)
           </div>
         )}
 
-        <p className="mt-3 text-[0.85rem] leading-snug text-ink-faint">
+        <p className="type-meta mt-3">
           About {estimate} as an MP3 ({EXPORT_BITRATE_KBPS} kbps mono), or{' '}
           {wavEstimate} if this browser can only make a WAV. Longer files take a
           few minutes to render, and you can keep using the app while they do.
         </p>
       </div>
 
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-3.5">
-        <p className="text-[0.88rem] font-medium text-ink">What goes in the file</p>
-        <ul className="mt-2 space-y-1.5 text-[0.85rem] leading-snug text-ink-muted">
-          <li className={cx(hasRecording ? 'text-ink' : undefined)}>
-            {hasRecording ? '✓' : '—'} Your recorded voice, repeated with a{' '}
-            {settings.repeatPauseSeconds}s delay
-          </li>
-          <li className={cx(hasBackground ? 'text-ink' : undefined)}>
-            {hasBackground ? '✓' : '—'} Background sound at{' '}
-            {Math.round(settings.musicVolume * 100)}%
-          </li>
-        </ul>
+      <div className="surface-control px-4 py-4">
+        <p className="type-label mb-3">What goes in the file</p>
+        <dl className="space-y-2.5 text-[0.875rem]">
+          <ManifestRow
+            included={hasRecording}
+            label="Voice"
+            value={
+              hasRecording
+                ? `Your recording at ${Math.round(settings.voiceVolume * 100)}%`
+                : 'Not included — see the note below'
+            }
+          />
+          <ManifestRow
+            included={hasBackground}
+            label="Sound"
+            value={hasBackground ? soundLabel : 'No background sound'}
+          />
+          <ManifestRow
+            included
+            label="Delay"
+            value={
+              settings.repeatPauseSeconds === 0
+                ? 'No pause between passes'
+                : `${settings.repeatPauseSeconds}s between passes`
+            }
+          />
+          <ManifestRow
+            included
+            label="Format"
+            value={`MP3, ${EXPORT_BITRATE_KBPS} kbps mono, ${EXPORT_SAMPLE_RATE / 1000} kHz`}
+          />
+        </dl>
+
         {!hasRecording && (
-          <p className="mt-2.5 text-[0.82rem] leading-relaxed text-ink-faint">
-            No browser can record the speaking voice — the device generates it
-            outside the page. Record your own voice above to include words in the
-            file.
+          <p className="type-meta mt-4 border-t border-[var(--quiet-border)] pt-3">
+            The app's speaking voice ({voiceLabel}) cannot go in the file, and no
+            web app can manage that — your device generates that speech outside
+            the page, where a website has no way to listen to it. Record your own
+            voice to put words in the download.
           </p>
         )}
       </div>
@@ -325,7 +356,7 @@ export function ExportPanel({ settings, title, hasRecording }: ExportPanelProps)
       )}
 
       {stage.kind === 'done' ? (
-        <div className="rounded-[1.25rem] border border-[var(--sage)] bg-[var(--sage-soft)] p-4">
+        <div className="rounded-[1.25rem] border border-[var(--sage)] bg-[var(--sage-soft)] p-4" role="status">
           <p className="flex items-center gap-2 text-[0.98rem] font-medium text-ink">
             <CheckIcon className="text-[1rem] text-[var(--sage)]" />
             Your {minutes} minute {stage.format.toUpperCase()} is ready
@@ -366,10 +397,41 @@ export function ExportPanel({ settings, title, hasRecording }: ExportPanelProps)
       )}
 
       {!canExport && (
-        <p className="text-[0.85rem] leading-relaxed text-ink-faint">
+        <p className="type-meta">
           Record your voice or choose a background sound first.
         </p>
       )}
+    </div>
+  )
+}
+
+/** One line of the export manifest: included, or honestly marked as not. */
+function ManifestRow({
+  included,
+  label,
+  value,
+}: {
+  included: boolean
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span
+        aria-hidden="true"
+        className={cx(
+          'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[0.6rem]',
+          included
+            ? 'bg-[var(--sage-soft)] text-[var(--sage)]'
+            : 'border border-[var(--control-border)] text-ink-faint',
+        )}
+      >
+        {included ? '✓' : '—'}
+      </span>
+      <dt className="w-16 shrink-0 text-ink-muted">{label}</dt>
+      <dd className={cx('min-w-0 grow', included ? 'text-ink' : 'text-ink-muted')}>
+        {value}
+      </dd>
     </div>
   )
 }

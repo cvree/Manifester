@@ -11,7 +11,10 @@ import { cue } from './feedback'
 import { useReducedMotion } from './motion'
 
 export interface BreathingRuntime {
-  /** Attach to the element the orb scales inside; receives the `--e` variable. */
+  /**
+   * Attach to the element the orb scales inside. It receives two custom
+   * properties every frame: `--e` (expansion) and `--p` (phase progress).
+   */
   stageRef: React.RefObject<HTMLDivElement | null>
   phase: BreathPhase
   label: string
@@ -60,8 +63,11 @@ export function useBreathing({
 
   const valid = isPatternValid(pattern)
 
-  const write = useCallback((expansion: number) => {
-    stageRef.current?.style.setProperty('--e', expansion.toFixed(4))
+  const write = useCallback((expansion: number, progress = 0) => {
+    const stage = stageRef.current
+    if (!stage) return
+    stage.style.setProperty('--e', expansion.toFixed(4))
+    stage.style.setProperty('--p', progress.toFixed(4))
   }, [])
 
   // Restart the cycle whenever the pattern itself changes.
@@ -92,7 +98,9 @@ export function useBreathing({
         bankedRef.current + (performance.now() - startedAtRef.current) / 1000
       const state = breathStateAt(pattern, elapsed)
 
-      if (!reducedMotion) write(state.expansion)
+      // Reduced motion keeps the phase ring, which conveys progress without
+      // anything moving fast, but not the scaling.
+      write(reducedMotion ? 0.55 : state.expansion, state.phaseProgress)
 
       if (state.phase !== lastPhaseRef.current) {
         const previous = lastPhaseRef.current
@@ -127,7 +135,7 @@ export function useBreathing({
 
     // Reduced motion still needs the labels and countdown, just not the scaling.
     if (reducedMotion) {
-      write(0.55)
+      write(0.55, 0)
       const interval = window.setInterval(step, 250)
       return () => window.clearInterval(interval)
     }
@@ -138,9 +146,10 @@ export function useBreathing({
     void total
   }, [active, valid, pattern, reducedMotion, soundCues, hapticCues, write])
 
-  // Settle the orb closed when the guide is switched off entirely.
+  // Settle the orb to a resting half-open pose when the guide is switched off,
+  // rather than collapsing it to nothing — a closed orb reads as broken.
   useEffect(() => {
-    if (!active && !reducedMotion) write(0)
+    if (!active && !reducedMotion) write(0.35, 0)
   }, [active, reducedMotion, write])
 
   return {

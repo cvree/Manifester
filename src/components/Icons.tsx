@@ -176,3 +176,55 @@ export const DownloadIcon = (props: IconProps) => (
     <path d="M4.5 17.5V19A1.5 1.5 0 0 0 6 20.5h12a1.5 1.5 0 0 0 1.5-1.5v-1.5" />
   </Icon>
 )
+
+/** Speech leaving a mouth — the voice setting. */
+export const VoiceIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M5 9.5v5M8.5 6.5v11M12 8v8" />
+    <path d="M15.8 9.4a4.2 4.2 0 0 1 0 5.2" />
+    <path d="M18.6 6.8a8 8 0 0 1 0 10.4" opacity=".6" />
+  </Icon>
+)
+
+export const ClockIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="8.4" />
+    <path d="M12 7.6V12l3 1.8" />
+  </Icon>
+)
+
+/** Concentric breath rings — the breathing guide. */
+export const BreathIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="3" />
+    <circle cx="12" cy="12" r="6.4" opacity=".62" />
+    <circle cx="12" cy="12" r="9.4" opacity=".3" />
+  </Icon>
+)
+
+export const MicIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="9" y="3" width="6" height="10.6" rx="3" />
+    <path d="M5.6 11.4a6.4 6.4 0 0 0 12.8 0" />
+    <path d="M12 17.8V21" />
+  </Icon>
+)
+
+/** Sliders — haptics and interface sound. */
+export const TuneIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M5 6h14M5 12h14M5 18h14" />
+    <circle cx="9.5" cy="6" r="2.1" fill="var(--panel-solid)" />
+    <circle cx="15" cy="12" r="2.1" fill="var(--panel-solid)" />
+    <circle cx="8" cy="18" r="2.1" fill="var(--panel-solid)" />
+  </Icon>
+)
+
+/** A gently opening flower — the Create tab. */
+export const BloomIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 12c0-3.4 1.6-6 3.6-6S19 8 19 10.4c0 2-1.6 3.4-3.4 3.4" />
+    <path d="M12 12c0-3.4-1.6-6-3.6-6S5 8 5 10.4c0 2 1.6 3.4 3.4 3.4" />
+    <path d="M12 12v9" />
+  </Icon>
+)

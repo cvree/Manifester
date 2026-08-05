@@ -12,9 +12,12 @@ interface DisclosureProps {
 }
 
 /**
- * Progressive disclosure: the everyday controls stay on screen, and the fiddly
- * ones live behind one of these. Animated with a grid-row trick so the height
- * transition works without measuring anything.
+ * Progressive disclosure *within* a sheet — the second level down, for the
+ * handful of controls that even a settings panel should keep folded away.
+ * Whole sections of settings live in `<Sheet>` now; this is what is left.
+ *
+ * Animated with a grid-row trick so the height transition works without
+ * measuring anything.
  */
 export function Disclosure({
   title,
@@ -27,23 +30,18 @@ export function Disclosure({
   const panelId = useId()
 
   return (
-    <div
-      className={cx(
-        'overflow-hidden rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-sunken)]',
-        className,
-      )}
-    >
+    <div className={cx('surface-quiet overflow-hidden', className)}>
       <button
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((current) => !current)}
-        className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left"
+        className="interactive flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left"
       >
         <span className="min-w-0">
           <span className="block text-[0.98rem] font-medium text-ink">{title}</span>
           {summary && !open && (
-            <span className="block truncate text-[0.85rem] text-ink-faint">
+            <span className="block truncate text-[0.85rem] text-ink-muted">
               {summary}
             </span>
           )}
@@ -74,7 +72,7 @@ export function Disclosure({
             !open && 'invisible',
           )}
         >
-          <div className="space-y-5 border-t border-[var(--border)] px-4 pt-4 pb-5">
+          <div className="space-y-5 border-t border-[var(--quiet-border)] px-4 pt-4 pb-5">
             {children}
           </div>
         </div>

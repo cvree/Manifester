@@ -2,9 +2,19 @@
 
 /*
  * ─────────────────────────────────────────────────────────────
- *  Cosmic Garden Minimal
- *  An original palette: warm cream and moonlit lavender ground,
- *  dusty rose lead, sage support, soft gold accent, twilight depth.
+ *  Manifester — Cosmic Garden design system
+ *
+ *  Three surface levels, never one repeated pane of glass:
+ *
+ *    1. Canvas   the twilight garden itself. Nothing sits on it directly.
+ *    2. Panel    an elevated ritual surface. Opaque enough to read on,
+ *                a hairline luminous border, one real shadow.
+ *    3. Control  the sunken, interactive level inside a panel. No shadow,
+ *                no blur, tighter radius — it should feel pressed *into*
+ *                the panel rather than floating above it.
+ *
+ *  Palette: warm cream and moonlit lavender ground, dusty rose lead,
+ *  sage support, soft gold accent, twilight depth.
  * ─────────────────────────────────────────────────────────────
  */
 
@@ -13,78 +23,118 @@
 :root {
   color-scheme: light;
 
-  /* Ground */
-  --bg-0: #f7f1e8;
+  /* ── Canvas ── */
+  --bg-0: #f8f3ec;
   --bg-1: #efe9f3;
-  --bg-2: #e9e3ef;
+  --bg-2: #e7e1ee;
 
-  /* Surfaces */
-  --surface: rgb(255 253 249 / 0.74);
-  --surface-strong: rgb(255 253 249 / 0.92);
-  --surface-sunken: rgb(58 50 44 / 0.04);
-  --border: rgb(58 50 44 / 0.1);
-  --border-strong: rgb(58 50 44 / 0.18);
+  /* ── Level 2 — elevated ritual panel ── */
+  --panel: rgb(255 253 249 / 0.82);
+  --panel-solid: #fffdf9;
+  --panel-border: rgb(58 50 44 / 0.09);
+  --panel-highlight: rgb(255 255 255 / 0.85);
+  --panel-shadow:
+    0 1px 1px rgb(58 50 44 / 0.03), 0 10px 28px -16px rgb(58 50 44 / 0.22);
+  --panel-shadow-lift:
+    0 2px 4px rgb(58 50 44 / 0.05), 0 28px 60px -28px rgb(58 50 44 / 0.34);
 
-  /* Ink */
-  --ink: #3a322c;
-  --ink-muted: #6e6259;
-  --ink-faint: #9a8c81;
+  /* ── Level 2b — quiet grouping inside a panel ── */
+  --quiet: rgb(58 50 44 / 0.035);
+  --quiet-border: rgb(58 50 44 / 0.07);
 
-  /* Accents */
-  --rose: #c4818a;
-  --rose-deep: #a5636d;
-  --rose-soft: rgb(196 129 138 / 0.14);
-  --sage: #7f9d81;
-  --sage-soft: rgb(127 157 129 / 0.16);
-  --gold: #cfa45f;
-  --gold-soft: rgb(207 164 95 / 0.18);
+  /* ── Level 3 — interactive control ── */
+  --control: rgb(255 253 249 / 0.7);
+  --control-border: rgb(58 50 44 / 0.13);
+  --control-border-hover: rgb(58 50 44 / 0.22);
+  --control-sunken: rgb(58 50 44 / 0.05);
+
+  /* Legacy aliases, still referenced by a few utilities. */
+  --surface: var(--panel);
+  --surface-strong: rgb(255 253 249 / 0.94);
+  --surface-sunken: var(--control-sunken);
+  --border: var(--panel-border);
+  --border-strong: var(--control-border-hover);
+
+  /* ── Ink ── */
+  --ink: #2f2823;
+  --ink-muted: #5f544b;
+  --ink-faint: #8a7c71;
+
+  /* ── Accents ── */
+  --rose: #c07a84;
+  --rose-deep: #9d5a65;
+  --rose-soft: rgb(192 122 132 / 0.13);
+  --sage: #6f9073;
+  --sage-soft: rgb(111 144 115 / 0.14);
+  --gold: #c19850;
+  --gold-soft: rgb(193 152 80 / 0.16);
   --twilight: #2e3a59;
 
-  /* Effects */
-  --glow: rgb(196 129 138 / 0.3);
-  --shadow-card: 0 1px 2px rgb(58 50 44 / 0.04), 0 8px 24px -12px rgb(58 50 44 / 0.16);
-  --shadow-lift: 0 2px 6px rgb(58 50 44 / 0.06), 0 20px 48px -20px rgb(58 50 44 / 0.28);
-  --aurora-a: rgb(196 129 138 / 0.4);
-  --aurora-b: rgb(127 157 129 / 0.32);
-  --aurora-c: rgb(207 164 95 / 0.28);
-  --spark: rgb(46 58 89 / 0.5);
-  --noise-opacity: 0.035;
+  /* ── Effects ── */
+  --glow: rgb(192 122 132 / 0.34);
+  --shadow-card: var(--panel-shadow);
+  --shadow-lift: var(--panel-shadow-lift);
+  --aurora-a: rgb(192 122 132 / 0.34);
+  --aurora-b: rgb(111 144 115 / 0.26);
+  --aurora-c: rgb(193 152 80 / 0.24);
+  --moonlight: rgb(255 252 244 / 0.55);
+  --spark: rgb(46 58 89 / 0.45);
+  --pollen: rgb(193 152 80 / 0.6);
+  --noise-opacity: 0.03;
+  --scrim: rgb(46 40 35 / 0.32);
 }
 
 .dark {
   color-scheme: dark;
 
-  --bg-0: #171423;
-  --bg-1: #1d1a2c;
-  --bg-2: #221e33;
+  --bg-0: #14111f;
+  --bg-1: #1a1728;
+  --bg-2: #201c30;
 
-  --surface: rgb(247 241 232 / 0.055);
-  --surface-strong: rgb(247 241 232 / 0.09);
-  --surface-sunken: rgb(10 8 18 / 0.28);
-  --border: rgb(247 241 232 / 0.1);
-  --border-strong: rgb(247 241 232 / 0.2);
+  --panel: rgb(247 241 232 / 0.062);
+  --panel-solid: #221e33;
+  --panel-border: rgb(247 241 232 / 0.11);
+  --panel-highlight: rgb(255 255 255 / 0.16);
+  --panel-shadow: 0 1px 1px rgb(0 0 0 / 0.28), 0 12px 32px -18px rgb(0 0 0 / 0.68);
+  --panel-shadow-lift:
+    0 2px 6px rgb(0 0 0 / 0.4), 0 30px 64px -28px rgb(0 0 0 / 0.85);
 
-  --ink: #efe7dc;
-  --ink-muted: #b7adb9;
-  --ink-faint: #8b8296;
+  --quiet: rgb(10 8 18 / 0.26);
+  --quiet-border: rgb(247 241 232 / 0.07);
 
-  --rose: #dfa1a9;
-  --rose-deep: #efc0c5;
-  --rose-soft: rgb(223 161 169 / 0.16);
-  --sage: #a3c4a4;
-  --sage-soft: rgb(163 196 164 / 0.16);
-  --gold: #e3c489;
-  --gold-soft: rgb(227 196 137 / 0.18);
+  --control: rgb(247 241 232 / 0.05);
+  --control-border: rgb(247 241 232 / 0.14);
+  --control-border-hover: rgb(247 241 232 / 0.26);
+  --control-sunken: rgb(10 8 18 / 0.3);
+
+  --surface: var(--panel);
+  --surface-strong: rgb(247 241 232 / 0.1);
+  --surface-sunken: var(--control-sunken);
+  --border: var(--panel-border);
+  --border-strong: var(--control-border-hover);
+
+  --ink: #f3ece2;
+  --ink-muted: #c2b8c3;
+  --ink-faint: #9a90a3;
+
+  --rose: #e5aab1;
+  --rose-deep: #f2c8cc;
+  --rose-soft: rgb(229 170 177 / 0.15);
+  --sage: #a9c9aa;
+  --sage-soft: rgb(169 201 170 / 0.15);
+  --gold: #e7cb94;
+  --gold-soft: rgb(231 203 148 / 0.16);
   --twilight: #b7c3e6;
 
-  --glow: rgb(223 161 169 / 0.34);
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
-  --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.35), 0 20px 48px -20px rgb(0 0 0 / 0.7);
-  --aurora-a: rgb(223 161 169 / 0.3);
-  --aurora-b: rgb(120 150 122 / 0.28);
-  --aurora-c: rgb(227 196 137 / 0.2);
-  --spark: rgb(239 231 220 / 0.6);
-  --noise-opacity: 0.05;
+  --glow: rgb(229 170 177 / 0.36);
+  --aurora-a: rgb(229 170 177 / 0.26);
+  --aurora-b: rgb(120 150 122 / 0.26);
+  --aurora-c: rgb(231 203 148 / 0.17);
+  --moonlight: rgb(214 222 255 / 0.16);
+  --spark: rgb(243 236 226 / 0.55);
+  --pollen: rgb(231 203 148 / 0.62);
+  --noise-opacity: 0.045;
+  --scrim: rgb(8 6 14 / 0.58);
 }
 
 @theme inline {
@@ -92,6 +142,10 @@
   --color-bg-1: var(--bg-1);
   --color-bg-2: var(--bg-2);
 
+  --color-panel: var(--panel);
+  --color-panel-solid: var(--panel-solid);
+  --color-quiet: var(--quiet);
+  --color-control: var(--control);
   --color-surface: var(--surface);
   --color-surface-strong: var(--surface-strong);
   --color-surface-sunken: var(--surface-sunken);
@@ -111,18 +165,32 @@
   --color-gold-soft: var(--gold-soft);
   --color-twilight: var(--twilight);
 
+  /*
+   * ui-serif first so iOS and macOS get New York, which is warmer and more
+   * modern than anything else installed by default. Iowan and Palatino are
+   * the next best things on other systems; Georgia is the floor.
+   */
+  --font-display:
+    ui-serif, 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua',
+    Georgia, 'Times New Roman', serif;
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
     Arial, sans-serif;
-  --font-display: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif;
 
+  /* 8-point spacing rhythm, named so layouts read as intent. */
+  --spacing-gutter: 1.5rem;
+  --spacing-section: 2rem;
+
+  --radius-panel: 1.75rem;
   --radius-card: 1.5rem;
+  --radius-control: 1rem;
   --radius-pill: 999px;
 
-  --shadow-card: var(--shadow-card);
-  --shadow-lift: var(--shadow-lift);
+  --shadow-card: var(--panel-shadow);
+  --shadow-lift: var(--panel-shadow-lift);
 
   --ease-calm: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-breath: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Base ───────────────────────────────────────────────────── */
@@ -150,13 +218,17 @@
     overscroll-behavior-y: none;
   }
 
+  body[data-scroll-locked] {
+    overflow: hidden;
+  }
+
   h1,
   h2,
   h3 {
     font-family: var(--font-display);
     font-weight: 400;
-    letter-spacing: -0.015em;
-    line-height: 1.18;
+    letter-spacing: -0.018em;
+    line-height: 1.14;
     text-wrap: balance;
   }
 
@@ -175,7 +247,7 @@
   :focus-visible {
     outline: 2px solid var(--rose-deep);
     outline-offset: 3px;
-    border-radius: 6px;
+    border-radius: 8px;
   }
 
   ::selection {
@@ -183,23 +255,149 @@
   }
 }
 
-/* ── Component-level primitives ─────────────────────────────── */
+/* ── Type scale ─────────────────────────────────────────────── */
+
+/*
+ * One place for every size decision. Emotional headings take the serif;
+ * everything you operate takes the sans. Instructions are never rendered in
+ * a faint grey — `--ink-muted` is the quietest a full sentence is allowed
+ * to get, and it clears 4.5:1 on both themes.
+ */
 
 @layer components {
-  .surface-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-    backdrop-filter: blur(14px) saturate(1.25);
-    -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  .type-display {
+    font-family: var(--font-display);
+    font-size: clamp(2.1rem, 1.6rem + 2vw, 3rem);
+    line-height: 1.06;
+    letter-spacing: -0.024em;
+    color: var(--ink);
   }
 
+  .type-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 1.35rem + 1vw, 2.1rem);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+
+  .type-heading {
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    line-height: 1.22;
+    letter-spacing: -0.014em;
+    color: var(--ink);
+  }
+
+  .type-subheading {
+    font-size: 1.0625rem;
+    font-weight: 550;
+    line-height: 1.35;
+    letter-spacing: -0.004em;
+    color: var(--ink);
+  }
+
+  .type-body {
+    font-size: 1rem;
+    line-height: 1.65;
+    color: var(--ink-muted);
+    max-width: 62ch;
+  }
+
+  .type-meta {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--ink-muted);
+  }
+
+  .type-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+  }
+
+  .type-numeral {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ── Surfaces ───────────────────────────────────────────────── */
+
+@layer components {
+  /*
+   * Level 2. The luminous top edge is a 1px inset highlight rather than a
+   * gradient border, so it survives on any background and costs nothing.
+   */
+  .surface-panel {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-panel);
+    box-shadow:
+      inset 0 1px 0 var(--panel-highlight),
+      var(--panel-shadow);
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  }
+
+  /* The one screen-defining surface per route: bigger, deeper, warmer. */
+  .surface-stage {
+    position: relative;
+    background:
+      radial-gradient(
+        120% 90% at 50% -20%,
+        color-mix(in oklab, var(--rose) 9%, transparent) 0%,
+        transparent 60%
+      ),
+      var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: calc(var(--radius-panel) + 0.5rem);
+    box-shadow:
+      inset 0 1px 0 var(--panel-highlight),
+      var(--panel-shadow-lift);
+    backdrop-filter: blur(20px) saturate(1.35);
+    -webkit-backdrop-filter: blur(20px) saturate(1.35);
+  }
+
+  /* Level 2b. Groups things inside a panel without adding another shadow. */
+  .surface-quiet {
+    background: var(--quiet);
+    border: 1px solid var(--quiet-border);
+    border-radius: var(--radius-card);
+  }
+
+  /* Level 3. Deliberately opaque — not every element gets to be glass. */
+  .surface-control {
+    background: var(--control-sunken);
+    border: 1px solid var(--control-border);
+    border-radius: var(--radius-control);
+  }
+
+  /* Sheets and toasts: the most opaque thing in the app, since they float. */
   .surface-sheet {
-    background: var(--surface-strong);
-    border: 1px solid var(--border);
-    backdrop-filter: blur(24px) saturate(1.3);
-    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    background: color-mix(in srgb, var(--panel-solid) 88%, transparent);
+    border: 1px solid var(--panel-border);
+    box-shadow:
+      inset 0 1px 0 var(--panel-highlight),
+      var(--panel-shadow-lift);
+    backdrop-filter: blur(28px) saturate(1.4);
+    -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  }
+
+  /* Kept so older markup keeps rendering while the redesign lands. */
+  .surface-card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-panel);
+    box-shadow:
+      inset 0 1px 0 var(--panel-highlight),
+      var(--panel-shadow);
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
   }
 
   /* Grain: one static SVG turbulence layer, composited once. */
@@ -211,6 +409,47 @@
     opacity: var(--noise-opacity);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
     mix-blend-mode: overlay;
+  }
+}
+
+/* ── Interactive states ─────────────────────────────────────── */
+
+@layer components {
+  /*
+   * Every tappable row in the app shares these states so pressed, selected
+   * and disabled always mean the same thing. Touch targets are never under
+   * 44px; `min-height` is set on the classes that use this.
+   */
+  .interactive {
+    transition:
+      background-color 200ms var(--ease-calm),
+      border-color 200ms var(--ease-calm),
+      color 200ms var(--ease-calm),
+      transform 160ms var(--ease-calm),
+      box-shadow 200ms var(--ease-calm);
+  }
+
+  .interactive:active:not(:disabled) {
+    transform: scale(0.985);
+  }
+
+  .interactive:disabled,
+  .interactive[aria-disabled='true'] {
+    cursor: not-allowed;
+    opacity: 0.45;
+    box-shadow: none;
+  }
+
+  @media (hover: hover) {
+    .interactive:hover:not(:disabled) {
+      border-color: var(--control-border-hover);
+    }
+  }
+
+  /* A selected choice reads by border, tint *and* a mark — never colour alone. */
+  .is-selected {
+    border-color: var(--rose);
+    background: var(--rose-soft);
   }
 }
 
@@ -242,7 +481,7 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: shimmer-sweep 7s var(--ease-calm) infinite;
+  animation: shimmer-sweep 9s var(--ease-calm) infinite;
 }
 
 @keyframes shimmer-sweep {
@@ -252,18 +491,6 @@
   }
   55% {
     background-position: -30% 0;
-  }
-}
-
-@keyframes breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.55;
-  }
-  50% {
-    transform: scale(1.14);
-    opacity: 0;
   }
 }
 
@@ -291,95 +518,257 @@
   }
 }
 
-.animate-breathe {
-  animation: breathe 4.2s var(--ease-calm) infinite;
-}
-
 .animate-drift {
-  animation: drift 34s ease-in-out infinite;
+  animation: drift 42s ease-in-out infinite;
 }
 
-/* ── Breathing guide ────────────────────────────────────────── */
+/* ── Sheets ─────────────────────────────────────────────────── */
+
+@keyframes sheet-in-mobile {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sheet-in-desktop {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-scrim-in {
+  animation: scrim-in 240ms var(--ease-calm) both;
+}
+
+.animate-sheet-in {
+  animation: sheet-in-mobile 340ms var(--ease-calm) both;
+}
+
+@media (min-width: 768px) {
+  .animate-sheet-in {
+    animation-name: sheet-in-desktop;
+    animation-duration: 260ms;
+  }
+}
+
+/* ── Breathing visualiser ───────────────────────────────────── */
 
 /*
- * Every layer scales from one custom property that the breathing hook writes
- * each frame. Only transform and opacity change, so this composites on the GPU
- * and stays smooth on a phone.
+ * Every layer is driven by two custom properties the breathing hook writes
+ * each frame: `--e` (0 → 1 expansion) and `--p` (0 → 1 through the current
+ * phase). Only transform, opacity and one stroke-dashoffset change, so the
+ * whole thing composites on the GPU and never touches layout or React.
  */
-.breath-stage {
+.breath {
   --e: 0;
+  --p: 0;
+  --size: 15rem;
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  display: grid;
+  place-items: center;
+  isolation: isolate;
 }
 
-.breath-stage > * {
-  position: absolute;
+.breath > * {
+  grid-area: 1 / 1;
   will-change: transform, opacity;
 }
 
+/* 1 — moonlit halo, the outermost bloom of light. */
+/*
+ * Sized under 100% and capped at scale 1, so the outermost layer plus its
+ * blur still land inside the visualiser's own box. Anything that escapes it
+ * shows up as stray overflow in whatever panel the orb is sitting in.
+ */
 .breath-halo {
-  width: 15rem;
-  height: 15rem;
+  width: 94%;
+  height: 94%;
   border-radius: 999px;
   background: radial-gradient(
-    circle,
+    circle at 50% 46%,
     var(--glow) 0%,
-    color-mix(in oklab, var(--gold) 22%, transparent) 42%,
+    color-mix(in oklab, var(--gold) 18%, transparent) 38%,
     transparent 68%
   );
-  transform: scale(calc(0.55 + var(--e) * 0.45));
-  opacity: calc(0.3 + var(--e) * 0.5);
+  transform: scale(calc(0.68 + var(--e) * 0.32));
+  opacity: calc(0.34 + var(--e) * 0.46);
+  filter: blur(2px);
 }
 
+/* 2 — six petals opening from a seed. The signature form. */
+.breath-petal {
+  /*
+   * Narrow enough that six of them read as petals rather than merging into
+   * one disc, and long enough to reach past the core when the breath opens.
+   */
+  width: calc(var(--size) * 0.34);
+  height: calc(var(--size) * 0.5);
+  border-radius: 50% 50% 46% 46% / 62% 62% 38% 38%;
+  /*
+   * A radial fill rather than a linear one: it fades out on every edge, so
+   * six overlapping petals read as soft light instead of stacked triangles,
+   * and it costs nothing next to a blur filter running each frame.
+   */
+  background: radial-gradient(
+    54% 40% at 50% 40%,
+    color-mix(in oklab, var(--rose) 72%, transparent) 0%,
+    color-mix(in oklab, var(--rose) 40%, transparent) 52%,
+    color-mix(in oklab, var(--rose) 10%, transparent) 80%,
+    transparent 96%
+  );
+  /*
+   * Rotate about the petal's own centre — which sits on the orb's centre —
+   * then push it outward along its new axis. Anything else makes the six
+   * petals bunch to one side instead of opening evenly.
+   */
+  transform: rotate(var(--angle))
+    translateY(calc(var(--size) * -0.12 - var(--e) * var(--size) * 0.08))
+    scale(calc(0.68 + var(--e) * 0.32));
+  opacity: calc(0.32 + var(--e) * 0.42);
+}
+
+/*
+ * Screen blending only works over the dark ground. On the cream theme it
+ * washes the petals out completely, so there they stay as plain soft shapes.
+ */
+.dark .breath-petal {
+  mix-blend-mode: screen;
+}
+
+/* 3 — the two guide rings. */
 .breath-ring {
   border-radius: 999px;
   border: 1px solid var(--rose);
 }
 
 .breath-ring--outer {
-  width: 12.5rem;
-  height: 12.5rem;
-  transform: scale(calc(0.6 + var(--e) * 0.4));
-  opacity: calc(0.18 + var(--e) * 0.4);
+  width: calc(var(--size) * 0.84);
+  height: calc(var(--size) * 0.84);
+  transform: scale(calc(0.66 + var(--e) * 0.34));
+  opacity: calc(0.16 + var(--e) * 0.34);
 }
 
 .breath-ring--inner {
-  width: 9.75rem;
-  height: 9.75rem;
+  width: calc(var(--size) * 0.63);
+  height: calc(var(--size) * 0.63);
   border-color: var(--gold);
-  transform: scale(calc(0.66 + var(--e) * 0.34));
-  opacity: calc(0.22 + var(--e) * 0.45);
+  transform: scale(calc(0.72 + var(--e) * 0.28));
+  opacity: calc(0.2 + var(--e) * 0.4);
 }
 
-/* Seed lights ride outward on the breath, each on its own spoke. */
+/* 4 — seed lights riding outward, each on its own spoke. */
 .breath-seed {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 999px;
   background: var(--sage);
   transform: rotate(var(--angle))
-    translateY(calc(-3.6rem - var(--e) * 2.9rem))
-    rotate(calc(-1 * var(--angle)))
-    scale(calc(0.7 + var(--e) * 0.6));
-  opacity: calc(0.25 + var(--e) * 0.6);
+    translateY(calc(var(--size) * -0.26 - var(--e) * var(--size) * 0.19))
+    rotate(calc(-1 * var(--angle))) scale(calc(0.6 + var(--e) * 0.7));
+  opacity: calc(0.22 + var(--e) * 0.55);
+  box-shadow: 0 0 8px 1px color-mix(in oklab, var(--sage) 45%, transparent);
 }
 
+/* 5 — the core, lit from within and slightly above. */
 .breath-core {
-  width: 8.5rem;
-  height: 8.5rem;
+  width: calc(var(--size) * 0.4);
+  height: calc(var(--size) * 0.4);
   border-radius: 999px;
-  background: radial-gradient(
-    circle at 50% 42%,
-    color-mix(in oklab, var(--rose) 40%, transparent) 0%,
-    color-mix(in oklab, var(--rose) 14%, transparent) 55%,
-    transparent 72%
-  );
-  transform: scale(calc(0.62 + var(--e) * 0.38));
-  opacity: calc(0.4 + var(--e) * 0.6);
+  background:
+    radial-gradient(
+      circle at 40% 32%,
+      color-mix(in oklab, var(--moonlight) 95%, transparent) 0%,
+      transparent 44%
+    ),
+    radial-gradient(
+      circle at 50% 56%,
+      color-mix(in oklab, var(--rose) 74%, transparent) 0%,
+      color-mix(in oklab, var(--rose) 34%, transparent) 56%,
+      color-mix(in oklab, var(--rose) 8%, transparent) 78%,
+      transparent 92%
+    );
+  box-shadow:
+    inset 0 1px 3px color-mix(in oklab, var(--moonlight) 70%, transparent),
+    inset 0 -8px 20px -10px color-mix(in oklab, var(--rose-deep) 45%, transparent),
+    0 0 40px -8px var(--glow);
+  transform: scale(calc(0.6 + var(--e) * 0.4));
+  opacity: calc(0.65 + var(--e) * 0.35);
+}
+
+/* 6 — the phase progress ring, drawn once and offset per frame. */
+.breath-progress {
+  width: calc(var(--size) * 0.93);
+  height: calc(var(--size) * 0.93);
+  transform: rotate(-90deg);
+}
+
+.breath-progress__track {
+  fill: none;
+  stroke: var(--control-border);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
+/*
+ * Deliberately thin and half-transparent: this ring reports progress, it does
+ * not compete with the orb for attention.
+ */
+.breath-progress__value {
+  fill: none;
+  stroke: var(--rose);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  /* r = 48 in the 100-unit viewBox, so the circumference is 2πr. */
+  stroke-dasharray: 301.6;
+  stroke-dashoffset: calc(301.6 * (1 - var(--p)));
+  opacity: 0.55;
+}
+
+/* The one-shot bloom when a session begins. */
+@keyframes breath-awaken {
+  0% {
+    transform: scale(0.94);
+    opacity: 0.3;
+  }
+  55% {
+    transform: scale(1.035);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.breath--awaken {
+  animation: breath-awaken 1400ms var(--ease-calm) both;
 }
 
 @keyframes phase-in {
   from {
     opacity: 0;
-    transform: translate3d(0, 4px, 0);
+    transform: translate3d(0, 5px, 0);
   }
   to {
     opacity: 1;
@@ -388,29 +777,29 @@
 }
 
 .animate-phase-in {
-  animation: phase-in 420ms var(--ease-calm) both;
+  animation: phase-in 480ms var(--ease-calm) both;
 }
 
-/* With reduced motion the orb holds still and the words do the guiding. */
+/*
+ * With reduced motion the guide holds a comfortable half-open pose and the
+ * words plus the countdown do all the guiding.
+ */
 @media (prefers-reduced-motion: reduce) {
-  .breath-stage > * {
-    transition: none !important;
+  .breath {
+    --e: 0.55;
+  }
+
+  .breath > * {
     will-change: auto;
   }
 
-  .breath-halo,
-  .breath-ring,
-  .breath-seed,
-  .breath-core {
-    transform: none;
-  }
-
-  .breath-seed {
-    transform: rotate(var(--angle)) translateY(-5rem) rotate(calc(-1 * var(--angle)));
+  .breath--awaken {
+    animation: none;
   }
 }
 
-/* Range inputs: large, obvious, thumb-friendly on touch. */
+/* ── Range inputs ───────────────────────────────────────────── */
+
 .range-input {
   -webkit-appearance: none;
   appearance: none;
@@ -428,10 +817,10 @@
     to right,
     var(--rose) 0%,
     var(--rose) var(--fill, 50%),
-    var(--surface-sunken) var(--fill, 50%),
-    var(--surface-sunken) 100%
+    var(--control-sunken) var(--fill, 50%),
+    var(--control-sunken) 100%
   );
-  border: 1px solid var(--border);
+  border: 1px solid var(--control-border);
 }
 
 .range-input::-moz-range-track {
@@ -441,10 +830,10 @@
     to right,
     var(--rose) 0%,
     var(--rose) var(--fill, 50%),
-    var(--surface-sunken) var(--fill, 50%),
-    var(--surface-sunken) 100%
+    var(--control-sunken) var(--fill, 50%),
+    var(--control-sunken) 100%
   );
-  border: 1px solid var(--border);
+  border: 1px solid var(--control-border);
 }
 
 .range-input::-webkit-slider-thumb {
@@ -454,7 +843,7 @@
   height: 26px;
   margin-top: -10px;
   border-radius: 999px;
-  background: var(--bg-0);
+  background: var(--panel-solid);
   border: 2px solid var(--rose-deep);
   box-shadow: 0 2px 8px rgb(58 50 44 / 0.22);
   transition: transform 160ms var(--ease-calm);
@@ -464,7 +853,7 @@
   width: 26px;
   height: 26px;
   border-radius: 999px;
-  background: var(--bg-0);
+  background: var(--panel-solid);
   border: 2px solid var(--rose-deep);
   box-shadow: 0 2px 8px rgb(58 50 44 / 0.22);
 }
@@ -473,7 +862,7 @@
   transform: scale(1.14);
 }
 
-/* Hide scrollbar on the horizontal tab strip without losing scroll. */
+/* Hide scrollbar on horizontal strips without losing the scroll. */
 .no-scrollbar {
   scrollbar-width: none;
 }
