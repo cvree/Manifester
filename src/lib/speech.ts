@@ -232,6 +232,10 @@ export class SpeechLooper {
   private stallTimer: number | null = null
   private keepAlive: number | null = null
   private running = false
+  /** When the current inter-repeat silence is due to end. */
+  private gapEndsAt = 0
+  /** Milliseconds of silence still owed, when paused during that gap. */
+  private pausedGapMs: number | null = null
 
   get isRunning(): boolean {
     return this.running
@@ -281,6 +285,13 @@ export class SpeechLooper {
 
   pause(): void {
     if (!this.running || !isSpeechSupported()) return
+
+    // Pausing during the silence between repetitions has to remember how much
+    // of that silence is left, or the loop would never start again.
+    if (this.pauseTimer != null) {
+      this.pausedGapMs = Math.max(0, this.gapEndsAt - Date.now())
+    }
+
     this.clearTimer('pauseTimer')
     this.clearTimer('stallTimer')
     window.speechSynthesis.pause()
@@ -288,7 +299,19 @@ export class SpeechLooper {
 
   resume(): void {
     if (!this.running || !isSpeechSupported()) return
-    window.speechSynthesis.resume()
+
+    const synth = window.speechSynthesis
+    synth.resume()
+
+    if (this.pausedGapMs != null) {
+      // Nothing was mid-utterance, so restart the queue after the remaining gap.
+      const remaining = this.pausedGapMs
+      this.pausedGapMs = null
+      const generation = this.generation
+      this.startGap(generation, remaining)
+      return
+    }
+
     this.armStallWatchdog(this.generation)
   }
 
@@ -296,6 +319,8 @@ export class SpeechLooper {
     this.generation += 1
     this.running = false
     this.pending.clear()
+    this.gapEndsAt = 0
+    this.pausedGapMs = null
     this.clearTimer('pauseTimer')
     this.clearTimer('stallTimer')
     this.stopKeepAlive()
@@ -388,10 +413,18 @@ export class SpeechLooper {
     }
 
     this.index = 0
+    this.startGap(generation, Math.max(0, this.options.repeatPauseMs))
+  }
+
+  /** Hold the silence between repetitions, then begin again. */
+  private startGap(generation: number, durationMs: number): void {
+    this.clearTimer('pauseTimer')
+    this.gapEndsAt = Date.now() + durationMs
     this.pauseTimer = window.setTimeout(() => {
       this.pauseTimer = null
+      this.gapEndsAt = 0
       this.speakCurrent(generation)
-    }, Math.max(0, this.options.repeatPauseMs))
+    }, durationMs)
   }
 
   /**

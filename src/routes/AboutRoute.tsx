@@ -58,11 +58,33 @@ export function AboutRoute() {
         </p>
       </Card>
 
+      <Card data-rise title="Getting the best voice">
+        <p className="text-[0.95rem] leading-relaxed text-ink-muted">
+          Manifester automatically picks the nicest voice your device has, and
+          labels how good it is. If that label says <em className="not-italic text-ink">Basic</em>,
+          your device is falling back to an old robotic synthesiser — and there is
+          a free fix.
+        </p>
+        <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-muted">
+          On iPhone: <strong className="text-ink">Settings → Accessibility → Spoken
+          Content → Voices → English</strong>, then download one marked{' '}
+          <strong className="text-ink">Premium</strong>. Ava, Zoe, Evan and Nathan
+          are all excellent. They are Apple's neural voices, they run on the
+          phone's own hardware, and they cost nothing. Open Manifester again
+          afterwards and it will find them by itself.
+        </p>
+        <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-muted">
+          The Create screen has the same instructions for Android, Windows and Mac,
+          tucked under the voice picker.
+        </p>
+      </Card>
+
       <Card data-rise title="What browsers can and cannot do">
         <ul className="space-y-3 text-[0.95rem] leading-relaxed text-ink-muted">
           <Bullet>
             The list of voices comes from your device. iPhone, Android, Windows and
-            Mac all offer different ones, and Manifester cannot add to that list.
+            Mac all offer different ones, and Manifester cannot add to that list —
+            though it can tell you where to download better ones.
           </Bullet>
           <Bullet>
             Some voices ignore the pitch and volume settings. On iOS in particular,

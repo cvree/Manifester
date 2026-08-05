@@ -1,8 +1,8 @@
 /**
  * The playback session: what is being spoken, over what, and for how long.
  *
- * This provider owns the three engines (voice, music, timer), the draft the
- * Create tab edits, and the live state the Player tab renders.
+ * This provider owns the engines (voice, music, timer), the draft the Create
+ * tab edits, and the live state the Player tab renders.
  */
 
 import {
@@ -16,14 +16,9 @@ import {
   type ReactNode,
 } from 'react'
 import { MusicEngine, type TrackSource } from '../lib/audio'
-import { loopToDraft, type Draft } from '../lib/loops'
-import {
-  SpeechLooper,
-  isSpeechSupported,
-  loadVoices,
-  toVoiceOption,
-  type VoiceOption,
-} from '../lib/speech'
+import { AudioBus } from '../lib/audioBus'
+import { loopToDraft, normaliseSettings, type Draft } from '../lib/loops'
+import { SpeechLooper, isSpeechSupported, loadVoices } from '../lib/speech'
 import * as storage from '../lib/storage'
 import { SessionTimer } from '../lib/timer'
 import {
@@ -32,6 +27,11 @@ import {
   type SavedLoop,
   type SessionStatus,
 } from '../lib/types'
+import {
+  pickBestVoice,
+  rankVoices,
+  type RankedVoice,
+} from '../lib/voiceRanking'
 
 interface SessionSnapshot {
   status: SessionStatus
@@ -53,9 +53,16 @@ interface SessionContextValue {
   loadIntoDraft: (loop: SavedLoop) => void
   resetDraft: () => void
 
-  voices: VoiceOption[]
+  /** Every device voice, best first. */
+  voices: RankedVoice[]
   voicesReady: boolean
   speechSupported: boolean
+  /** The voice that the current style setting resolves to. */
+  resolvedDeviceVoice: RankedVoice | null
+
+  /** Speak a short sample with whatever voice the settings resolve to. */
+  previewVoice: (style?: 'feminine' | 'masculine') => void
+  previewState: 'idle' | 'loading' | 'playing'
 
   session: SessionSnapshot
   start: (source?: SavedLoop) => void
@@ -95,10 +102,13 @@ function newDraft(): Draft {
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<Draft>(newDraft)
-  const [voices, setVoices] = useState<VoiceOption[]>([])
+  const [voices, setVoices] = useState<RankedVoice[]>([])
   const [voicesReady, setVoicesReady] = useState(false)
   const [session, setSession] = useState<SessionSnapshot>(EMPTY_SESSION)
+  const [previewState, setPreviewState] =
+    useState<SessionContextValue['previewState']>('idle')
 
+  const busRef = useRef<AudioBus | null>(null)
   const speechRef = useRef<SpeechLooper | null>(null)
   const musicRef = useRef<MusicEngine | null>(null)
   const timerRef = useRef<SessionTimer | null>(null)
@@ -107,10 +117,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     interval: null,
   })
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
+
   const speechSupported = useMemo(isSpeechSupported, [])
 
+  if (!busRef.current) busRef.current = new AudioBus()
   if (!speechRef.current) speechRef.current = new SpeechLooper()
-  if (!musicRef.current) musicRef.current = new MusicEngine()
+  if (!musicRef.current) musicRef.current = new MusicEngine(busRef.current)
   if (!timerRef.current) timerRef.current = new SessionTimer()
 
   /* ── Voices ── */
@@ -122,7 +134,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const list = await loadVoices()
       if (cancelled) return
       speechRef.current?.setVoices(list)
-      setVoices(list.map(toVoiceOption))
+      setVoices(rankVoices(list))
       setVoicesReady(true)
     }
 
@@ -139,6 +151,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /** The device voice this style setting actually lands on. */
+  const resolvedDeviceVoice = useMemo(() => {
+    if (draft.settings.voiceURI) {
+      const chosen = voices.find(
+        (voice) => voice.voiceURI === draft.settings.voiceURI,
+      )
+      if (chosen) return chosen
+    }
+    return pickBestVoice(voices, draft.settings.voiceStyle)
+  }, [voices, draft.settings.voiceURI, draft.settings.voiceStyle])
+
   /* ── Restore last-used settings ── */
 
   useEffect(() => {
@@ -147,11 +170,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (cancelled || !saved) return
       setDraft((current) => ({
         ...current,
-        settings: {
-          ...current.settings,
-          ...saved,
-          sound: { ...current.settings.sound, ...saved.sound },
-        },
+        settings: normaliseSettings({ ...current.settings, ...saved }),
       }))
     })
     return () => {
@@ -188,6 +207,44 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   )
 
   const resetDraft = useCallback(() => setDraft(newDraft()), [])
+
+  /* ── Voice preview ── */
+
+  const previewVoice = useCallback(
+    (style?: 'feminine' | 'masculine') => {
+      const settings = draft.settings
+      const wantedStyle = style ?? settings.voiceStyle
+
+      if (!isSpeechSupported()) return
+      window.speechSynthesis.cancel()
+
+      const synth = window.speechSynthesis
+      const utterance = new SpeechSynthesisUtterance(
+        'This is how your words will sound.',
+      )
+      const target =
+        (settings.voiceURI && !style
+          ? voices.find((item) => item.voiceURI === settings.voiceURI)
+          : null) ?? pickBestVoice(voices, wantedStyle)
+
+      const match = target
+        ? synth.getVoices().find((item) => item.voiceURI === target.voiceURI)
+        : undefined
+      if (match) {
+        utterance.voice = match
+        utterance.lang = match.lang
+      }
+      utterance.rate = settings.rate
+      utterance.pitch = settings.pitch
+      utterance.volume = settings.voiceVolume
+      utterance.onend = () => setPreviewState('idle')
+      utterance.onerror = () => setPreviewState('idle')
+
+      setPreviewState('playing')
+      synth.speak(utterance)
+    },
+    [draft.settings, voices],
+  )
 
   /* ── Screen wake lock: speech stops when a phone sleeps ── */
 
@@ -258,24 +315,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const start = useCallback(
     (source?: SavedLoop) => {
+      const bus = busRef.current
       const music = musicRef.current
       const speech = speechRef.current
       const timer = timerRef.current
-      if (!music || !speech || !timer) return
+      if (!bus || !music || !speech || !timer) return
 
       const settings: LoopSettings = source
-        ? { ...source, sound: { ...source.sound } }
+        ? normaliseSettings(source)
         : draft.settings
       const text = source ? source.text : draft.text
       const title = (source ? source.title : draft.title).trim() || 'Untitled loop'
 
       // Reach for audio permission while we are still inside the tap.
+      bus.ensure()
       music.unlock()
 
       const started = speech.start(
         {
           text,
-          voiceURI: settings.voiceURI,
+          voiceURI:
+            settings.voiceURI ??
+            pickBestVoice(voices, settings.voiceStyle)?.voiceURI ??
+            null,
           rate: settings.rate,
           pitch: settings.pitch,
           volume: settings.voiceVolume,
@@ -302,7 +364,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         remainingSeconds:
           settings.timerMinutes != null ? settings.timerMinutes * 60 : null,
       })
-
       startElapsed()
       void requestWakeLock()
 
@@ -329,12 +390,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         })
       }
     },
-    [draft, finish, requestWakeLock, startElapsed],
+    [draft, finish, requestWakeLock, startElapsed, voices],
   )
 
   const pause = useCallback(() => {
     speechRef.current?.pause()
     musicRef.current?.suspend()
+    busRef.current?.suspend()
     timerRef.current?.pause()
     stopElapsed()
     releaseWakeLock()
@@ -342,9 +404,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [releaseWakeLock, stopElapsed])
 
   const resume = useCallback(() => {
-    const music = musicRef.current
-    music?.unlock()
-    music?.resumePlayback()
+    busRef.current?.ensure()
+    musicRef.current?.unlock()
+    musicRef.current?.resumePlayback()
     speechRef.current?.resume()
     timerRef.current?.resume()
     setSession((current) => ({ ...current, status: 'playing' }))
@@ -402,10 +464,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const speech = speechRef.current
     const music = musicRef.current
     const timer = timerRef.current
+    const bus = busRef.current
     return () => {
       speech?.stop()
       music?.dispose()
       timer?.stop()
+      bus?.close()
       stopElapsed()
     }
   }, [stopElapsed])
@@ -420,6 +484,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       voices,
       voicesReady,
       speechSupported,
+      resolvedDeviceVoice,
+      previewVoice,
+      previewState,
       session,
       start,
       pause,
@@ -439,6 +506,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       voices,
       voicesReady,
       speechSupported,
+      resolvedDeviceVoice,
+      previewVoice,
+      previewState,
       session,
       start,
       pause,

@@ -18,6 +18,7 @@ import {
 import { SegmentedControl } from '../components/SegmentedControl'
 import { TextField } from '../components/TextArea'
 import { MusicEngine, type TrackSource } from '../lib/audio'
+import { AudioBus } from '../lib/audioBus'
 import { cx } from '../lib/cx'
 import { formatApproxDuration, formatBytes } from '../lib/format'
 import { estimateUsage, getCustomTrack } from '../lib/storage'
@@ -37,6 +38,8 @@ export function SoundsRoute() {
   const { draft, updateSettings } = useSession()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const previewRef = useRef<MusicEngine | null>(null)
+  // Auditioning a sound runs on its own bus so it never disturbs a live session.
+  const previewBusRef = useRef<AudioBus | null>(null)
 
   const [previewId, setPreviewId] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
@@ -47,11 +50,18 @@ export function SoundsRoute() {
 
   const { sound } = draft.settings
 
-  if (!previewRef.current) previewRef.current = new MusicEngine()
+  if (!previewBusRef.current) previewBusRef.current = new AudioBus()
+  if (!previewRef.current) {
+    previewRef.current = new MusicEngine(previewBusRef.current)
+  }
 
   useEffect(() => {
     const engine = previewRef.current
-    return () => engine?.dispose()
+    const bus = previewBusRef.current
+    return () => {
+      engine?.dispose()
+      bus?.close()
+    }
   }, [])
 
   useEffect(() => {

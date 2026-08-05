@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { Button } from '../components/Button'
 import { Card, FieldLabel } from '../components/Card'
 import { Disclosure } from '../components/Disclosure'
-import { CheckIcon, PlayIcon, SeedIcon } from '../components/Icons'
+import { CheckIcon, CloseIcon, PlayIcon, SeedIcon } from '../components/Icons'
 import { SoundSettings } from '../components/SoundSettings'
 import { TextArea, TextField } from '../components/TextArea'
 import { TimerSettings } from '../components/TimerSettings'
@@ -14,7 +14,6 @@ import {
   formatApproxDuration,
 } from '../lib/format'
 import { draftToLoop } from '../lib/loops'
-import { isSpeechSupported } from '../lib/speech'
 import { useLibrary } from '../state/LibraryProvider'
 import { useSession } from '../state/SessionProvider'
 
@@ -36,11 +35,15 @@ export function CreateRoute() {
     voices,
     voicesReady,
     speechSupported,
+    resolvedDeviceVoice,
+    previewVoice,
+    previewState,
+    session,
+    dismissNotice,
     start,
   } = useSession()
   const { allTracks, loops, saveLoop, storageError } = useLibrary()
   const [saved, setSaved] = useState(false)
-  const [previewing, setPreviewing] = useState(false)
 
   const words = countWords(draft.text)
   const perPass = formatApproxDuration(
@@ -49,9 +52,11 @@ export function CreateRoute() {
   const canStart = words > 0
 
   const voiceSummary = useMemo(() => {
-    const name = draft.settings.voiceName ?? 'System default voice'
-    return `${name} · ${draft.settings.rate.toFixed(2)}× speed`
-  }, [draft.settings.voiceName, draft.settings.rate])
+    const { voiceName, voiceStyle, rate } = draft.settings
+    const name =
+      voiceName ?? resolvedDeviceVoice?.name ?? `Best ${voiceStyle} voice`
+    return `${name} · ${rate.toFixed(2)}× speed`
+  }, [draft.settings, resolvedDeviceVoice])
 
   const soundSummary = useMemo(() => {
     const { sound } = draft.settings
@@ -78,29 +83,6 @@ export function CreateRoute() {
     setSaved(true)
     window.setTimeout(() => setSaved(false), 2200)
   }, [draft, loops, saveLoop, updateDraft])
-
-  const handlePreview = useCallback(() => {
-    if (!isSpeechSupported()) return
-    const synth = window.speechSynthesis
-    synth.cancel()
-    const utterance = new SpeechSynthesisUtterance(
-      'This is how your words will sound.',
-    )
-    const voice = synth
-      .getVoices()
-      .find((item) => item.voiceURI === draft.settings.voiceURI)
-    if (voice) {
-      utterance.voice = voice
-      utterance.lang = voice.lang
-    }
-    utterance.rate = draft.settings.rate
-    utterance.pitch = draft.settings.pitch
-    utterance.volume = draft.settings.voiceVolume
-    utterance.onend = () => setPreviewing(false)
-    utterance.onerror = () => setPreviewing(false)
-    setPreviewing(true)
-    synth.speak(utterance)
-  }, [draft.settings])
 
   const appendStarter = (phrase: string) => {
     const separator = draft.text.trim() ? '\n\n' : ''
@@ -137,6 +119,26 @@ export function CreateRoute() {
           className="rounded-2xl border border-[var(--border-strong)] bg-[var(--gold-soft)] px-4 py-3.5 text-[0.92rem] leading-relaxed text-ink"
         >
           {storageError}
+        </div>
+      )}
+
+      {session.notice && (
+        <div
+          role="alert"
+          data-rise
+          className="flex items-start gap-3 rounded-2xl border border-[var(--border-strong)] bg-[var(--gold-soft)] px-4 py-3.5"
+        >
+          <p className="grow text-[0.92rem] leading-relaxed text-ink">
+            {session.notice}
+          </p>
+          <button
+            type="button"
+            onClick={dismissNotice}
+            aria-label="Dismiss this message"
+            className="mt-0.5 shrink-0 text-ink-muted"
+          >
+            <CloseIcon />
+          </button>
         </div>
       )}
 
@@ -202,10 +204,11 @@ export function CreateRoute() {
           <VoiceSettings
             voices={voices}
             voicesReady={voicesReady}
+            resolvedDeviceVoice={resolvedDeviceVoice}
             settings={draft.settings}
             onChange={updateSettings}
-            onPreview={handlePreview}
-            previewing={previewing}
+            onPreview={previewVoice}
+            previewState={previewState}
           />
         </Disclosure>
 

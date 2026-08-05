@@ -31,6 +31,12 @@ export interface TrackMeta {
 
 /** Everything needed to recreate a listening session. */
 export interface LoopSettings {
+  /**
+   * The headline choice. Resolves to the best-ranked voice of that style that
+   * the device actually has.
+   */
+  voiceStyle: 'feminine' | 'masculine'
+  /** Manual override. When null, the ranked pick for `voiceStyle` wins. */
   voiceURI: string | null
   voiceName: string | null
   /** 0.5 – 1.6 */
@@ -68,6 +74,7 @@ export const DEFAULT_SOUND: SoundConfig = {
 }
 
 export const DEFAULT_SETTINGS: LoopSettings = {
+  voiceStyle: 'feminine',
   voiceURI: null,
   voiceName: null,
   rate: 0.9,

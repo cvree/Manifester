@@ -50,12 +50,20 @@ app.
 
 **Voice**
 
-- Uses your device's own speech engine through the Web Speech API — no cloud
-  service, no API key, no cost.
-- Pick any voice your device offers, filtered by likely feminine / masculine
-  style where the voice name makes that guessable.
+- Two headline choices — **feminine** and **masculine** — each showing the
+  actual voice it resolves to on this device.
+- Every voice the device offers is **scored by quality** and the best one wins
+  automatically. Modern neural voices (Microsoft *Natural*, Google, Apple
+  *Premium* / *Enhanced*) are ranked far above the legacy formant synths that
+  most devices default to, and each is labelled honestly: *Neural*, *Enhanced*,
+  *Standard*, or *Basic — robotic, worth avoiding*.
+- When the best available voice is a poor one, the app says so and shows the
+  exact settings path to download a free neural voice for that platform.
+- Uses the device's own speech engine through the Web Speech API — no cloud
+  service, no API key, no cost, nothing sent anywhere.
 - Speed, pitch, voice volume, and the length of the quiet pause between repeats.
 - A "Hear this voice" button so you can audition before you commit.
+- An advanced picker for choosing an exact voice, including other languages.
 
 **Player**
 
@@ -102,6 +110,54 @@ third-party audio of any kind**. Nothing was sampled, scraped, or borrowed.
 
 Any other sound you hear is audio you imported yourself. Please only import audio
 you have the right to use.
+
+---
+
+## Getting a genuinely good voice
+
+This matters more than any other setting, and it is free.
+
+Every platform ships modern neural voices that are **not installed by default**.
+The difference between them and the fallback synthesiser is not subtle — it is
+the difference between a person and a robot.
+
+| Platform | Where to get them |
+| --- | --- |
+| **iPhone / iPad** | Settings → Accessibility → Spoken Content → Voices → English → download one marked **Premium**. Ava, Zoe, Evan, Nathan are all excellent. |
+| **Android** | Settings → Accessibility → Text-to-speech output → **Google Speech Services** → install English voice data. |
+| **Windows** | Settings → Time & language → Language & region → English → Language options → add **Speech**. Windows 11's **Natural** voices are excellent. Chrome and Edge also offer Google/Microsoft online voices with no install. |
+| **Mac** | System Settings → Accessibility → Spoken Content → System Voice → Manage Voices → **Premium** or **Enhanced**. |
+
+Install one and reopen Manifester — it finds it and switches to it
+automatically. The same instructions live inside the app, under the voice
+picker.
+
+### Why not bundle a neural TTS model?
+
+It was built and measured, and then removed. Kokoro-82M (Apache-2.0) was run
+in-browser via ONNX Runtime in a worker: a ~90 MB one-time download, fully
+offline afterwards, and it did work — it produced genuinely lovely audio.
+
+The problem was speed. Measured on a 32-core desktop, **with cross-origin
+isolation enabled so ONNX Runtime could use threads**, synthesis ran at a real
+time factor of **≈3.3× — 3.3 seconds of compute per second of speech**, and the
+figure held steady across passage lengths:
+
+```
+chars=34   audio=2.6s   render=8.9s    rtf=3.47
+chars=127  audio=9.3s   render=30.4s   rtf=3.27
+chars=215  audio=14.5s  render=47.3s   rtf=3.26
+```
+
+A phone — the device this app is actually for — would be several times slower
+again. A ten-minute loop would take the better part of an hour to render before
+the first word. Cross-origin isolation also has to be faked through the service
+worker on GitHub Pages, which puts the whole app at risk of a COEP failure for a
+feature that would not have been usable anyway.
+
+Apple's Premium voices are also neural, are free, run on dedicated hardware, and
+keep speaking when the screen locks. Pointing people at those was simply the
+better engineering answer.
 
 ---
 
@@ -216,12 +272,14 @@ src/
   routes/         Create, Player, Saved, Sounds, About
   state/          Theme, Library (IndexedDB), Session (playback engines)
   lib/
-    speech.ts     chunking, voice loading, the looping speaker
-    audio.ts      background sound engine (synth + imported files)
-    ambient.ts    the two generated ambiences
-    storage.ts    IndexedDB + localStorage
-    timer.ts      wall-clock session countdown
-    motion.ts     reduced motion, low-power and platform detection
+    speech.ts       chunking, voice loading, the looping speaker
+    voiceRanking.ts scores device voices and picks the best of each style
+    audio.ts        background sound engine (synth + imported files)
+    audioBus.ts     owns the AudioContext and the sound channel
+    ambient.ts      the two generated ambiences
+    storage.ts      IndexedDB + localStorage
+    timer.ts        wall-clock session countdown
+    motion.ts       reduced motion, low-power and platform detection
   styles/
     theme.css     Cosmic Garden Minimal — the whole design system
 ```
@@ -252,10 +310,12 @@ These come from the browser, not from Manifester, and no amount of code makes
 them go away:
 
 - **The voice list is the device's.** iPhone, Android, Windows, and Mac each
-  offer a different set. Manifester cannot add voices to that list.
+  offer a different set. Manifester cannot add voices to that list — it can only
+  rank what is there and tell you where to download better ones.
 - **Style labels are a guess.** There is no gender field in the Web Speech API,
-  so feminine / masculine labels are inferred from voice names and marked
-  "likely".
+  so feminine / masculine labels are inferred from voice names. Quality tiers
+  are inferred the same way, from the naming conventions each platform uses for
+  its neural voices.
 - **Pitch and volume are sometimes ignored.** On iOS especially, speech usually
   follows the system media volume regardless of the in-app slider. The slider is
   wired to `SpeechSynthesisUtterance.volume`, which is all a web app is given.

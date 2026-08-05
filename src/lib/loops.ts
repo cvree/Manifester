@@ -1,5 +1,5 @@
 import { createId } from './format'
-import type { LoopSettings, SavedLoop } from './types'
+import { DEFAULT_SETTINGS, type LoopSettings, type SavedLoop } from './types'
 
 /** The in-progress loop the Create tab edits. */
 export interface Draft {
@@ -36,5 +36,17 @@ export function loopToDraft(loop: SavedLoop): Draft {
     lastPlayedAt: _lastPlayedAt,
     ...settings
   } = loop
-  return { id, title, text, settings: { ...settings, sound: { ...settings.sound } } }
+  return { id, title, text, settings: normaliseSettings(settings) }
+}
+
+/**
+ * Fill in anything a loop saved by an older version is missing, so adding a
+ * setting never breaks someone's existing library.
+ */
+export function normaliseSettings(settings: Partial<LoopSettings>): LoopSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...settings,
+    sound: { ...DEFAULT_SETTINGS.sound, ...settings.sound },
+  }
 }

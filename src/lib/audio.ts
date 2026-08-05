@@ -15,6 +15,7 @@
  */
 
 import { findAmbientPreset, type AmbientHandle } from './ambient'
+import type { AudioBus } from './audioBus'
 import type { RepeatMode } from './types'
 
 /** How long a generated ambience plays before a playlist moves on. */
@@ -41,8 +42,7 @@ export interface MusicEngineHandlers {
 }
 
 export class MusicEngine {
-  private ctx: AudioContext | null = null
-  private master: GainNode | null = null
+  private readonly bus: AudioBus
   private ambient: AmbientHandle | null = null
   private element: HTMLAudioElement | null = null
   private objectUrl: string | null = null
@@ -58,6 +58,10 @@ export class MusicEngine {
   private paused = false
   private handlers: MusicEngineHandlers = {}
 
+  constructor(bus: AudioBus) {
+    this.bus = bus
+  }
+
   get isActive(): boolean {
     return this.active
   }
@@ -71,7 +75,7 @@ export class MusicEngine {
    * the audio context and primes the media element so later playback is allowed.
    */
   unlock(): void {
-    this.ensureContext()
+    this.bus.ensure()
 
     if (!this.element) {
       const element = new Audio()
@@ -94,9 +98,7 @@ export class MusicEngine {
 
   setVolume(value: number): void {
     this.volume = Math.min(1, Math.max(0, value))
-    if (this.master && this.ctx) {
-      this.master.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.08)
-    }
+    this.bus.setMusicVolume(this.volume)
     // Only take over the element's volume when it is not mid-fade.
     if (this.element && this.fadeTimer == null && this.active) {
       this.element.volume = this.volume
@@ -123,13 +125,13 @@ export class MusicEngine {
   }
 
   /**
-   * Hold everything in place, keeping the current position. Used when the
-   * session is paused, so resuming picks up mid-track instead of restarting.
+   * Hold in place, keeping the current position, so resuming picks up
+   * mid-track instead of restarting. The shared context is suspended by the
+   * session, not here — the voice channel rides on it too.
    */
   suspend(): void {
     if (!this.active) return
     this.paused = true
-    if (this.ctx && this.ctx.state === 'running') void this.ctx.suspend()
     this.element?.pause()
   }
 
@@ -137,16 +139,14 @@ export class MusicEngine {
   resumePlayback(): void {
     if (!this.active) return
     this.paused = false
-    if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume()
     if (this.element?.src && !this.element.src.startsWith('data:')) {
       void this.element.play().catch(() => undefined)
     }
   }
 
-  /** Wake a context suspended by a lock screen or a backgrounded tab. */
+  /** Recover from a lock screen or a backgrounded tab. */
   resumeIfSuspended(): void {
     if (!this.active || this.paused) return
-    if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume()
     if (this.element?.paused && this.element.src) {
       void this.element.play().catch(() => undefined)
     }
@@ -159,37 +159,15 @@ export class MusicEngine {
     this.handlers.onTrackChange?.(null)
   }
 
-  /** Release every resource. Called when the app unmounts. */
+  /** Release this engine's resources. The shared bus outlives it. */
   dispose(): void {
     this.teardown(0)
     this.active = false
     this.paused = false
     this.element = null
-    if (this.ctx) {
-      void this.ctx.close().catch(() => undefined)
-      this.ctx = null
-      this.master = null
-    }
   }
 
   /* ── internals ── */
-
-  private ensureContext(): AudioContext | null {
-    if (typeof window === 'undefined') return null
-    if (!this.ctx) {
-      const Ctor =
-        window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext })
-          .webkitAudioContext
-      if (!Ctor) return null
-      this.ctx = new Ctor()
-      this.master = this.ctx.createGain()
-      this.master.gain.value = this.volume
-      this.master.connect(this.ctx.destination)
-    }
-    if (this.ctx.state === 'suspended') void this.ctx.resume()
-    return this.ctx
-  }
 
   private teardown(fadeMs: number): void {
     this.generation += 1
@@ -234,8 +212,9 @@ export class MusicEngine {
   }
 
   private playBuiltin(track: TrackSource, generation: number): void {
-    const ctx = this.ensureContext()
-    if (!ctx || !this.master) {
+    const ctx = this.bus.ensure()
+    const destination = this.bus.musicNode
+    if (!ctx || !destination) {
       this.handlers.onError?.(
         'This browser will not let the app generate sound. You can still import your own audio in Sounds.',
       )
@@ -248,8 +227,8 @@ export class MusicEngine {
       return
     }
 
-    this.master.gain.setTargetAtTime(this.volume, ctx.currentTime, 0.5)
-    this.ambient = preset.build(ctx, this.master)
+    this.bus.setMusicVolume(this.volume)
+    this.ambient = preset.build(ctx, destination)
 
     // A generated ambience never "ends", so a playlist needs a nudge.
     const loopsForever = this.queue.length === 1 || this.repeat === 'one'
