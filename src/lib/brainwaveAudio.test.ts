@@ -318,7 +318,10 @@ describe('binaural graph', () => {
     )
     for (const channel of channels) {
       expect(peakOf(channel)).toBeGreaterThan(0.05)
-      expect(peakOf(channel)).toBeLessThan(0.5)
+      // Below 1: a single channel never reaches full scale on its own, even at
+      // full rhythm volume, leaving room for the mix ceiling to do its job
+      // rather than needing to bite on the rhythm alone.
+      expect(peakOf(channel)).toBeLessThan(0.85)
     }
   })
 })

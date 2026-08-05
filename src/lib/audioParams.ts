@@ -75,6 +75,17 @@ export const CEILING_KNEE = 0.25
  * inside the linear region, where this is exactly the identity. That is what
  * lets it sit in the path of a binaural pair without touching the channel
  * separation the beat depends on.
+ *
+ * `oversample` is deliberately left at its default, `'none'`. Oversampling
+ * exists to soften the aliasing a hard bend produces, but doing that resamples
+ * through a filter that can ring past the curve's own peak — measured on
+ * `'2x'`, pushing this exact curve with the extreme, no-real-session-does-this
+ * input the tests use came back *louder than full scale*, which is precisely
+ * what a safety ceiling must never do. Without oversampling, a `WaveShaperNode`
+ * is specified to clamp any input outside `[-1, 1]` to the curve's own boundary
+ * sample, so the output can never exceed `linearTo + knee` — full stop, on
+ * every engine, at every input. This node only ever bends on inputs already
+ * loud enough that a little extra aliasing is the least of it.
  */
 export function createSoftCeiling(
   ctx: BaseAudioContext,
@@ -95,8 +106,5 @@ export function createSoftCeiling(
 
   const shaper = ctx.createWaveShaper()
   shaper.curve = curve
-  // The curve only bends near the top, so oversampling costs little and keeps
-  // that bend from folding harmonics back down into the audible range.
-  shaper.oversample = '2x'
   return shaper
 }

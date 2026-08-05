@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AMBIENT_PRESETS, findAmbientPreset } from './ambient'
-import { buildBusGraph } from './audioBus'
+import { MAX_MUSIC_VOLUME, buildBusGraph } from './audioBus'
 import { createBrainwaveGraph } from './brainwaveAudio'
 import { peakOf, render, rmsOf } from './testing/audioHarness'
 
@@ -159,9 +159,10 @@ describe('the generated-sound mix', () => {
     const { channels } = await render(
       10,
       (ctx) => {
-        const graph = buildBusGraph(ctx, ctx.destination, 1)
+        // The worst level the app can actually ask for: Sound volume maxed,
+        // every ambience playing at once, and the rhythm at full level too.
+        const graph = buildBusGraph(ctx, ctx.destination, MAX_MUSIC_VOLUME)
 
-        // Everything at once, at the worst level the app can ask for.
         for (const preset of AMBIENT_PRESETS) {
           preset.build(ctx, graph.music, { offlineSeconds: 10, seed: 55 })
         }
@@ -180,6 +181,41 @@ describe('the generated-sound mix', () => {
     for (const channel of channels) {
       expect(peakOf(channel)).toBeLessThanOrEqual(1)
     }
+  })
+
+  it('lets Sound volume go to twice its old ceiling, clamped beyond that', async () => {
+    await render(0.2, (ctx) => {
+      const doubled = buildBusGraph(ctx, ctx.destination, MAX_MUSIC_VOLUME)
+      expect(doubled.generated.gain.value).toBeCloseTo(MAX_MUSIC_VOLUME)
+      expect(MAX_MUSIC_VOLUME).toBeCloseTo(2)
+
+      // A value past the ceiling is clamped there, not passed through raw —
+      // otherwise a corrupt or hand-edited setting could drive the mix as hard
+      // as it liked.
+      const overdriven = buildBusGraph(ctx, ctx.destination, 50)
+      expect(overdriven.generated.gain.value).toBeCloseTo(MAX_MUSIC_VOLUME)
+    })
+  })
+
+  it('cannot emit above full scale even at the new, higher Sound ceiling', async () => {
+    const { channels } = await render(
+      1,
+      (ctx) => {
+        const graph = buildBusGraph(ctx, ctx.destination, MAX_MUSIC_VOLUME)
+        for (let i = 0; i < 12; i += 1) {
+          const osc = ctx.createOscillator()
+          osc.frequency.value = 90 + i * 37
+          const trim = ctx.createGain()
+          trim.gain.value = 0.9
+          osc.connect(trim)
+          trim.connect(graph.music)
+          osc.start()
+        }
+      },
+      1,
+      22_050,
+    )
+    expect(peakOf(channels[0])).toBeLessThan(1)
   })
 
   it('holds the master volume steady while two ambiences crossfade', async () => {

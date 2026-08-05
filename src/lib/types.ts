@@ -54,9 +54,14 @@ export interface LoopSettings {
   rate: number
   /** 0.5 – 1.5 */
   pitch: number
-  /** 0 – 1 (see README: some platforms ignore this) */
+  /**
+   * 0 – `MAX_VOICE_VOLUME` (see `speech.ts`). The live spoken voice is capped at
+   * 1 by the browser regardless — some platforms ignore it entirely, see the
+   * README — so anything above 1 only reaches a recorded voice in an exported
+   * file.
+   */
   voiceVolume: number
-  /** 0 – 1 */
+  /** 0 – `MAX_MUSIC_VOLUME` (see `audioBus.ts`). */
   musicVolume: number
   /** Silence between repetitions, in seconds. */
   repeatPauseSeconds: number

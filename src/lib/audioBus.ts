@@ -8,8 +8,8 @@
  *
  * The mix has two sibling inputs — ambience and brainwave rhythm — so either
  * can be turned off without touching the other, while the user's single
- * "Sound volume" still governs both. Everything then passes through one
- * protective ceiling before the speakers:
+ * "Sound volume" still governs both, up to `MAX_MUSIC_VOLUME`. Everything then
+ * passes through one protective ceiling before the speakers:
  *
  *     ambience ─┐
  *               ├─→ generated (sound volume) ─→ ceiling ─→ master ─→ output
@@ -24,6 +24,16 @@ import { createSoftCeiling, rampParam } from './audioParams'
 
 /** Short enough to feel immediate on a slider, long enough not to step. */
 const RAMP_SECONDS = 0.12
+
+/**
+ * The ceiling for the "Sound" volume setting.
+ *
+ * Unlike the spoken voice, ambience and the brainwave rhythm are both fully
+ * inside this app's own Web Audio graph, so there is no platform limit stopping
+ * this from going past 1 — the soft-clip ceiling `createSoftCeiling` builds
+ * below is what keeps the result from ever clipping, however loud the setting.
+ */
+export const MAX_MUSIC_VOLUME = 2
 
 export interface BusGraph {
   /** Final trim, wired to the context's output. */
@@ -55,7 +65,7 @@ export function buildBusGraph(
   ceiling.connect(master)
 
   const generated = ctx.createGain()
-  generated.gain.value = clamp01(soundVolume)
+  generated.gain.value = clampMusicVolume(soundVolume)
   generated.connect(ceiling)
 
   const music = ctx.createGain()
@@ -120,7 +130,7 @@ export class AudioBus {
   }
 
   setMusicVolume(value: number): void {
-    this.musicLevel = clamp01(value)
+    this.musicLevel = clampMusicVolume(value)
     if (this.graph && this.ctx) {
       // A short ramp rather than an assignment: a live volume change is one of
       // the easiest ways to put a click in a running mix.
@@ -158,6 +168,6 @@ export class AudioBus {
   }
 }
 
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value))
+function clampMusicVolume(value: number): number {
+  return Math.min(MAX_MUSIC_VOLUME, Math.max(0, value))
 }

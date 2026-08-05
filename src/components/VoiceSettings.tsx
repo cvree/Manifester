@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { cx } from '../lib/cx'
+import { MAX_VOICE_VOLUME } from '../lib/speech'
 import type { LoopSettings } from '../lib/types'
 import type { RankedVoice, VoiceTier } from '../lib/voiceRanking'
 import { BetterVoicesPanel } from './BetterVoicesPanel'
@@ -209,11 +210,11 @@ export function VoiceSettings({
       <Slider
         label="Voice volume"
         min={0}
-        max={1}
+        max={MAX_VOICE_VOLUME}
         step={0.05}
         value={settings.voiceVolume}
         display={`${Math.round(settings.voiceVolume * 100)}%`}
-        hint="iOS often locks speech to the system volume. Use your phone’s volume buttons if this slider has no effect."
+        hint="iOS often locks speech to the system volume. Use your phone’s volume buttons if this slider has no effect. Above 100% only makes a recorded voice louder in exported files — the spoken voice itself cannot go past 100%."
         onChange={(voiceVolume) => onChange({ voiceVolume })}
       />
 

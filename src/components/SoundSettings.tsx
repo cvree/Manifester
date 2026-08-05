@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { RAIN_CHARACTERS } from '../lib/ambient'
+import { MAX_MUSIC_VOLUME } from '../lib/audioBus'
 import { cx } from '../lib/cx'
 import type { LoopSettings, SoundConfig, TrackMeta } from '../lib/types'
 import { SegmentedControl } from './SegmentedControl'
@@ -136,7 +137,7 @@ export function SoundSettings({ settings, tracks, onChange }: SoundSettingsProps
           <Slider
             label="Sound volume"
             min={0}
-            max={1}
+            max={MAX_MUSIC_VOLUME}
             step={0.05}
             value={settings.musicVolume}
             display={`${Math.round(settings.musicVolume * 100)}%`}

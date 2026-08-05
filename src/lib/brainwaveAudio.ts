@@ -280,11 +280,15 @@ function clampRange(
 export const BRAINWAVE_FADE_SECONDS = 1.8
 
 /**
- * Peak amplitude of the summed carriers before the fade envelope. Chosen so a
- * rhythm at full level still leaves room for ambience underneath it.
+ * Peak amplitude of the summed carriers before the fade envelope.
+ *
+ * Doubled from the original 0.3 / 0.34 at the user's request, so 100% on the
+ * rhythm volume slider is twice as loud as it used to be. The shared mix
+ * ceiling in `audioBus.ts` is what keeps this from clipping when a rhythm at
+ * full level stacks with ambience on top of it.
  */
-const AM_TRIM = 0.3
-const BINAURAL_TRIM = 0.34
+const AM_TRIM = 0.6
+const BINAURAL_TRIM = 0.68
 
 /**
  * A soft organ-like timbre rather than a bare sine, so a 200 Hz tone can run

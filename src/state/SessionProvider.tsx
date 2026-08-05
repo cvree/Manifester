@@ -24,7 +24,12 @@ import {
   type BrainwaveSettings,
 } from '../lib/brainwaveAudio'
 import { loopToDraft, normaliseSettings, type Draft } from '../lib/loops'
-import { SpeechLooper, isSpeechSupported, loadVoices } from '../lib/speech'
+import {
+  LIVE_VOICE_VOLUME_CAP,
+  SpeechLooper,
+  isSpeechSupported,
+  loadVoices,
+} from '../lib/speech'
 import * as storage from '../lib/storage'
 import { SessionTimer } from '../lib/timer'
 import {
@@ -269,7 +274,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       utterance.rate = settings.rate
       utterance.pitch = settings.pitch
-      utterance.volume = settings.voiceVolume
+      // The setting can go above 1 for exported recordings; the live preview
+      // still speaks at the browser's own hard ceiling.
+      utterance.volume = Math.min(LIVE_VOICE_VOLUME_CAP, settings.voiceVolume)
       utterance.onend = () => setPreviewState('idle')
       utterance.onerror = () => setPreviewState('idle')
 

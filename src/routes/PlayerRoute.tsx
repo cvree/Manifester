@@ -21,9 +21,11 @@ import { SettingRow } from '../components/SettingRow'
 import { Sheet } from '../components/Sheet'
 import { Slider } from '../components/Slider'
 import { Toggle } from '../components/Toggle'
+import { MAX_MUSIC_VOLUME } from '../lib/audioBus'
 import { cx } from '../lib/cx'
 import { cue, hapticsSupported, primeFeedback } from '../lib/feedback'
 import { countWords, formatClock } from '../lib/format'
+import { MAX_VOICE_VOLUME } from '../lib/speech'
 import {
   affirmationLines,
   brainwaveSummary,
@@ -330,16 +332,21 @@ export function PlayerRoute() {
               <Slider
                 label="Voice"
                 min={0}
-                max={1}
+                max={MAX_VOICE_VOLUME}
                 step={0.05}
                 value={draft.settings.voiceVolume}
                 display={`${Math.round(draft.settings.voiceVolume * 100)}%`}
+                hint={
+                  draft.settings.voiceVolume > 1
+                    ? 'The spoken voice itself is capped at 100% by your device.'
+                    : undefined
+                }
                 onChange={setLiveVoiceVolume}
               />
               <Slider
                 label="Sound"
                 min={0}
-                max={1}
+                max={MAX_MUSIC_VOLUME}
                 step={0.05}
                 value={draft.settings.musicVolume}
                 display={`${Math.round(draft.settings.musicVolume * 100)}%`}

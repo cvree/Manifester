@@ -20,6 +20,23 @@ const STALL_TIMEOUT_MS = 2500
 /** Chrome desktop stops speaking after ~15s unless nudged. */
 const KEEPALIVE_INTERVAL_MS = 9000
 
+/**
+ * The ceiling for the `voiceVolume` setting.
+ *
+ * The live spoken voice cannot actually get louder than 1: `volume` on
+ * `SpeechSynthesisUtterance` is spec'd to `[0, 1]`, and browsers clamp it there
+ * regardless of what this app does, because speech synthesis renders entirely
+ * outside the page — there is no Web Audio node to put a gain on. `LIVE_VOICE_VOLUME_CAP`
+ * below is that hard limit, applied to every utterance.
+ *
+ * Anything this setting does above 1 only reaches a recorded voice blended into
+ * an exported file, which *is* fully inside this app's own mixing — see
+ * `exportAudio.ts` and `encode.worker.ts`. `MAX_VOICE_VOLUME` is the ceiling for
+ * that path, used as the slider's maximum.
+ */
+export const MAX_VOICE_VOLUME = 2
+export const LIVE_VOICE_VOLUME_CAP = 1
+
 export function isSpeechSupported(): boolean {
   return (
     typeof window !== 'undefined' &&
@@ -366,7 +383,7 @@ export class SpeechLooper {
 
     utterance.rate = clamp(this.options.rate, 0.1, 4)
     utterance.pitch = clamp(this.options.pitch, 0, 2)
-    utterance.volume = clamp(this.options.volume, 0, 1)
+    utterance.volume = clamp(this.options.volume, 0, LIVE_VOICE_VOLUME_CAP)
 
     utterance.onend = () => {
       this.pending.delete(utterance)

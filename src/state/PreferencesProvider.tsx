@@ -37,7 +37,7 @@ const DEFAULTS: Preferences = {
   breathPattern: DEFAULT_PATTERN,
   breathSoundCues: false,
   breathHapticCues: true,
-  uiSounds: false,
+  uiSounds: true,
   uiHaptics: true,
 }
 
