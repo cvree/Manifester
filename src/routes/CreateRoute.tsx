@@ -21,6 +21,7 @@ import { draftToLoop } from '../lib/loops'
 import { useReducedMotion } from '../lib/motion'
 import {
   affirmationLines,
+  brainwaveSummary,
   delaySummary,
   soundSummary,
   timerSummary,
@@ -280,6 +281,11 @@ export function CreateRoute() {
             breathing={breathing}
             voice={voiceSummary(draft.settings, resolvedDeviceVoice)}
             sound={soundSummary(draft.settings, allTracks)}
+            rhythm={
+              draft.settings.brainwave.enabled
+                ? brainwaveSummary(draft.settings.brainwave)
+                : null
+            }
             timer={timerSummary(draft.settings.timerMinutes)}
             delay={delaySummary(draft.settings.repeatPauseSeconds)}
             sceneKey={sceneKey}

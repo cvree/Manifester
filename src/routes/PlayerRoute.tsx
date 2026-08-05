@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { BrainwavePanel } from '../components/BrainwavePanel'
 import { BreathingSettings } from '../components/BreathingSettings'
 import { BreathingVisualizer } from '../components/BreathingVisualizer'
 import { Button } from '../components/Button'
@@ -10,6 +11,7 @@ import {
   CloseIcon,
   PauseIcon,
   PlayIcon,
+  PulseIcon,
   SeedIcon,
   SparkIcon,
   StopIcon,
@@ -22,7 +24,12 @@ import { Toggle } from '../components/Toggle'
 import { cx } from '../lib/cx'
 import { cue, hapticsSupported, primeFeedback } from '../lib/feedback'
 import { countWords, formatClock } from '../lib/format'
-import { affirmationLines, breathingSummary, feelSummary } from '../lib/summaries'
+import {
+  affirmationLines,
+  brainwaveSummary,
+  breathingSummary,
+  feelSummary,
+} from '../lib/summaries'
 import { useBreathing } from '../lib/useBreathing'
 import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
@@ -47,9 +54,12 @@ export function PlayerRoute() {
     dismissNotice,
     setLiveVoiceVolume,
     setLiveMusicVolume,
+    setBrainwave,
   } = useSession()
   const { preferences, update: updatePreferences } = usePreferences()
-  const [sheet, setSheet] = useState<'breathing' | 'feel' | null>(null)
+  const [sheet, setSheet] = useState<'breathing' | 'brainwave' | 'feel' | null>(
+    null,
+  )
 
   const hasText = countWords(draft.text) > 0
   const idle = session.status === 'idle'
@@ -345,6 +355,16 @@ export function PlayerRoute() {
 
           <div className="surface-panel overflow-hidden">
             <SettingRow
+              icon={<PulseIcon />}
+              title="Brainwave rhythm"
+              summary={brainwaveSummary(draft.settings.brainwave)}
+              onClick={() => {
+                cue('tap')
+                setSheet('brainwave')
+              }}
+              accent={draft.settings.brainwave.enabled}
+            />
+            <SettingRow
               icon={<BreathIcon />}
               title="Breathing"
               summary={breathingSummary(
@@ -383,6 +403,18 @@ export function PlayerRoute() {
         description="The guide that expands and settles while you listen."
       >
         <BreathingSettings preferences={preferences} onChange={updatePreferences} />
+      </Sheet>
+
+      <Sheet
+        open={sheet === 'brainwave'}
+        onClose={() => setSheet(null)}
+        title="Brainwave rhythm"
+        description="Changes here take effect straight away, without restarting."
+      >
+        <BrainwavePanel
+          settings={draft.settings.brainwave}
+          onChange={setBrainwave}
+        />
       </Sheet>
 
       <Sheet

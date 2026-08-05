@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "target": "ES2022",
-    "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
 
@@ -12,7 +11,6 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "jsx": "react-jsx",
 
     "strict": true,
     "noUnusedLocals": true,
@@ -20,9 +18,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    "exactOptionalPropertyTypes": false,
-    "types": ["vite/client", "vite-plugin-pwa/client"]
+    "types": ["node"]
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/lib/testing"]
+  "include": ["src/**/*.test.ts", "src/lib/testing/**/*.ts", "vitest.config.ts"]
 }

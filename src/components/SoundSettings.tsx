@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { RAIN_CHARACTERS } from '../lib/ambient'
 import { cx } from '../lib/cx'
 import type { LoopSettings, SoundConfig, TrackMeta } from '../lib/types'
 import { SegmentedControl } from './SegmentedControl'
@@ -99,6 +100,24 @@ export function SoundSettings({ settings, tracks, onChange }: SoundSettingsProps
           >
             Build the playlist in Sounds
           </Link>
+        </div>
+      )}
+
+      {sound.mode === 'single' && sound.trackId === 'rain-window' && (
+        <div>
+          <p className="type-label mb-2.5">Rain character</p>
+          <SegmentedControl
+            label="Rain character"
+            value={sound.rainCharacter}
+            onChange={(rainCharacter) => patchSound({ rainCharacter })}
+            segments={RAIN_CHARACTERS.map((value) => ({
+              value,
+              label: value.charAt(0).toUpperCase() + value.slice(1),
+            }))}
+          />
+          <p className="mt-2 text-[0.82rem] leading-snug text-ink-faint">
+            Changes how dense and bright the rain is. No thunder, at any setting.
+          </p>
         </div>
       )}
 

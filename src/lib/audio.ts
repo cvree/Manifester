@@ -14,13 +14,24 @@
  * actual track can then be loaded asynchronously afterwards.
  */
 
-import { findAmbientPreset, type AmbientHandle } from './ambient'
+import {
+  AMBIENCE_FADE_SECONDS,
+  findAmbientPreset,
+  type AmbientHandle,
+  type RainCharacter,
+} from './ambient'
 import type { AudioBus } from './audioBus'
+import { isLowPowerDevice } from './motion'
 import type { RepeatMode } from './types'
 
 /** How long a generated ambience plays before a playlist moves on. */
 const BUILTIN_SEGMENT_MS = 150_000
-const FADE_MS = 900
+const FADE_MS = AMBIENCE_FADE_SECONDS * 1000
+
+/** Per-soundscape choices that a running ambience can be rebuilt around. */
+export interface AmbienceOptions {
+  rainCharacter?: RainCharacter
+}
 
 /** A valid, zero-sample WAV — used only to unlock playback on iOS. */
 const SILENT_WAV =
@@ -57,6 +68,9 @@ export class MusicEngine {
   private active = false
   private paused = false
   private handlers: MusicEngineHandlers = {}
+  private ambienceOptions: AmbienceOptions = {}
+  /** The soundscape the live `ambient` handle was built for. */
+  private ambientPresetId: string | null = null
 
   constructor(bus: AudioBus) {
     this.bus = bus
@@ -64,6 +78,21 @@ export class MusicEngine {
 
   get isActive(): boolean {
     return this.active
+  }
+
+  /**
+   * Change a soundscape's character. A running ambience is rebuilt into a
+   * crossfade rather than restarted, so moving the Rain slider is inaudible
+   * apart from the rain itself changing.
+   */
+  setAmbienceOptions(options: AmbienceOptions): void {
+    const changed = options.rainCharacter !== this.ambienceOptions.rainCharacter
+    this.ambienceOptions = { ...options }
+    if (!changed || !this.active || this.paused) return
+    if (this.ambientPresetId !== 'rain-window') return
+
+    const track = this.queue[this.queueIndex]
+    if (track?.kind === 'builtin') this.crossfadeToBuiltin(track)
   }
 
   setHandlers(handlers: MusicEngineHandlers): void {
@@ -105,9 +134,17 @@ export class MusicEngine {
     }
   }
 
-  /** Start (or restart) playback of an ordered list of tracks. */
+  /**
+   * Start (or restart) playback of an ordered list of tracks.
+   *
+   * Anything already playing is faded rather than cut, so choosing a different
+   * sound crossfades into it.
+   */
   async play(tracks: TrackSource[], repeat: RepeatMode): Promise<void> {
-    this.teardown(0)
+    // The outgoing ambience fades while the incoming one rises. An imported
+    // file cannot join that crossfade — every file shares one media element,
+    // and the outgoing fade would tear down the incoming track's own source.
+    this.teardown(FADE_MS, 0)
 
     if (tracks.length === 0) {
       this.active = false
@@ -155,13 +192,13 @@ export class MusicEngine {
   stop(fadeMs = FADE_MS): void {
     this.active = false
     this.paused = false
-    this.teardown(fadeMs)
+    this.teardown(fadeMs, fadeMs)
     this.handlers.onTrackChange?.(null)
   }
 
   /** Release this engine's resources. The shared bus outlives it. */
   dispose(): void {
-    this.teardown(0)
+    this.teardown(0, 0)
     this.active = false
     this.paused = false
     this.element = null
@@ -169,13 +206,15 @@ export class MusicEngine {
 
   /* ── internals ── */
 
-  private teardown(fadeMs: number): void {
+  private teardown(ambientFadeMs: number, elementFadeMs: number): void {
     this.generation += 1
     this.clearSegmentTimer()
 
     if (this.ambient) {
-      this.ambient.stop()
+      // The ambience fades itself out over the same span the next one fades in.
+      this.ambient.stop(ambientFadeMs / 1000)
       this.ambient = null
+      this.ambientPresetId = null
     }
 
     const element = this.element
@@ -189,7 +228,7 @@ export class MusicEngine {
         element.load()
         if (url) URL.revokeObjectURL(url)
       }
-      if (fadeMs > 0) this.rampElement(element, 0, fadeMs, release)
+      if (elementFadeMs > 0) this.rampElement(element, 0, elementFadeMs, release)
       else {
         this.clearFadeTimer()
         release()
@@ -228,7 +267,11 @@ export class MusicEngine {
     }
 
     this.bus.setMusicVolume(this.volume)
-    this.ambient = preset.build(ctx, destination)
+    this.ambient = preset.build(ctx, destination, {
+      rainCharacter: this.ambienceOptions.rainCharacter,
+      lowPower: isLowPowerDevice(),
+    })
+    this.ambientPresetId = preset.id
 
     // A generated ambience never "ends", so a playlist needs a nudge.
     const loopsForever = this.queue.length === 1 || this.repeat === 'one'
@@ -286,6 +329,21 @@ export class MusicEngine {
     }
   }
 
+  /** Swap one generated ambience for another without disturbing the queue. */
+  private crossfadeToBuiltin(track: TrackSource): void {
+    const ctx = this.bus.context
+    const destination = this.bus.musicNode
+    const preset = findAmbientPreset(track.presetId ?? track.id)
+    if (!ctx || !destination || !preset) return
+
+    this.ambient?.stop(AMBIENCE_FADE_SECONDS)
+    this.ambient = preset.build(ctx, destination, {
+      rainCharacter: this.ambienceOptions.rainCharacter,
+      lowPower: isLowPowerDevice(),
+    })
+    this.ambientPresetId = preset.id
+  }
+
   private advance(generation: number): void {
     if (generation !== this.generation) return
 
@@ -293,6 +351,7 @@ export class MusicEngine {
     if (this.ambient) {
       this.ambient.stop()
       this.ambient = null
+      this.ambientPresetId = null
     }
     if (this.element && this.objectUrl) {
       const url = this.objectUrl

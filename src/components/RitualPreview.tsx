@@ -7,7 +7,14 @@ import { affirmationLines } from '../lib/summaries'
 import type { BreathingRuntime } from '../lib/useBreathing'
 import type { LoopSettings } from '../lib/types'
 import { BreathingVisualizer } from './BreathingVisualizer'
-import { ClockIcon, PauseIcon, PlayIcon, VoiceIcon, WaveIcon } from './Icons'
+import {
+  ClockIcon,
+  PauseIcon,
+  PlayIcon,
+  PulseIcon,
+  VoiceIcon,
+  WaveIcon,
+} from './Icons'
 
 interface RitualPreviewProps {
   title: string
@@ -16,6 +23,8 @@ interface RitualPreviewProps {
   breathing: BreathingRuntime
   voice: string
   sound: string
+  /** The brainwave rhythm summary, or `null` when it is off. */
+  rhythm: string | null
   timer: string
   delay: string
   /** Name of the chosen ambience, used to tint the scene. */
@@ -48,6 +57,21 @@ const SCENES: Record<string, { wash: string; name: string }> = {
     wash:
       'radial-gradient(80% 60% at 50% 0%, color-mix(in oklab, var(--gold) 18%, transparent) 0%, transparent 62%)',
   },
+  'rain-window': {
+    name: 'Rain on Window',
+    wash:
+      'radial-gradient(80% 60% at 50% 0%, color-mix(in oklab, var(--twilight) 20%, transparent) 0%, transparent 62%)',
+  },
+  'ocean-tide': {
+    name: 'Ocean Tide',
+    wash:
+      'radial-gradient(80% 60% at 50% 0%, color-mix(in oklab, var(--twilight) 15%, transparent) 30%, color-mix(in oklab, var(--gold) 10%, transparent) 100%)',
+  },
+  'fireplace-glow': {
+    name: 'Fireplace Glow',
+    wash:
+      'radial-gradient(80% 70% at 50% 100%, color-mix(in oklab, var(--gold) 24%, transparent) 0%, transparent 66%)',
+  },
   off: {
     name: 'Silence',
     wash:
@@ -69,6 +93,7 @@ export function RitualPreview({
   breathing,
   voice,
   sound,
+  rhythm,
   timer,
   delay,
   sceneKey,
@@ -186,6 +211,14 @@ export function RitualPreview({
           <SummaryTile icon={<WaveIcon />} label="Sound" value={sound} />
           <SummaryTile icon={<ClockIcon />} label="Length" value={timer} />
           <SummaryTile icon={<PauseIcon />} label="Delay" value={delay} />
+          {rhythm && (
+            <SummaryTile
+              icon={<PulseIcon />}
+              label="Rhythm"
+              value={rhythm}
+              className="col-span-2"
+            />
+          )}
         </dl>
 
         <p className="type-meta mt-4 text-center">
@@ -206,13 +239,20 @@ function SummaryTile({
   icon,
   label,
   value,
+  className,
 }: {
   icon: ReactNode
   label: string
   value: string
+  className?: string
 }) {
   return (
-    <div className="surface-control flex min-w-0 items-center gap-2.5 px-3 py-2.5">
+    <div
+      className={cx(
+        'surface-control flex min-w-0 items-center gap-2.5 px-3 py-2.5',
+        className,
+      )}
+    >
       <span aria-hidden="true" className="shrink-0 text-[0.95rem] text-ink-faint">
         {icon}
       </span>

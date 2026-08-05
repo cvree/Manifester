@@ -1,5 +1,8 @@
 /** Shared domain types for Manifester. */
 
+import type { RainCharacter } from './ambient'
+import { DEFAULT_BRAINWAVE, type BrainwaveSettings } from './brainwaveAudio'
+
 /** How the background sound layer is configured for a loop. */
 export type SoundMode = 'off' | 'single' | 'playlist'
 
@@ -13,6 +16,8 @@ export interface SoundConfig {
   /** Ordered track ids used when `mode === 'playlist'`. */
   playlist: string[]
   repeat: RepeatMode
+  /** Density and brightness of Rain on Window, when that sound is chosen. */
+  rainCharacter: RainCharacter
 }
 
 /** A background sound the user can pick. */
@@ -58,6 +63,11 @@ export interface LoopSettings {
   /** `null` means "keep going until I stop it". */
   timerMinutes: number | null
   sound: SoundConfig
+  /**
+   * The generated brainwave rhythm. Off by default, and independent of `sound`
+   * so either layer can play without the other.
+   */
+  brainwave: BrainwaveSettings
 }
 
 export interface SavedLoop extends LoopSettings {
@@ -77,6 +87,7 @@ export const DEFAULT_SOUND: SoundConfig = {
   trackId: 'moon-garden',
   playlist: [],
   repeat: 'all',
+  rainCharacter: 'steady',
 }
 
 export const DEFAULT_SETTINGS: LoopSettings = {
@@ -91,6 +102,7 @@ export const DEFAULT_SETTINGS: LoopSettings = {
   repeatPauseSeconds: 3,
   timerMinutes: 10,
   sound: DEFAULT_SOUND,
+  brainwave: DEFAULT_BRAINWAVE,
 }
 
 /** Roughly the largest file worth holding in browser storage. */

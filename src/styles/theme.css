@@ -870,6 +870,243 @@
   display: none;
 }
 
+/* ── Sound scenes ───────────────────────────────────────────── */
+
+/*
+ * A small decorative thumbnail per built-in ambience. Deliberately cheap: one
+ * gradient, a few absolutely-positioned shapes, and at most one slow animation
+ * each. They are never the only signal for which sound is selected, and the
+ * global reduced-motion rule above stills all of them.
+ */
+.scene {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  width: 3.25rem;
+  height: 3.25rem;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  border: 1px solid var(--panel-border);
+  isolation: isolate;
+}
+
+.scene > * {
+  position: absolute;
+  display: block;
+}
+
+/* Moon Garden */
+.scene--moon-garden {
+  background: linear-gradient(165deg, #2b2a4a 0%, #3d3a5c 55%, #4a4460 100%);
+}
+.scene__moon {
+  top: 22%;
+  left: 24%;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: radial-gradient(circle at 34% 32%, #fdf6e6 0%, #e8dcc4 72%, #cbbda1 100%);
+  box-shadow: 0 0 0.65rem rgb(253 246 230 / 0.5);
+}
+.scene__glint {
+  width: 2.5px;
+  height: 2.5px;
+  border-radius: 999px;
+  background: rgb(253 246 230 / 0.85);
+}
+.scene__glint--a {
+  top: 62%;
+  left: 66%;
+}
+.scene__glint--b {
+  top: 76%;
+  left: 34%;
+  opacity: 0.6;
+}
+
+/* Soft Horizon */
+.scene--soft-horizon {
+  background: linear-gradient(180deg, #3a3358 0%, #7d5f6b 58%, #c99a76 100%);
+}
+.scene__sun {
+  top: 44%;
+  left: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-left: -0.75rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgb(255 232 196 / 0.95) 0%, rgb(255 208 150 / 0) 70%);
+}
+.scene__horizon {
+  bottom: 34%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgb(255 240 214 / 0.5);
+}
+
+/* Rain on Window */
+.scene--rain-window {
+  background: linear-gradient(170deg, #4a5c6e 0%, #5c6f80 52%, #6f8391 100%);
+}
+.scene__window-glow {
+  bottom: -18%;
+  left: 50%;
+  width: 2.6rem;
+  height: 2.6rem;
+  margin-left: -1.3rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgb(240 232 210 / 0.42) 0%, rgb(240 232 210 / 0) 68%);
+  filter: blur(1px);
+}
+.scene__rain {
+  inset: 0;
+}
+.scene__rain > span {
+  position: absolute;
+  top: -55%;
+  width: 1px;
+  height: 55%;
+  border-radius: 999px;
+  background: linear-gradient(
+    to bottom,
+    rgb(236 244 250 / 0) 0%,
+    rgb(236 244 250 / 0.62) 100%
+  );
+  animation: rain-trail 1.6s linear infinite;
+}
+.scene__rain > span:nth-child(1) {
+  left: 22%;
+  animation-duration: 1.5s;
+}
+.scene__rain > span:nth-child(2) {
+  left: 42%;
+  animation-duration: 1.9s;
+  animation-delay: 0.4s;
+}
+.scene__rain > span:nth-child(3) {
+  left: 63%;
+  animation-duration: 1.65s;
+  animation-delay: 0.8s;
+}
+.scene__rain > span:nth-child(4) {
+  left: 82%;
+  animation-duration: 2.1s;
+  animation-delay: 0.2s;
+}
+/* Still rain: the same trails, drawn in place. */
+.scene__rain--still {
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    100deg,
+    rgb(236 244 250 / 0) 0 5px,
+    rgb(236 244 250 / 0.38) 5px 6px,
+    rgb(236 244 250 / 0) 6px 13px
+  );
+}
+
+@keyframes rain-trail {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(200%);
+  }
+}
+
+/* Ocean Tide */
+.scene--ocean-tide {
+  background: linear-gradient(180deg, #1f4560 0%, #2f6a86 46%, #cdb493 100%);
+}
+.scene__shore {
+  left: -12%;
+  right: -12%;
+  height: 1.4rem;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+.scene__shore--far {
+  bottom: 42%;
+  background: rgb(213 232 238 / 0.24);
+}
+.scene__shore--near {
+  bottom: 26%;
+  background: rgb(226 240 244 / 0.34);
+}
+.scene__foam {
+  bottom: 30%;
+  left: 18%;
+  width: 1.5rem;
+  height: 2px;
+  border-radius: 999px;
+  background: rgb(250 250 246 / 0.62);
+}
+
+/* Fireplace Glow */
+.scene--fireplace-glow {
+  background: linear-gradient(180deg, #3a2318 0%, #7a4420 58%, #c2792c 100%);
+}
+.scene__flame {
+  bottom: -22%;
+  left: 50%;
+  width: 2.8rem;
+  height: 2.8rem;
+  margin-left: -1.4rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgb(255 206 118 / 0.72) 0%, rgb(255 168 66 / 0) 66%);
+  animation: flame-breathe 5.5s ease-in-out infinite;
+}
+.scene__embers {
+  inset: 0;
+}
+.scene__embers > span {
+  position: absolute;
+  bottom: 12%;
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgb(255 216 150 / 0.95);
+  animation: ember-rise 4.5s ease-out infinite;
+}
+.scene__embers > span:nth-child(1) {
+  left: 34%;
+}
+.scene__embers > span:nth-child(2) {
+  left: 55%;
+  animation-duration: 5.6s;
+  animation-delay: 1.4s;
+}
+.scene__embers > span:nth-child(3) {
+  left: 71%;
+  animation-duration: 6.2s;
+  animation-delay: 2.8s;
+}
+
+@keyframes flame-breathe {
+  0%,
+  100% {
+    opacity: 0.78;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.07);
+  }
+}
+
+@keyframes ember-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0);
+  }
+  18% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-2.2rem) translateX(0.35rem);
+  }
+}
+
 /* ── Reduced motion ─────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {

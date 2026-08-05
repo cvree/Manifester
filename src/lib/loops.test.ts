@@ -1,0 +1,145 @@
+import { describe, expect, it } from 'vitest'
+import { DEFAULT_BRAINWAVE, getTargetHz } from './brainwaveAudio'
+import { draftToLoop, loopToDraft, normaliseSettings, type Draft } from './loops'
+import { DEFAULT_SETTINGS, type LoopSettings, type SavedLoop } from './types'
+
+/** A loop exactly as the previous version of the app would have written it. */
+const LEGACY_LOOP = {
+  id: 'loop-legacy',
+  title: 'Morning words',
+  text: 'I am steady today.',
+  createdAt: 1,
+  updatedAt: 2,
+  lastPlayedAt: null,
+  voiceStyle: 'feminine',
+  voiceURI: null,
+  voiceName: null,
+  recordingId: null,
+  rate: 0.9,
+  pitch: 1,
+  voiceVolume: 1,
+  musicVolume: 0.35,
+  repeatPauseSeconds: 3,
+  timerMinutes: 20,
+  sound: {
+    mode: 'single',
+    trackId: 'soft-horizon',
+    playlist: [],
+    repeat: 'all',
+  },
+} as unknown as SavedLoop
+
+describe('older saved rituals', () => {
+  it('loads a loop that has never heard of the new settings', () => {
+    const draft = loopToDraft(LEGACY_LOOP)
+
+    // Everything the older version did save is untouched.
+    expect(draft.title).toBe('Morning words')
+    expect(draft.settings.sound.trackId).toBe('soft-horizon')
+    expect(draft.settings.timerMinutes).toBe(20)
+    expect(draft.settings.musicVolume).toBe(0.35)
+
+    // Everything it did not save arrives at a safe default.
+    expect(draft.settings.brainwave).toEqual(DEFAULT_BRAINWAVE)
+    expect(draft.settings.brainwave.enabled).toBe(false)
+    expect(draft.settings.sound.rainCharacter).toBe('steady')
+  })
+
+  it('does not turn a feature on during migration', () => {
+    const settings = normaliseSettings({})
+    expect(settings.brainwave.enabled).toBe(false)
+  })
+
+  it('survives a partially written record', () => {
+    const settings = normaliseSettings({
+      musicVolume: 0.2,
+      sound: { mode: 'off' } as LoopSettings['sound'],
+    })
+    expect(settings.sound.mode).toBe('off')
+    expect(settings.sound.playlist).toEqual([])
+    expect(settings.sound.rainCharacter).toBe('steady')
+    expect(settings.brainwave.enabled).toBe(false)
+  })
+
+  it('replaces an unrecognised rain character rather than indexing on it', () => {
+    const settings = normaliseSettings({
+      sound: { ...DEFAULT_SETTINGS.sound, rainCharacter: 'thunderstorm' as never },
+    })
+    expect(settings.sound.rainCharacter).toBe('steady')
+  })
+
+  it('rebuilds a rhythm frequency that disagrees with its preset', () => {
+    const settings = normaliseSettings({
+      brainwave: {
+        ...DEFAULT_BRAINWAVE,
+        enabled: true,
+        preset: 'theta',
+        targetHz: 432 as never,
+      },
+    })
+    expect(settings.brainwave.targetHz).toBe(6)
+    expect(settings.brainwave.targetHz).toBe(getTargetHz('theta'))
+  })
+})
+
+describe('saving a ritual', () => {
+  const draft: Draft = {
+    id: 'loop-1',
+    title: 'Evening',
+    text: 'I rest easily.',
+    settings: normaliseSettings({
+      musicVolume: 0.3,
+      sound: {
+        mode: 'single',
+        trackId: 'rain-window',
+        playlist: [],
+        repeat: 'one',
+        rainCharacter: 'full',
+      },
+      brainwave: {
+        enabled: true,
+        preset: 'delta',
+        targetHz: 2,
+        mode: 'binaural',
+        volume: 0.22,
+        depth: 0.55,
+      },
+    }),
+  }
+
+  it('keeps the chosen rhythm, mode, level and intensity', () => {
+    const saved = draftToLoop(draft)
+    expect(saved.brainwave).toEqual({
+      enabled: true,
+      preset: 'delta',
+      targetHz: 2,
+      mode: 'binaural',
+      volume: 0.22,
+      depth: 0.55,
+    })
+    expect(saved.sound.rainCharacter).toBe('full')
+  })
+
+  it('round-trips through storage without drift', () => {
+    const saved = draftToLoop(draft)
+    const reloaded = loopToDraft(saved)
+    expect(reloaded.settings.brainwave).toEqual(draft.settings.brainwave)
+    expect(reloaded.settings.sound).toEqual(draft.settings.sound)
+    expect(reloaded.title).toBe('Evening')
+  })
+
+  it('copies the rhythm rather than sharing it with the draft', () => {
+    const saved = draftToLoop(draft)
+    expect(saved.brainwave).not.toBe(draft.settings.brainwave)
+    expect(saved.sound).not.toBe(draft.settings.sound)
+  })
+})
+
+describe('defaults', () => {
+  it('ships with the rhythm off and rain at its middle setting', () => {
+    expect(DEFAULT_SETTINGS.brainwave.enabled).toBe(false)
+    expect(DEFAULT_SETTINGS.sound.rainCharacter).toBe('steady')
+    // The existing default sound is unchanged, so no-one's saved loop moves.
+    expect(DEFAULT_SETTINGS.sound.trackId).toBe('moon-garden')
+  })
+})

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { cue, hapticsSupported } from '../lib/feedback'
 import {
+  brainwaveSummary,
   breathingSummary,
   delaySummary,
   exportSummary,
@@ -12,6 +13,7 @@ import {
 import { useLibrary } from '../state/LibraryProvider'
 import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
+import { BrainwavePanel } from './BrainwavePanel'
 import { BreathingSettings } from './BreathingSettings'
 import { DelaySettings } from './DelaySettings'
 import { ExportPanel } from './ExportPanel'
@@ -20,6 +22,7 @@ import {
   DownloadIcon,
   MicIcon,
   PauseIcon,
+  PulseIcon,
   TuneIcon,
   VoiceIcon,
   WaveIcon,
@@ -34,6 +37,7 @@ import { VoiceSettings } from './VoiceSettings'
 type PanelKey =
   | 'voice'
   | 'sound'
+  | 'brainwave'
   | 'breathing'
   | 'delay'
   | 'recording'
@@ -48,6 +52,10 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
   sound: {
     title: 'Background sound',
     description: 'The ambience your words rest on.',
+  },
+  brainwave: {
+    title: 'Brainwave rhythm',
+    description: 'A generated rhythm, on its own or under the ambience.',
   },
   breathing: {
     title: 'Breathing',
@@ -83,6 +91,7 @@ export function CustomizePanel() {
   const {
     draft,
     updateSettings,
+    setBrainwave,
     voices,
     voicesReady,
     resolvedDeviceVoice,
@@ -123,6 +132,13 @@ export function CustomizePanel() {
           summary={soundSummary(settings, allTracks)}
           onClick={() => openPanel('sound')}
           accent={settings.sound.mode !== 'off'}
+        />
+        <SettingRow
+          icon={<PulseIcon />}
+          title="Brainwave rhythm"
+          summary={brainwaveSummary(settings.brainwave)}
+          onClick={() => openPanel('brainwave')}
+          accent={settings.brainwave.enabled}
         />
         <SettingRow
           icon={<BreathIcon />}
@@ -187,6 +203,14 @@ export function CustomizePanel() {
           tracks={allTracks}
           onChange={updateSettings}
         />
+      </Sheet>
+
+      <Sheet
+        open={open === 'brainwave'}
+        onClose={() => setOpen(null)}
+        {...TITLES.brainwave}
+      >
+        <BrainwavePanel settings={settings.brainwave} onChange={setBrainwave} />
       </Sheet>
 
       <Sheet

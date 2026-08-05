@@ -16,6 +16,7 @@ import {
 } from '../lib/exportAudio'
 import type { EncodeRequest, EncodeResponse } from '../lib/exportTypes'
 import { cue } from '../lib/feedback'
+import { brainwaveSummary } from '../lib/summaries'
 import type { LoopSettings } from '../lib/types'
 import { Button } from './Button'
 import { Chip } from './SegmentedControl'
@@ -63,7 +64,8 @@ export function ExportPanel({
   )
 
   const hasBackground = settings.sound.mode !== 'off'
-  const canExport = hasRecording || hasBackground
+  const rhythm = settings.brainwave
+  const canExport = hasRecording || hasBackground || rhythm.enabled
   const estimate = formatEstimate(estimateMp3Bytes(minutes))
   const wavEstimate = formatEstimate(estimateWavBytes(minutes))
 
@@ -284,6 +286,15 @@ export function ExportPanel({
             value={hasBackground ? soundLabel : 'No background sound'}
           />
           <ManifestRow
+            included={rhythm.enabled}
+            label="Rhythm"
+            value={
+              rhythm.enabled
+                ? `${brainwaveSummary(rhythm)} — as modulation, since the file is mono`
+                : 'No brainwave rhythm'
+            }
+          />
+          <ManifestRow
             included
             label="Delay"
             value={
@@ -398,7 +409,8 @@ export function ExportPanel({
 
       {!canExport && (
         <p className="type-meta">
-          Record your voice or choose a background sound first.
+          Record your voice, choose a background sound, or turn on a brainwave
+          rhythm first.
         </p>
       )}
     </div>

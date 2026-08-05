@@ -69,11 +69,54 @@ export function AboutRoute() {
 
       <Card data-rise title="How the sound works">
         <p className="type-body">
-          The two built-in ambiences, Moon Garden and Soft Horizon, are not audio
-          files. They are generated live from oscillators and filtered noise in
-          your browser, which is why they load instantly and keep working with no
-          connection. Anything else you hear is audio you imported yourself.
+          None of the built-in sounds are audio files. Moon Garden, Soft Horizon,
+          Rain on Window, Ocean Tide and Fireplace Glow are all generated live
+          from oscillators and filtered noise in your browser, which is why they
+          load instantly and keep working with no connection. The rain's droplets
+          and the fire's crackles are scheduled a couple of seconds ahead with
+          bounded randomness, so they never settle into a loop you can hear.
+          Anything else you hear is audio you imported yourself.
         </p>
+      </Card>
+
+      <Card data-rise title="About the brainwave rhythms">
+        <p className="type-body">
+          The five rhythms are named after conventional EEG frequency bands:
+          Gamma at 40 Hz, Beta at 20 Hz, Alpha at 10 Hz, Theta at 6 Hz and Delta
+          at 2 Hz. Band edges vary a little between references, so the ranges
+          shown in the app are described as conventional rather than definitive.
+          The target rates themselves are exact.
+        </p>
+        <p className="type-body mt-3">
+          Those rates are far below hearing, so they are never played as pitches.
+          Instead an audible 200 Hz tone rises and falls at exactly the chosen
+          rate — or, in headphone mode, each ear receives a tone offset by half
+          the rate, so the difference between them is the rate. The timing runs
+          on the browser's audio thread rather than a JavaScript timer, which is
+          why a backgrounded tab cannot shift it.
+        </p>
+        <ul className="type-body mt-4 space-y-2.5">
+          <Bullet>
+            A binaural beat is the rhythm you perceive when two different tones
+            are delivered separately to the ears. Headphones are required,
+            because a speaker mixes both tones into both ears.
+          </Bullet>
+          <Bullet>
+            Binaural beating is generally discussed for differences of roughly
+            1–30 Hz, so 40 Hz Gamma uses amplitude modulation even with headphone
+            mode on.
+          </Bullet>
+          <Bullet>
+            Scientific evidence that any of this reliably changes brain activity,
+            or produces a particular psychological outcome, remains inconsistent.
+            Experiences vary. This is not a medical treatment or a diagnostic
+            tool.
+          </Bullet>
+          <Bullet>
+            Please choose a moderate listening level, and turn it down rather
+            than up if you are unsure.
+          </Bullet>
+        </ul>
       </Card>
 
       <Card data-rise title="Getting the best voice">

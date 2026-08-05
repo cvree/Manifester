@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { BrainwavePanel } from '../components/BrainwavePanel'
 import { Button } from '../components/Button'
 import { Card, FieldLabel } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
@@ -6,6 +7,7 @@ import { IconButton } from '../components/IconButton'
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  CheckIcon,
   CloseIcon,
   PauseIcon,
   PencilIcon,
@@ -16,15 +18,35 @@ import {
   WaveIcon,
 } from '../components/Icons'
 import { SegmentedControl } from '../components/SegmentedControl'
+import { SoundScene } from '../components/SoundScene'
 import { TextField } from '../components/TextArea'
+import {
+  RAIN_CHARACTERS,
+  isBuiltInAmbientId,
+  type BuiltInAmbientId,
+  type RainCharacter,
+} from '../lib/ambient'
 import { MusicEngine, type TrackSource } from '../lib/audio'
 import { AudioBus } from '../lib/audioBus'
+import { BrainwaveVoice } from '../lib/brainwaveAudio'
 import { cx } from '../lib/cx'
 import { formatApproxDuration, formatBytes } from '../lib/format'
 import { estimateUsage, getCustomTrack } from '../lib/storage'
 import { MAX_TRACK_BYTES, type TrackMeta } from '../lib/types'
 import { useLibrary } from '../state/LibraryProvider'
 import { useSession } from '../state/SessionProvider'
+
+const RAIN_LABELS: Record<RainCharacter, string> = {
+  soft: 'Soft',
+  steady: 'Steady',
+  full: 'Full',
+}
+
+const RAIN_HINTS: Record<RainCharacter, string> = {
+  soft: 'Fewer, quieter drops and a darker bed.',
+  steady: 'The everyday setting — even rainfall on the glass.',
+  full: 'Denser and brighter, with more warmth underneath.',
+}
 
 export function SoundsRoute() {
   const {
@@ -35,31 +57,38 @@ export function SoundsRoute() {
     renameTrack,
     removeTrack,
   } = useLibrary()
-  const { draft, updateSettings } = useSession()
+  const { draft, updateSettings, setBrainwave } = useSession()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const previewRef = useRef<MusicEngine | null>(null)
   // Auditioning a sound runs on its own bus so it never disturbs a live session.
   const previewBusRef = useRef<AudioBus | null>(null)
+  const rhythmPreviewRef = useRef<BrainwaveVoice | null>(null)
 
   const [previewId, setPreviewId] = useState<string | null>(null)
+  const [rhythmPreviewing, setRhythmPreviewing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [notes, setNotes] = useState<string[]>([])
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [usage, setUsage] = useState<string | null>(null)
 
-  const { sound } = draft.settings
+  const { sound, brainwave } = draft.settings
 
   if (!previewBusRef.current) previewBusRef.current = new AudioBus()
   if (!previewRef.current) {
     previewRef.current = new MusicEngine(previewBusRef.current)
   }
+  if (!rhythmPreviewRef.current) {
+    rhythmPreviewRef.current = new BrainwaveVoice(previewBusRef.current)
+  }
 
   useEffect(() => {
     const engine = previewRef.current
+    const rhythm = rhythmPreviewRef.current
     const bus = previewBusRef.current
     return () => {
       engine?.dispose()
+      rhythm?.dispose()
       bus?.close()
     }
   }, [])
@@ -88,7 +117,9 @@ export function SoundsRoute() {
       }
 
       engine.unlock()
-      engine.setVolume(Math.max(0.35, draft.settings.musicVolume))
+      // Previews open at a moderate level whatever the loop is set to.
+      engine.setVolume(Math.min(0.6, Math.max(0.35, draft.settings.musicVolume)))
+      engine.setAmbienceOptions({ rainCharacter: sound.rainCharacter })
       setPreviewId(track.id)
 
       let source: TrackSource
@@ -105,8 +136,37 @@ export function SoundsRoute() {
 
       await engine.play([source], 'one')
     },
-    [draft.settings.musicVolume, previewId, stopPreview],
+    [draft.settings.musicVolume, previewId, sound.rainCharacter, stopPreview],
   )
+
+  /** Keep a running rain preview in step with the character control. */
+  useEffect(() => {
+    previewRef.current?.setAmbienceOptions({ rainCharacter: sound.rainCharacter })
+  }, [sound.rainCharacter])
+
+  const toggleRhythmPreview = useCallback(() => {
+    const voice = rhythmPreviewRef.current
+    const bus = previewBusRef.current
+    if (!voice || !bus) return
+
+    if (rhythmPreviewing) {
+      voice.stop()
+      setRhythmPreviewing(false)
+      return
+    }
+
+    // Reached synchronously from the tap, so the context is allowed to start.
+    bus.ensure()
+    bus.setMusicVolume(Math.min(0.6, Math.max(0.35, draft.settings.musicVolume)))
+    voice.apply({ ...brainwave, enabled: true })
+    setRhythmPreviewing(true)
+  }, [brainwave, draft.settings.musicVolume, rhythmPreviewing])
+
+  /** A live rhythm preview follows the controls as they move. */
+  useEffect(() => {
+    if (!rhythmPreviewing) return
+    rhythmPreviewRef.current?.apply({ ...brainwave, enabled: true })
+  }, [brainwave, rhythmPreviewing])
 
   const handleFiles = useCallback(
     async (files: FileList | null) => {
@@ -156,13 +216,18 @@ export function SoundsRoute() {
     })
   }
 
+  const rainSelected =
+    (sound.mode === 'single' && sound.trackId === 'rain-window') ||
+    inPlaylist('rain-window') ||
+    previewId === 'rain-window'
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 lg:grid lg:max-w-none lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start lg:gap-8 lg:space-y-0">
       <header data-rise className="pt-2 lg:col-span-2">
         <h1 className="type-display">Sounds</h1>
         <p className="type-body mt-3">
-          Two ambiences come built in. You can also bring your own audio — it stays
-          on this device.
+          Five ambiences and five rhythms come built in, all generated on this
+          device. You can also bring your own audio — it stays here too.
         </p>
       </header>
 
@@ -171,11 +236,15 @@ export function SoundsRoute() {
           data-rise
           level="stage"
           title="Built in"
-          description="Generated live in your browser, so they always work offline."
+          description="Generated live in your browser, so they always work offline. None of these are recordings."
         >
-          <div className="space-y-2">
+          <div
+            role="radiogroup"
+            aria-label="Built-in ambience"
+            className="space-y-2.5"
+          >
             {builtinTracks.map((track) => (
-              <TrackRow
+              <AmbienceCard
                 key={track.id}
                 track={track}
                 playing={previewId === track.id}
@@ -190,109 +259,145 @@ export function SoundsRoute() {
                 onTogglePlaylist={() => togglePlaylist(track.id)}
               />
             ))}
-        </div>
-      </Card>
+          </div>
 
-      <Card
-        data-rise
-        title="Your sounds"
-        description={`Audio files up to ${formatBytes(MAX_TRACK_BYTES)} each.`}
-        action={
-          <Button
-            variant="secondary"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            leading={<UploadIcon className="text-[0.95rem]" />}
-          >
-            {importing ? 'Adding…' : 'Import'}
-          </Button>
-        }
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac,.flac"
-          multiple
-          className="sr-only"
-          onChange={(event) => void handleFiles(event.target.files)}
-        />
+          {rainSelected && (
+            <div className="mt-5 border-t border-[var(--quiet-border)] pt-5">
+              <FieldLabel hint="Rain on Window">Rain character</FieldLabel>
+              <SegmentedControl
+                label="Rain character"
+                value={sound.rainCharacter}
+                onChange={(rainCharacter) =>
+                  updateSettings({ sound: { ...sound, rainCharacter } })
+                }
+                segments={RAIN_CHARACTERS.map((value) => ({
+                  value,
+                  label: RAIN_LABELS[value],
+                }))}
+              />
+              <p className="mt-2 text-[0.82rem] leading-snug text-ink-faint">
+                {RAIN_HINTS[sound.rainCharacter]} No thunder, at any setting.
+              </p>
+            </div>
+          )}
 
-        {notes.length > 0 && (
-          <ul className="mb-4 space-y-1 rounded-2xl border border-[var(--border)] bg-[var(--gold-soft)] px-4 py-3 text-[0.88rem] leading-relaxed text-ink">
-            {notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        )}
+          <p className="type-meta mt-5">
+            Whichever you pick, please choose a listening level that feels
+            comfortable — these are meant to sit under your words, not over them.
+          </p>
+        </Card>
 
-        {customTracks.length === 0 ? (
-          <EmptyState
-            icon={<WaveIcon />}
-            title="No imported sounds"
-            description="Bring in music or ambience you already own. Please only use audio you have the right to use."
-            action={
-              <Button variant="primary" onClick={() => fileInputRef.current?.click()}>
-                Choose audio files
-              </Button>
-            }
+        <Card
+          data-rise
+          title="Brainwave rhythm"
+          description="A generated rhythm that can play on its own or under an ambience."
+        >
+          <BrainwavePanel
+            settings={brainwave}
+            onChange={setBrainwave}
+            previewing={rhythmPreviewing}
+            onTogglePreview={toggleRhythmPreview}
           />
-        ) : (
-          <div className="space-y-2">
-            {customTracks.map((track) =>
-              renamingId === track.id ? (
-                <div key={track.id} className="flex items-center gap-2">
-                  <TextField
-                    autoFocus
-                    aria-label={`Rename ${track.name}`}
-                    value={renameValue}
-                    onChange={(event) => setRenameValue(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
+        </Card>
+
+        <Card
+          data-rise
+          title="Your sounds"
+          description={`Audio files up to ${formatBytes(MAX_TRACK_BYTES)} each.`}
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              leading={<UploadIcon className="text-[0.95rem]" />}
+            >
+              {importing ? 'Adding…' : 'Import'}
+            </Button>
+          }
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac,.flac"
+            multiple
+            className="sr-only"
+            onChange={(event) => void handleFiles(event.target.files)}
+          />
+
+          {notes.length > 0 && (
+            <ul className="mb-4 space-y-1 rounded-2xl border border-[var(--border)] bg-[var(--gold-soft)] px-4 py-3 text-[0.88rem] leading-relaxed text-ink">
+              {notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          )}
+
+          {customTracks.length === 0 ? (
+            <EmptyState
+              icon={<WaveIcon />}
+              title="No imported sounds"
+              description="Bring in music or ambience you already own. Please only use audio you have the right to use."
+              action={
+                <Button variant="primary" onClick={() => fileInputRef.current?.click()}>
+                  Choose audio files
+                </Button>
+              }
+            />
+          ) : (
+            <div className="space-y-2">
+              {customTracks.map((track) =>
+                renamingId === track.id ? (
+                  <div key={track.id} className="flex items-center gap-2">
+                    <TextField
+                      autoFocus
+                      aria-label={`Rename ${track.name}`}
+                      value={renameValue}
+                      onChange={(event) => setRenameValue(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          void renameTrack(track.id, renameValue)
+                          setRenamingId(null)
+                        }
+                        if (event.key === 'Escape') setRenamingId(null)
+                      }}
+                    />
+                    <Button
+                      variant="primary"
+                      onClick={() => {
                         void renameTrack(track.id, renameValue)
                         setRenamingId(null)
-                      }
-                      if (event.key === 'Escape') setRenamingId(null)
+                      }}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                ) : (
+                  <TrackRow
+                    key={track.id}
+                    track={track}
+                    playing={previewId === track.id}
+                    selected={sound.mode === 'single' && sound.trackId === track.id}
+                    inPlaylist={inPlaylist(track.id)}
+                    onPreview={() => void togglePreview(track)}
+                    onSelect={() =>
+                      updateSettings({
+                        sound: { ...sound, mode: 'single', trackId: track.id },
+                      })
+                    }
+                    onTogglePlaylist={() => togglePlaylist(track.id)}
+                    onRename={() => {
+                      setRenamingId(track.id)
+                      setRenameValue(track.name)
                     }}
+                    onDelete={() => void handleDelete(track)}
                   />
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      void renameTrack(track.id, renameValue)
-                      setRenamingId(null)
-                    }}
-                  >
-                    Save
-                  </Button>
-                </div>
-              ) : (
-                <TrackRow
-                  key={track.id}
-                  track={track}
-                  playing={previewId === track.id}
-                  selected={sound.mode === 'single' && sound.trackId === track.id}
-                  inPlaylist={inPlaylist(track.id)}
-                  onPreview={() => void togglePreview(track)}
-                  onSelect={() =>
-                    updateSettings({
-                      sound: { ...sound, mode: 'single', trackId: track.id },
-                    })
-                  }
-                  onTogglePlaylist={() => togglePlaylist(track.id)}
-                  onRename={() => {
-                    setRenamingId(track.id)
-                    setRenameValue(track.name)
-                  }}
-                  onDelete={() => void handleDelete(track)}
-                />
-              ),
-            )}
-          </div>
-        )}
+                ),
+              )}
+            </div>
+          )}
 
-        {usage && (
-          <p className="mt-4 text-[0.82rem] text-ink-faint">{usage}</p>
-        )}
-      </Card>
+          {usage && <p className="mt-4 text-[0.82rem] text-ink-faint">{usage}</p>}
+        </Card>
       </div>
 
       <Card
@@ -381,14 +486,135 @@ export function SoundsRoute() {
                 { value: 'playlist', label: 'Playlist' },
               ]}
             />
+            <p className="mt-2 text-[0.82rem] leading-snug text-ink-faint">
+              The brainwave rhythm is separate from this, and stays on even with
+              ambience turned off.
+            </p>
           </div>
         </div>
       </Card>
 
-      <p className="px-1 pb-2 text-center text-[0.82rem] leading-relaxed text-ink-faint">
-        Manifester ships with no third-party audio. The built-in ambiences are
-        synthesised in your browser, and imported files never leave your device.
+      <p className="px-1 pb-2 text-center text-[0.82rem] leading-relaxed text-ink-faint lg:col-span-2">
+        Manifester ships with no third-party audio. Every built-in ambience and
+        rhythm is synthesised in your browser as it plays, and imported files
+        never leave your device.
       </p>
+    </div>
+  )
+}
+
+interface AmbienceCardProps {
+  track: TrackMeta
+  playing: boolean
+  selected: boolean
+  inPlaylist: boolean
+  onPreview: () => void
+  onSelect: () => void
+  onTogglePlaylist: () => void
+}
+
+/**
+ * One built-in soundscape.
+ *
+ * The scene on the left is decoration; the name, the sentence under it and the
+ * word "Selected" are what actually carry the state.
+ */
+function AmbienceCard({
+  track,
+  playing,
+  selected,
+  inPlaylist,
+  onPreview,
+  onSelect,
+  onTogglePlaylist,
+}: AmbienceCardProps) {
+  const sceneId: BuiltInAmbientId | null = isBuiltInAmbientId(track.id)
+    ? track.id
+    : null
+
+  return (
+    <div
+      className={cx(
+        'rounded-[1.15rem] border px-3 py-3 transition-colors duration-200',
+        selected
+          ? 'border-[var(--rose)] bg-[var(--rose-soft)]'
+          : 'border-[var(--border)] bg-[var(--surface-sunken)]',
+      )}
+    >
+      <div className="flex items-start gap-3">
+        {sceneId && <SoundScene id={sceneId} />}
+
+        <button
+          type="button"
+          role="radio"
+          aria-checked={selected}
+          /*
+           * Spelled out rather than left to the contents, which would otherwise
+           * run the name, the sentence, the badge and the word "Selected"
+           * together into one unpunctuated string.
+           */
+          aria-label={[
+            track.name,
+            track.description,
+            'Generated on this device.',
+            selected ? 'Selected.' : null,
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          onClick={onSelect}
+          className="interactive min-w-0 grow rounded-[0.85rem] py-0.5 text-left"
+        >
+          <span className="flex items-center gap-2">
+            <span className="truncate text-[1rem] font-medium text-ink">
+              {track.name}
+            </span>
+            {selected && (
+              <span className="inline-flex shrink-0 items-center gap-1 text-[0.72rem] font-medium tracking-[0.06em] text-[var(--rose-deep)] uppercase">
+                <CheckIcon className="text-[0.7rem]" />
+                Selected
+              </span>
+            )}
+          </span>
+          <span className="mt-0.5 block text-[0.85rem] leading-snug text-ink-muted">
+            {track.description}
+          </span>
+          <span className="mt-1.5 inline-block rounded-pill bg-[var(--quiet)] px-2 py-0.5 text-[0.72rem] text-ink-faint">
+            Generated on this device
+          </span>
+        </button>
+      </div>
+
+      {/* Aligned under the text: the 3.25rem scene plus the 0.75rem gap. */}
+      <div className="mt-2.5 flex items-center gap-2 pl-16">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onPreview}
+          leading={
+            playing ? (
+              <PauseIcon className="text-[0.8rem]" />
+            ) : (
+              <PlayIcon className="text-[0.8rem]" />
+            )
+          }
+          aria-label={
+            playing ? `Stop preview of ${track.name}` : `Preview ${track.name}`
+          }
+        >
+          {playing ? 'Stop preview' : 'Preview'}
+        </Button>
+
+        <IconButton
+          label={
+            inPlaylist
+              ? `Remove ${track.name} from the playlist`
+              : `Add ${track.name} to the playlist`
+          }
+          icon={inPlaylist ? <TrashIcon /> : <PlusIcon />}
+          onClick={onTogglePlaylist}
+          className={inPlaylist ? 'border-[var(--sage)] text-[var(--sage)]' : undefined}
+        />
+      </div>
     </div>
   )
 }
@@ -446,8 +672,15 @@ function TrackRow({
         className="min-w-0 grow py-1 text-left"
         aria-pressed={selected}
       >
-        <span className="block truncate text-[0.98rem] font-medium text-ink">
-          {track.name}
+        <span className="flex items-center gap-2">
+          <span className="truncate text-[0.98rem] font-medium text-ink">
+            {track.name}
+          </span>
+          {selected && (
+            <span className="shrink-0 text-[0.72rem] font-medium tracking-[0.06em] text-[var(--rose-deep)] uppercase">
+              Selected
+            </span>
+          )}
         </span>
         {meta && (
           <span className="block truncate text-[0.82rem] text-ink-muted">{meta}</span>

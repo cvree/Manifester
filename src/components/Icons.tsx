@@ -220,6 +220,22 @@ export const TuneIcon = (props: IconProps) => (
   </Icon>
 )
 
+/** A slow rhythmic trace — the brainwave rhythm. */
+export const PulseIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M2.8 12h2.6l1.5-4.4 2.4 8.8 2.4-9.6 2.4 9.6 1.5-4.4h2.6" />
+  </Icon>
+)
+
+/** Over-ear headphones — the binaural requirement. */
+export const HeadphonesIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M4.6 14.4v-1.9a7.4 7.4 0 0 1 14.8 0v1.9" />
+    <rect x="2.8" y="13.6" width="3.6" height="6.2" rx="1.8" />
+    <rect x="17.6" y="13.6" width="3.6" height="6.2" rx="1.8" />
+  </Icon>
+)
+
 /** A gently opening flower — the Create tab. */
 export const BloomIcon = (props: IconProps) => (
   <Icon {...props}>

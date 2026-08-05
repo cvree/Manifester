@@ -16,6 +16,12 @@
  */
 
 import { findAmbientPreset } from './ambient'
+import {
+  createBrainwaveGraph,
+  getTargetHz,
+  normaliseBrainwave,
+  type BrainwavePresetId,
+} from './brainwaveAudio'
 import type { LoopSettings } from './types'
 import * as storage from './storage'
 
@@ -73,9 +79,45 @@ function toMono(buffer: AudioBuffer): Float32Array<ArrayBuffer> {
 
 /**
  * Render the loop's background selection into a loopable bed.
- * Returns an empty array when the loop has no background sound.
+ * Returns an empty array when the loop has neither ambience nor a rhythm.
  */
 export async function renderBackgroundBed(
+  settings: LoopSettings,
+): Promise<Float32Array<ArrayBuffer>> {
+  const ambience = await renderAmbienceBed(settings)
+  const brainwave = normaliseBrainwave(settings.brainwave)
+  if (!brainwave.enabled) return ambience
+
+  /*
+   * A file has to loop, and the rhythm has to stay exact across the loop point.
+   * The exporter crossfades the bed's tail over its head and then drops the
+   * tail, so the length that actually repeats is `bed - crossfade`. Making that
+   * a whole number of seconds puts the 200 Hz carrier and every target rate —
+   * 40, 20, 10, 6 and 2 Hz all divide a second exactly — back in phase at the
+   * wrap, so the crossfade sums coherently instead of stepping the waveform.
+   */
+  const crossfade = Math.floor(BED_CROSSFADE_SECONDS * EXPORT_SAMPLE_RATE)
+  const seconds =
+    ambience.length > 0
+      ? Math.max(
+          1,
+          Math.floor((ambience.length - crossfade) / EXPORT_SAMPLE_RATE),
+        )
+      : BED_SECONDS
+  const length = seconds * EXPORT_SAMPLE_RATE + crossfade
+
+  const rhythm = await renderBrainwave(brainwave.preset, brainwave.depth, length)
+
+  const bed = new Float32Array(length)
+  for (let i = 0; i < length; i += 1) {
+    // Ambience keeps its own loop, so it simply wraps inside the new length.
+    const ambient = ambience.length > 0 ? ambience[i % ambience.length] : 0
+    bed[i] = ambient + (rhythm[i] ?? 0) * brainwave.volume
+  }
+  return bed
+}
+
+async function renderAmbienceBed(
   settings: LoopSettings,
 ): Promise<Float32Array<ArrayBuffer>> {
   const { sound } = settings
@@ -95,7 +137,10 @@ export async function renderBackgroundBed(
     const preset = findAmbientPreset(id)
     if (preset) {
       const ctx = offlineContext(BED_SECONDS)
-      preset.build(ctx, ctx.destination, { offlineSeconds: BED_SECONDS })
+      preset.build(ctx, ctx.destination, {
+        offlineSeconds: BED_SECONDS,
+        rainCharacter: sound.rainCharacter,
+      })
       const rendered = await ctx.startRendering()
       segments.push(toMono(rendered))
       continue
@@ -123,6 +168,31 @@ export async function renderBackgroundBed(
     offset += segment.length
   }
   return bed
+}
+
+/**
+ * Render the rhythm as amplitude modulation, whatever mode the app is playing.
+ *
+ * The exported file is mono, and a binaural pair summed to one channel *is* an
+ * amplitude-modulated carrier at the same beat rate — so there is nothing to
+ * lose by building the modulation graph directly, and the result is the same
+ * exact rate either way.
+ */
+async function renderBrainwave(
+  preset: BrainwavePresetId,
+  depth: number,
+  lengthSamples: number,
+): Promise<Float32Array<ArrayBuffer>> {
+  const ctx = offlineContext(lengthSamples / EXPORT_SAMPLE_RATE)
+  const graph = createBrainwaveGraph(ctx, {
+    targetHz: getTargetHz(preset),
+    mode: 'amplitude-modulation',
+    depth,
+  })
+  graph.out.connect(ctx.destination)
+  graph.setLevel(1, 0)
+  const rendered = await ctx.startRendering()
+  return toMono(rendered)
 }
 
 async function decodeTrack(blob: Blob): Promise<Float32Array<ArrayBuffer> | null> {

@@ -15,8 +15,14 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { findAmbientPreset } from '../lib/ambient'
 import { MusicEngine, type TrackSource } from '../lib/audio'
 import { AudioBus } from '../lib/audioBus'
+import {
+  BrainwaveVoice,
+  normaliseBrainwave,
+  type BrainwaveSettings,
+} from '../lib/brainwaveAudio'
 import { loopToDraft, normaliseSettings, type Draft } from '../lib/loops'
 import { SpeechLooper, isSpeechSupported, loadVoices } from '../lib/speech'
 import * as storage from '../lib/storage'
@@ -84,6 +90,8 @@ interface SessionContextValue {
   setLiveVoiceVolume: (value: number) => void
   setLiveMusicVolume: (value: number) => void
   setLiveRate: (value: number) => void
+  /** Change the brainwave rhythm, taking effect at once during a session. */
+  setBrainwave: (patch: Partial<BrainwaveSettings>) => void
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null)
@@ -106,7 +114,11 @@ function newDraft(): Draft {
     id: null,
     title: '',
     text: '',
-    settings: { ...DEFAULT_SETTINGS, sound: { ...DEFAULT_SETTINGS.sound } },
+    settings: {
+      ...DEFAULT_SETTINGS,
+      sound: { ...DEFAULT_SETTINGS.sound },
+      brainwave: { ...DEFAULT_SETTINGS.brainwave },
+    },
   }
 }
 
@@ -121,11 +133,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const busRef = useRef<AudioBus | null>(null)
   const speechRef = useRef<SpeechLooper | null>(null)
   const musicRef = useRef<MusicEngine | null>(null)
+  const brainwaveRef = useRef<BrainwaveVoice | null>(null)
   const timerRef = useRef<SessionTimer | null>(null)
   const elapsedRef = useRef<{ startedAt: number; interval: number | null }>({
     startedAt: 0,
     interval: null,
   })
+  /**
+   * True between `start()` and `finish()`. Generated sound is only ever touched
+   * while this holds, which is what guarantees nothing reaches for the audio
+   * hardware outside a real tap — including on first load.
+   */
+  const liveRef = useRef(false)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
 
   const speechSupported = useMemo(isSpeechSupported, [])
@@ -133,6 +152,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   if (!busRef.current) busRef.current = new AudioBus()
   if (!speechRef.current) speechRef.current = new SpeechLooper()
   if (!musicRef.current) musicRef.current = new MusicEngine(busRef.current)
+  if (!brainwaveRef.current) brainwaveRef.current = new BrainwaveVoice(busRef.current)
   if (!timerRef.current) timerRef.current = new SessionTimer()
 
   /* ── Voices ── */
@@ -315,7 +335,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     (status: SessionStatus, notice: string | null) => {
       speechRef.current?.stop()
       musicRef.current?.stop()
+      brainwaveRef.current?.stop()
       timerRef.current?.stop()
+      liveRef.current = false
       stopElapsed()
       releaseWakeLock()
       setSession((current) => ({
@@ -381,6 +403,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       if (!started) return
 
+      liveRef.current = true
       setSession({
         ...EMPTY_SESSION,
         status: 'playing',
@@ -399,9 +422,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           setSession((current) => ({ ...current, notice: message })),
       })
       music.setVolume(settings.musicVolume)
+      music.setAmbienceOptions({ rainCharacter: settings.sound.rainCharacter })
       void resolveTrackSources(settings).then((sources) => {
         if (sources.length > 0) void music.play(sources, settings.sound.repeat)
       })
+
+      // The rhythm is a sibling of the ambience, not part of it: it plays on
+      // its own whether or not a soundscape was chosen.
+      brainwaveRef.current?.apply(settings.brainwave)
 
       if (settings.timerMinutes != null) {
         timer.start(settings.timerMinutes * 60_000, {
@@ -476,6 +504,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [updateSettings],
   )
 
+  const setBrainwave = useCallback<SessionContextValue['setBrainwave']>(
+    (patch) => {
+      setDraft((current) => {
+        const brainwave = normaliseBrainwave({
+          ...current.settings.brainwave,
+          ...patch,
+        })
+        const settings = { ...current.settings, brainwave }
+        void storage.saveLastSettings(settings)
+        // Only a running session touches the audio graph; editing while idle is
+        // just editing.
+        if (liveRef.current) brainwaveRef.current?.apply(brainwave)
+        return { ...current, settings }
+      })
+    },
+    [],
+  )
+
+  /**
+   * Rain's character can change mid-session. The engine ignores this unless an
+   * ambience is already playing, so it can never start one.
+   */
+  useEffect(() => {
+    musicRef.current?.setAmbienceOptions({
+      rainCharacter: draft.settings.sound.rainCharacter,
+    })
+  }, [draft.settings.sound.rainCharacter])
+
   /* ── Lifecycle ── */
 
   useEffect(() => {
@@ -494,11 +550,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const speech = speechRef.current
     const music = musicRef.current
+    const brainwave = brainwaveRef.current
     const timer = timerRef.current
     const bus = busRef.current
     return () => {
       speech?.stop()
       music?.dispose()
+      brainwave?.dispose()
       timer?.stop()
       bus?.close()
       stopElapsed()
@@ -529,6 +587,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLiveVoiceVolume,
       setLiveMusicVolume,
       setLiveRate,
+      setBrainwave,
     }),
     [
       draft,
@@ -553,6 +612,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLiveVoiceVolume,
       setLiveMusicVolume,
       setLiveRate,
+      setBrainwave,
     ],
   )
 
@@ -580,12 +640,13 @@ async function resolveTrackSources(settings: LoopSettings): Promise<TrackSource[
   const sources: TrackSource[] = []
 
   for (const id of ids) {
-    if (id === 'moon-garden' || id === 'soft-horizon') {
+    const preset = findAmbientPreset(id)
+    if (preset) {
       sources.push({
         id,
-        name: id === 'moon-garden' ? 'Moon Garden' : 'Soft Horizon',
+        name: preset.name,
         kind: 'builtin',
-        presetId: id,
+        presetId: preset.id,
       })
       continue
     }

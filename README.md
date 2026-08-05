@@ -111,7 +111,14 @@ app.
 
 **Sounds**
 
-- Two built-in ambiences: **Moon Garden** and **Soft Horizon**.
+- Five built-in ambiences, all generated live: **Moon Garden**, **Soft
+  Horizon**, **Rain on Window**, **Ocean Tide** and **Fireplace Glow**. Each has
+  its own preview, a one-line description, a small decorative scene, and a
+  "Generated on this device" label.
+- **Rain character** — Soft, Steady or Full, changing density, brightness and
+  low-end warmth. No thunder at any setting.
+- Switching between ambiences **crossfades** over 1.5 s rather than cutting.
+- **Brainwave Rhythm** — five optional rhythms at exact rates, off by default.
 - Import your own audio (MP3, M4A, WAV, OGG, FLAC — up to 40 MB each).
 - Rename, preview, and delete imported sounds.
 - Build an ordered playlist, reorder it, and choose repeat-one or repeat-all.
@@ -119,7 +126,9 @@ app.
 **Saved**
 
 - Every saved loop keeps its text, title, voice, speed, pitch, volumes, timer,
-  sound selection, playlist, repeat mode, and dates.
+  sound selection, rain character, brainwave rhythm, playlist, repeat mode, and
+  dates. A loop saved before a setting existed loads with it turned off rather
+  than failing.
 - Play, edit, duplicate, or delete.
 
 **Everywhere**
@@ -145,16 +154,118 @@ app.
 
 ## The built-in sounds are generated, not sampled
 
-Moon Garden and Soft Horizon are **not audio files**. They are built live in the
-Web Audio graph from oscillators, filtered brown noise, and slow LFOs
+None of the five ambiences are audio files. They are built live in the Web Audio
+graph from oscillators, filtered noise and slow LFOs
 ([`src/lib/ambient.ts`](src/lib/ambient.ts)).
 
 That choice does three useful things: the download stays tiny, the sounds work
 offline forever with no cache to miss, and **this repository contains no
 third-party audio of any kind**. Nothing was sampled, scraped, or borrowed.
 
+Three ideas hold across all of them:
+
+- **One noise buffer per shape, per context.** A soundscape reads the same few
+  seconds of pink or brown noise from a dozen places at different offsets and
+  playback rates. Nothing longer than nine seconds is ever generated.
+- **Transients are scheduled in a rolling window.** Rain droplets, fire crackles
+  and ocean waves are laid onto the audio thread a couple of seconds ahead, so a
+  throttled tab cannot change their timing, and stopping cancels everything still
+  in flight.
+- **Randomness is bounded.** Every random parameter is drawn from a curated range
+  with a hard ceiling on gain, so no seed can produce a droplet, crackle or pop
+  louder than intended. The ceilings are asserted directly against adversarial
+  draws.
+
 Any other sound you hear is audio you imported yourself. Please only import audio
 you have the right to use.
+
+---
+
+## Brainwave rhythms
+
+Five optional rhythms, off by default, named after the conventional EEG frequency
+bands ([`src/lib/brainwaveAudio.ts`](src/lib/brainwaveAudio.ts)):
+
+| Preset      | Exact target |  Conventional band |   Binaural pair |
+| ----------- | -----------: | -----------------: | --------------: |
+| Gamma Waves |        40 Hz |          30 – 80 Hz | modulation only |
+| Beta Waves  |        20 Hz |          13 – 30 Hz |    190 / 210 Hz |
+| Alpha Waves |        10 Hz |           8 – 13 Hz |    195 / 205 Hz |
+| Theta Waves |         6 Hz |            4 – 8 Hz |    197 / 203 Hz |
+| Delta Waves |         2 Hz |          0.5 – 4 Hz |    199 / 201 Hz |
+
+Band edges differ between clinical and research references, so the app presents
+them as conventional ranges rather than universal boundaries. The target rates
+themselves are fixed and exact.
+
+Those rates are far below hearing and are never played as pitches. By default a
+200 Hz sine carrier is amplitude-modulated at the target rate:
+
+```text
+carrier(t)  = sin(2π · 200 · t)
+envelope(t) = 0.5 · [1 + sin(2π · targetHz · t)]
+output(t)   = gain · carrier(t) · envelope(t)
+```
+
+The envelope is an `OscillatorNode` wired into a `GainNode`'s `gain`
+`AudioParam` — an audio-rate connection on the rendering thread. No interval, no
+frame callback, no restarted oscillator, so a backgrounded tab or a dropped frame
+cannot shift the rate. The tests render each preset through a real Web Audio
+implementation and measure the cycle rate that actually came out, to within
+0.05 Hz.
+
+**Headphone binaural mode** is optional. Each ear receives one tone, hard-split
+through a `ChannelMergerNode`, offset symmetrically about 200 Hz so the
+difference is exactly the target and the mean is exactly the carrier. Headphones
+are genuinely required: a speaker mixes both tones into both ears. Binaural
+beating is generally discussed for differences of roughly 1–30 Hz, so 40 Hz Gamma
+falls back to amplitude modulation even with headphone mode on, and says so on
+screen.
+
+Two rules keep the numbers honest:
+
+- `BRAINWAVE_PRESETS` is the only place a frequency is written down.
+- A persisted `targetHz` is never trusted. It is re-derived from the preset id, so
+  a stale or hand-edited saved ritual cannot play at some other rate.
+
+Scientific evidence that any of this reliably changes brain activity, or produces
+a particular psychological outcome, remains inconsistent. Experiences vary. The
+feature is not a medical treatment or a diagnostic tool, and the app says exactly
+that wherever it appears.
+
+---
+
+## How the generated sound is mixed
+
+Ambience and rhythm are siblings under one volume, so either can be off without
+touching the other ([`src/lib/audioBus.ts`](src/lib/audioBus.ts)):
+
+```text
+ambience ─┐
+          ├─→ generated (sound volume) ─→ ceiling ─→ master ─→ output
+  rhythm ─┘
+```
+
+The spoken affirmation does not pass through here at all — speech synthesis
+happens outside the page — so the voice is never squashed and stays the clearest
+thing in the mix.
+
+The ceiling is a fixed soft-clip curve rather than a `DynamicsCompressorNode`. A
+compressor is the more musical answer, but how it behaves is up to the engine and
+the differences are not small: measured against `node-web-audio-api` it applies
+about 2.5 dB of makeup gain below its own threshold where Chrome applies none,
+which would make the whole app louder on one engine than another. A waveshaper is
+arithmetic. It is exactly the identity below 0.7 — ordinary listening peaks around
+0.11, and the loudest single soundscape at full volume reaches about 0.33 — and it
+cannot emit above its own maximum however much arrives. That linearity is also
+what lets it sit in the path of a binaural pair without disturbing the channel
+separation the beat depends on.
+
+Every audible gain change goes through one primitive
+([`src/lib/audioParams.ts`](src/lib/audioParams.ts)) that pins the value a ramp
+had actually reached before starting a new one. That is what keeps starts, stops,
+pauses, preset changes, crossfades and slider drags free of clicks, and there is a
+rendered test for each.
 
 ---
 
@@ -359,6 +470,10 @@ npm run preview
 Other scripts:
 
 ```bash
+npm run test
+```
+
+```bash
 npm run typecheck
 ```
 
@@ -369,6 +484,36 @@ npm run icons
 `npm run icons` regenerates every PWA icon and the favicon from the single SVG
 motif in [`scripts/generate-icons.mjs`](scripts/generate-icons.mjs). The outputs
 are committed, so a plain `npm ci && npm run build` never needs to run it.
+
+### Tests
+
+`npm run test` runs Vitest against
+[`node-web-audio-api`](https://github.com/ircam-ismm/node-web-audio-api), a real
+Web Audio implementation for Node. It is a dev dependency only — nothing shipped
+imports it — and it is what makes the audio claims checkable rather than
+asserted: the tests build the same graph a browser builds, render it, and measure
+the result.
+
+- **Frequency.** Every preset's modulation rate is measured from a real render and
+  must land within 0.05 Hz of its target, Delta included, over a 30-second render.
+  Each binaural channel's pitch is measured separately, which only agrees with the
+  intended pair if the channels really are hard-split.
+- **Transitions.** `OfflineAudioContext.suspend()` interrupts a render partway
+  through so a test can call the production API at the context's own
+  `currentTime` — arriving, changing level, changing intensity, interrupting a
+  fade, crossfading presets, crossfading soundscapes, moving the master volume —
+  and then assert that the largest sample-to-sample jump anywhere never exceeds
+  the tone's own slew rate.
+- **Ceilings.** Random transient parameters are checked against adversarial draws,
+  not just typical ones. The mix ceiling is checked to be the identity across the
+  range real listening occupies, and to be unable to emit above full scale when
+  twelve loud oscillators are thrown at it.
+- **Lifecycle.** Each soundscape is asserted to hold sources open while playing,
+  release every one on stop, ignore a second stop, and keep two concurrent
+  instances independent.
+- **Compatibility.** A loop record written by the previous version — no
+  `brainwave` key, no `rainCharacter` — loads with the feature off and everything
+  else intact. A tampered `targetHz` is rebuilt from its preset.
 
 ### Project layout
 
@@ -391,8 +536,10 @@ src/
     recorder.ts     microphone capture for exports
     exportAudio.ts  offline bed rendering, decoding, normalisation
     audio.ts        background sound engine (synth + imported files)
-    audioBus.ts     owns the AudioContext and the sound channel
-    ambient.ts      the two generated ambiences
+    audioBus.ts     owns the AudioContext and the generated-sound mix
+    audioParams.ts  click-free ramps and the soft-clip ceiling
+    ambient.ts      the five generated ambiences
+    brainwaveAudio.ts  preset table, frequency maths and the rhythm engine
     storage.ts      IndexedDB + localStorage
     timer.ts        wall-clock session countdown
     motion.ts       reduced motion, low-power, breakpoint and platform detection

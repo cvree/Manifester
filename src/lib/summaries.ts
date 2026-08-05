@@ -8,6 +8,12 @@
  */
 
 import { cycleSeconds, findPreset, type BreathPattern } from './breathing'
+import {
+  BRAINWAVE_LIST,
+  formatHz,
+  resolveMode,
+  type BrainwaveSettings,
+} from './brainwaveAudio'
 import { hapticsSupported } from './feedback'
 import type { LoopSettings, TrackMeta } from './types'
 import type { RankedVoice } from './voiceRanking'
@@ -38,6 +44,19 @@ export function soundSummary(settings: LoopSettings, tracks: TrackMeta[]): strin
 
   const track = tracks.find((item) => item.id === sound.trackId)
   return track ? `${track.name} · ${level}` : 'Choose a sound'
+}
+
+/** e.g. `"Alpha Waves · 10 Hz · Rhythmic modulation"`. */
+export function brainwaveSummary(brainwave: BrainwaveSettings): string {
+  if (!brainwave.enabled) return 'Off'
+  const meta = BRAINWAVE_LIST.find((item) => item.id === brainwave.preset)
+  if (!meta) return 'Off'
+  const mode = resolveMode(brainwave.preset, brainwave.mode)
+  return [
+    meta.label,
+    formatHz(meta.targetHz),
+    mode === 'binaural' ? 'Binaural headphones' : 'Rhythmic modulation',
+  ].join(' · ')
 }
 
 export function breathingSummary(
