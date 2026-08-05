@@ -39,6 +39,12 @@ export interface LoopSettings {
   /** Manual override. When null, the ranked pick for `voiceStyle` wins. */
   voiceURI: string | null
   voiceName: string | null
+  /**
+   * A recording of the user's own voice, held in IndexedDB. Speech synthesis
+   * cannot be captured by a browser, so this is what makes a real exported
+   * audio file possible.
+   */
+  recordingId: string | null
   /** 0.5 – 1.6 */
   rate: number
   /** 0.5 – 1.5 */
@@ -77,6 +83,7 @@ export const DEFAULT_SETTINGS: LoopSettings = {
   voiceStyle: 'feminine',
   voiceURI: null,
   voiceName: null,
+  recordingId: null,
   rate: 0.9,
   pitch: 1,
   voiceVolume: 1,

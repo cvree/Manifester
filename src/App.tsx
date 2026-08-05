@@ -6,6 +6,7 @@ import { PlayerRoute } from './routes/PlayerRoute'
 import { SavedRoute } from './routes/SavedRoute'
 import { SoundsRoute } from './routes/SoundsRoute'
 import { LibraryProvider } from './state/LibraryProvider'
+import { PreferencesProvider } from './state/PreferencesProvider'
 import { SessionProvider } from './state/SessionProvider'
 import { ThemeProvider } from './state/ThemeProvider'
 
@@ -17,23 +18,25 @@ import { ThemeProvider } from './state/ThemeProvider'
 export default function App() {
   return (
     <ThemeProvider>
-      <LibraryProvider>
-        <SessionProvider>
-          <Router>
-            <Routes>
-              <Route element={<AppShell />}>
-                <Route index element={<Navigate to="/create" replace />} />
-                <Route path="/create" element={<CreateRoute />} />
-                <Route path="/player" element={<PlayerRoute />} />
-                <Route path="/saved" element={<SavedRoute />} />
-                <Route path="/sounds" element={<SoundsRoute />} />
-                <Route path="/about" element={<AboutRoute />} />
-                <Route path="*" element={<Navigate to="/create" replace />} />
-              </Route>
-            </Routes>
-          </Router>
-        </SessionProvider>
-      </LibraryProvider>
+      <PreferencesProvider>
+        <LibraryProvider>
+          <SessionProvider>
+            <Router>
+              <Routes>
+                <Route element={<AppShell />}>
+                  <Route index element={<Navigate to="/create" replace />} />
+                  <Route path="/create" element={<CreateRoute />} />
+                  <Route path="/player" element={<PlayerRoute />} />
+                  <Route path="/saved" element={<SavedRoute />} />
+                  <Route path="/sounds" element={<SoundsRoute />} />
+                  <Route path="/about" element={<AboutRoute />} />
+                  <Route path="*" element={<Navigate to="/create" replace />} />
+                </Route>
+              </Routes>
+            </Router>
+          </SessionProvider>
+        </LibraryProvider>
+      </PreferencesProvider>
     </ThemeProvider>
   )
 }

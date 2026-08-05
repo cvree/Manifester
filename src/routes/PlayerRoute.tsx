@@ -1,11 +1,18 @@
 import { useNavigate } from 'react-router'
+import { BreathingCaption, BreathingOrb } from '../components/BreathingOrb'
+import { BreathingSettings } from '../components/BreathingSettings'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
+import { Disclosure } from '../components/Disclosure'
 import { EmptyState } from '../components/EmptyState'
 import { CloseIcon, SeedIcon, SparkIcon } from '../components/Icons'
 import { PlayerControls } from '../components/PlayerControls'
 import { Slider } from '../components/Slider'
+import { Toggle } from '../components/Toggle'
+import { cue, hapticsSupported, primeFeedback } from '../lib/feedback'
 import { countWords, formatClock } from '../lib/format'
+import { useBreathing } from '../lib/useBreathing'
+import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
 
 export function PlayerRoute() {
@@ -22,10 +29,20 @@ export function PlayerRoute() {
     setLiveMusicVolume,
     setLiveRate,
   } = useSession()
+  const { preferences, update: updatePreferences } = usePreferences()
 
   const hasText = countWords(draft.text) > 0
   const idle = session.status === 'idle'
   const complete = session.status === 'complete'
+
+  // The guide follows the session: it breathes while you listen and holds
+  // still the moment you pause.
+  const breathing = useBreathing({
+    pattern: preferences.breathPattern,
+    active: preferences.breathingEnabled && session.status === 'playing',
+    soundCues: preferences.breathSoundCues,
+    hapticCues: preferences.breathHapticCues,
+  })
 
   if (idle && !hasText) {
     return (
@@ -47,12 +64,16 @@ export function PlayerRoute() {
   const caption = complete
     ? 'Session finished'
     : session.status === 'paused'
-      ? 'Paused'
+      ? session.delayRemaining != null
+        ? `Paused · ${session.delayRemaining}s of delay left`
+        : 'Paused'
       : idle
         ? 'Ready when you are'
-        : session.remainingSeconds != null
-          ? `${formatClock(session.remainingSeconds)} left`
-          : `Looping · ${formatClock(session.elapsedSeconds)}`
+        : session.delayRemaining != null
+          ? `Next loop in ${session.delayRemaining}s`
+          : session.remainingSeconds != null
+            ? `${formatClock(session.remainingSeconds)} left`
+            : `Looping · ${formatClock(session.elapsedSeconds)}`
 
   const passProgress =
     session.chunkTotal > 0
@@ -124,11 +145,30 @@ export function PlayerRoute() {
             <PlayerControls
               status={session.status}
               caption={caption}
-              onStart={() => start()}
-              onPause={pause}
-              onResume={resume}
-              onStop={stop}
+              onStart={() => {
+                primeFeedback()
+                cue('start')
+                start()
+              }}
+              onPause={() => {
+                cue('stop')
+                pause()
+              }}
+              onResume={() => {
+                cue('start')
+                resume()
+              }}
+              onStop={() => {
+                cue('stop')
+                stop()
+              }}
               disabled={!hasText}
+              visualizer={
+                preferences.breathingEnabled ? (
+                  <BreathingOrb runtime={breathing} />
+                ) : undefined
+              }
+              visualizerCaption={<BreathingCaption runtime={breathing} />}
             />
           </div>
 
@@ -203,6 +243,60 @@ export function PlayerRoute() {
           />
         </div>
       </Card>
+
+      <div className="space-y-3" data-rise>
+        <Disclosure
+          title="Breathing guide"
+          summary={
+            preferences.breathingEnabled
+              ? `On · in ${preferences.breathPattern.inhale}s, out ${preferences.breathPattern.exhale}s`
+              : 'Off'
+          }
+        >
+          <BreathingSettings
+            preferences={preferences}
+            onChange={updatePreferences}
+          />
+        </Disclosure>
+
+        <Disclosure
+          title="Sound and feel"
+          summary={
+            [
+              preferences.uiSounds ? 'Taps make a sound' : null,
+              preferences.uiHaptics && hapticsSupported() ? 'Vibration on' : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') || 'Quiet'
+          }
+        >
+          <div className="space-y-4">
+            <Toggle
+              label="Interface sounds"
+              description="A soft tone when you start, pause, or finish something."
+              checked={preferences.uiSounds}
+              onChange={(uiSounds) => {
+                updatePreferences({ uiSounds })
+                if (uiSounds) cue('tap')
+              }}
+            />
+            <Toggle
+              label="Vibration"
+              description={
+                hapticsSupported()
+                  ? 'A brief buzz on the main controls.'
+                  : 'Not available in this browser. iPhone does not let web apps vibrate.'
+              }
+              checked={preferences.uiHaptics && hapticsSupported()}
+              disabled={!hapticsSupported()}
+              onChange={(uiHaptics) => {
+                updatePreferences({ uiHaptics })
+                if (uiHaptics) cue('tap')
+              }}
+            />
+          </div>
+        </Disclosure>
+      </div>
 
       <div data-rise className="flex justify-center pb-2">
         <Button variant="ghost" onClick={() => navigate('/create')}>

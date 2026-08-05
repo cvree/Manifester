@@ -217,20 +217,6 @@ export function VoiceSettings({
         onChange={(voiceVolume) => onChange({ voiceVolume })}
       />
 
-      <Slider
-        label="Pause between repeats"
-        min={0}
-        max={20}
-        step={1}
-        value={settings.repeatPauseSeconds}
-        display={
-          settings.repeatPauseSeconds === 0
-            ? 'None'
-            : `${settings.repeatPauseSeconds}s`
-        }
-        hint="Quiet space before the text begins again."
-        onChange={(repeatPauseSeconds) => onChange({ repeatPauseSeconds })}
-      />
     </div>
   )
 }

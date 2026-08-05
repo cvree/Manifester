@@ -245,6 +245,19 @@ export class SpeechLooper {
     return this.chunks.length
   }
 
+  /**
+   * Seconds left in the silence between repetitions, or `null` when words are
+   * actually being spoken. Drives the countdown on the Player.
+   */
+  get delayRemainingSeconds(): number | null {
+    if (!this.running) return null
+    if (this.pausedGapMs != null) return this.pausedGapMs / 1000
+    if (this.pauseTimer != null && this.gapEndsAt > 0) {
+      return Math.max(0, (this.gapEndsAt - Date.now()) / 1000)
+    }
+    return null
+  }
+
   setVoices(voices: SpeechSynthesisVoice[]): void {
     this.voices = voices
   }

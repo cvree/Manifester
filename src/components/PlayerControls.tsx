@@ -1,6 +1,6 @@
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
-import { useRef } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { cx } from '../lib/cx'
 import { useReducedMotion } from '../lib/motion'
 import type { SessionStatus } from '../lib/types'
@@ -15,6 +15,13 @@ interface PlayerControlsProps {
   disabled?: boolean
   /** Shown under the button, e.g. `"Looping"` or `"12:04 left"`. */
   caption?: string
+  /**
+   * The breathing orb, drawn behind the play button. When present it replaces
+   * the default pulse rings so the two never compete for attention.
+   */
+  visualizer?: ReactNode
+  /** Rendered above the caption, for the breathing phase.  */
+  visualizerCaption?: ReactNode
 }
 
 export function PlayerControls({
@@ -25,6 +32,8 @@ export function PlayerControls({
   onStop,
   disabled = false,
   caption,
+  visualizer,
+  visualizerCaption,
 }: PlayerControlsProps) {
   const scope = useRef<HTMLDivElement>(null)
   const reducedMotion = useReducedMotion()
@@ -67,8 +76,10 @@ export function PlayerControls({
 
   return (
     <div ref={scope} className="flex flex-col items-center">
-      <div className="relative flex h-[13.5rem] w-[13.5rem] items-center justify-center">
-        {playing && !reducedMotion && (
+      <div className="relative flex h-[15rem] w-[15rem] items-center justify-center">
+        {visualizer}
+
+        {!visualizer && playing && !reducedMotion && (
           <>
             <span
               aria-hidden="true"
@@ -98,6 +109,8 @@ export function PlayerControls({
           {playing ? <PauseIcon /> : <PlayIcon className="translate-x-[3px]" />}
         </button>
       </div>
+
+      {visualizerCaption && <div className="mt-1 mb-1">{visualizerCaption}</div>}
 
       <div
         className="min-h-6 text-center text-[0.95rem] text-ink-muted"

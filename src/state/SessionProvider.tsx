@@ -44,6 +44,8 @@ interface SessionSnapshot {
   chunkTotal: number
   trackName: string | null
   notice: string | null
+  /** Seconds left in the delay between loops, or `null` while speaking. */
+  delayRemaining: number | null
 }
 
 interface SessionContextValue {
@@ -89,6 +91,7 @@ const EMPTY_SESSION: SessionSnapshot = {
   chunkTotal: 0,
   trackName: null,
   notice: null,
+  delayRemaining: null,
 }
 
 function newDraft(): Draft {
@@ -270,15 +273,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     state.startedAt = Date.now()
     if (state.interval != null) clearInterval(state.interval)
     state.interval = window.setInterval(() => {
+      const remaining = speechRef.current?.delayRemainingSeconds ?? null
       setSession((current) =>
         current.status === 'playing'
           ? {
               ...current,
               elapsedSeconds: Math.floor((Date.now() - state.startedAt) / 1000),
+              delayRemaining: remaining == null ? null : Math.ceil(remaining),
             }
           : current,
       )
-    }, 1000)
+    }, 250)
   }, [])
 
   const stopElapsed = useCallback(() => {
@@ -400,7 +405,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     timerRef.current?.pause()
     stopElapsed()
     releaseWakeLock()
-    setSession((current) => ({ ...current, status: 'paused' }))
+    // Freeze the countdown where it stopped rather than letting it drift.
+    const remaining = speechRef.current?.delayRemainingSeconds ?? null
+    setSession((current) => ({
+      ...current,
+      status: 'paused',
+      delayRemaining: remaining == null ? null : Math.ceil(remaining),
+    }))
   }, [releaseWakeLock, stopElapsed])
 
   const resume = useCallback(() => {

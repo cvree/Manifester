@@ -11,18 +11,32 @@ export interface AmbientHandle {
   stop: () => void
 }
 
+export interface AmbientBuildOptions {
+  /**
+   * Set when rendering into an `OfflineAudioContext` for export. Anything that
+   * would normally be driven by a timer is instead scheduled up front across
+   * this many seconds, because offline rendering finishes long before any
+   * `setTimeout` would fire.
+   */
+  offlineSeconds?: number
+}
+
 export interface AmbientPreset {
   id: string
   name: string
   description: string
   /** Wire the preset into `destination` and return a stop handle. */
-  build: (ctx: AudioContext, destination: AudioNode) => AmbientHandle
+  build: (
+    ctx: BaseAudioContext,
+    destination: AudioNode,
+    options?: AmbientBuildOptions,
+  ) => AmbientHandle
 }
 
 /* ── Shared helpers ──────────────────────────────────────────── */
 
 /** A few seconds of brown noise, looped — softer and warmer than white noise. */
-function createNoiseBuffer(ctx: AudioContext, seconds = 6): AudioBuffer {
+function createNoiseBuffer(ctx: BaseAudioContext, seconds = 6): AudioBuffer {
   const length = Math.floor(ctx.sampleRate * seconds)
   const buffer = ctx.createBuffer(1, length, ctx.sampleRate)
   const data = buffer.getChannelData(0)
@@ -45,7 +59,7 @@ function createNoiseBuffer(ctx: AudioContext, seconds = 6): AudioBuffer {
 }
 
 function createLfo(
-  ctx: AudioContext,
+  ctx: BaseAudioContext,
   frequency: number,
   depth: number,
   target: AudioParam,
@@ -64,7 +78,7 @@ function makeStopper(
   nodes: Array<AudioScheduledSourceNode>,
   timers: number[],
   fadeGain: GainNode,
-  ctx: AudioContext,
+  ctx: BaseAudioContext,
 ): AmbientHandle {
   let stopped = false
   return {
@@ -109,7 +123,7 @@ const moonGarden: AmbientPreset = {
   id: 'moon-garden',
   name: 'Moon Garden',
   description: 'A slow pad with soft chimes drifting through it.',
-  build(ctx, destination) {
+  build(ctx, destination, options) {
     const nodes: AudioScheduledSourceNode[] = []
     const timers: number[] = []
 
@@ -164,26 +178,34 @@ const moonGarden: AmbientPreset = {
 
     // Chimes: a pentatonic scale, struck at unpredictable intervals.
     const scale = [523.25, 587.33, 698.46, 783.99, 880, 1046.5]
-    const strike = () => {
+
+    const strikeAt = (when: number) => {
       const osc = ctx.createOscillator()
       osc.type = 'sine'
       osc.frequency.value = scale[Math.floor(Math.random() * scale.length)]
 
       const bell = ctx.createGain()
-      const now = ctx.currentTime
-      bell.gain.setValueAtTime(0.0001, now)
-      bell.gain.exponentialRampToValueAtTime(0.07, now + 0.04)
-      bell.gain.exponentialRampToValueAtTime(0.0001, now + 4.5)
+      bell.gain.setValueAtTime(0.0001, when)
+      bell.gain.exponentialRampToValueAtTime(0.07, when + 0.04)
+      bell.gain.exponentialRampToValueAtTime(0.0001, when + 4.5)
 
       osc.connect(bell).connect(out)
-      osc.start(now)
-      osc.stop(now + 4.8)
-
-      timers.push(
-        window.setTimeout(strike, 6000 + Math.random() * 9000),
-      )
+      osc.start(when)
+      osc.stop(when + 4.8)
     }
-    timers.push(window.setTimeout(strike, 2500))
+
+    if (options?.offlineSeconds) {
+      // Offline rendering outruns any timer, so lay the whole sequence out now.
+      for (let at = 2.5; at < options.offlineSeconds; at += 6 + Math.random() * 9) {
+        strikeAt(ctx.currentTime + at)
+      }
+    } else {
+      const strike = () => {
+        strikeAt(ctx.currentTime)
+        timers.push(window.setTimeout(strike, 6000 + Math.random() * 9000))
+      }
+      timers.push(window.setTimeout(strike, 2500))
+    }
 
     return makeStopper(nodes, timers, out, ctx)
   },

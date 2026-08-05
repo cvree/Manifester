@@ -2,7 +2,10 @@ import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '../components/Button'
 import { Card, FieldLabel } from '../components/Card'
+import { DelaySettings } from '../components/DelaySettings'
 import { Disclosure } from '../components/Disclosure'
+import { ExportPanel } from '../components/ExportPanel'
+import { VoiceRecorderPanel } from '../components/VoiceRecorderPanel'
 import { CheckIcon, CloseIcon, PlayIcon, SeedIcon } from '../components/Icons'
 import { SoundSettings } from '../components/SoundSettings'
 import { TextArea, TextField } from '../components/TextArea'
@@ -13,6 +16,7 @@ import {
   estimateSpokenSeconds,
   formatApproxDuration,
 } from '../lib/format'
+import { cue } from '../lib/feedback'
 import { draftToLoop } from '../lib/loops'
 import { useLibrary } from '../state/LibraryProvider'
 import { useSession } from '../state/SessionProvider'
@@ -80,6 +84,7 @@ export function CreateRoute() {
     const loop = draftToLoop(draft, existing)
     await saveLoop(loop)
     updateDraft({ id: loop.id, title: loop.title })
+    cue('complete')
     setSaved(true)
     window.setTimeout(() => setSaved(false), 2200)
   }, [draft, loops, saveLoop, updateDraft])
@@ -199,6 +204,17 @@ export function CreateRoute() {
         />
       </Card>
 
+      <Card
+        data-rise
+        title="Delay between loops"
+        description="The quiet space before your words begin again."
+      >
+        <DelaySettings
+          seconds={draft.settings.repeatPauseSeconds}
+          onChange={(repeatPauseSeconds) => updateSettings({ repeatPauseSeconds })}
+        />
+      </Card>
+
       <div className="space-y-3" data-rise>
         <Disclosure title="Voice and speech" summary={voiceSummary}>
           <VoiceSettings
@@ -217,6 +233,31 @@ export function CreateRoute() {
             settings={draft.settings}
             tracks={allTracks}
             onChange={updateSettings}
+          />
+        </Disclosure>
+
+        <Disclosure
+          title="Record your own voice"
+          summary={
+            draft.settings.recordingId
+              ? 'Recorded — used in downloads'
+              : 'Optional, for downloadable audio'
+          }
+        >
+          <VoiceRecorderPanel
+            recordingId={draft.settings.recordingId}
+            onChange={(recordingId) => updateSettings({ recordingId })}
+          />
+        </Disclosure>
+
+        <Disclosure
+          title="Download audio"
+          summary="Save this loop as a file you can play anywhere"
+        >
+          <ExportPanel
+            settings={draft.settings}
+            title={draft.title}
+            hasRecording={draft.settings.recordingId != null}
           />
         </Disclosure>
       </div>

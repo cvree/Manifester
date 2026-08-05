@@ -8,11 +8,12 @@
 import type { LoopSettings, SavedLoop, TrackMeta } from './types'
 
 const DB_NAME = 'manifester'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 const STORE_LOOPS = 'loops'
 const STORE_TRACKS = 'tracks'
 const STORE_KV = 'kv'
+const STORE_RECORDINGS = 'recordings'
 
 export interface StoredTrack extends TrackMeta {
   kind: 'custom'
@@ -46,6 +47,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_KV)) {
         db.createObjectStore(STORE_KV, { keyPath: 'key' })
+      }
+      if (!db.objectStoreNames.contains(STORE_RECORDINGS)) {
+        db.createObjectStore(STORE_RECORDINGS, { keyPath: 'id' })
       }
     }
 
@@ -117,6 +121,34 @@ export async function getCustomTrack(id: string): Promise<StoredTrack | undefine
 
 export async function deleteCustomTrack(id: string): Promise<void> {
   await runRequest(STORE_TRACKS, 'readwrite', (s) => s.delete(id))
+}
+
+/* ── Voice recordings ────────────────────────────────────────── */
+
+export interface StoredRecording {
+  id: string
+  blob: Blob
+  durationSeconds: number
+  mimeType: string
+  createdAt: number
+}
+
+export async function putRecording(recording: StoredRecording): Promise<void> {
+  await runRequest(STORE_RECORDINGS, 'readwrite', (s) => s.put(recording))
+}
+
+export async function getRecording(
+  id: string,
+): Promise<StoredRecording | undefined> {
+  return runRequest<StoredRecording | undefined>(
+    STORE_RECORDINGS,
+    'readonly',
+    (s) => s.get(id),
+  )
+}
+
+export async function deleteRecording(id: string): Promise<void> {
+  await runRequest(STORE_RECORDINGS, 'readwrite', (s) => s.delete(id))
 }
 
 /* ── Small key/value settings ────────────────────────────────── */

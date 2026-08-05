@@ -299,6 +299,117 @@
   animation: drift 34s ease-in-out infinite;
 }
 
+/* ── Breathing guide ────────────────────────────────────────── */
+
+/*
+ * Every layer scales from one custom property that the breathing hook writes
+ * each frame. Only transform and opacity change, so this composites on the GPU
+ * and stays smooth on a phone.
+ */
+.breath-stage {
+  --e: 0;
+}
+
+.breath-stage > * {
+  position: absolute;
+  will-change: transform, opacity;
+}
+
+.breath-halo {
+  width: 15rem;
+  height: 15rem;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    var(--glow) 0%,
+    color-mix(in oklab, var(--gold) 22%, transparent) 42%,
+    transparent 68%
+  );
+  transform: scale(calc(0.55 + var(--e) * 0.45));
+  opacity: calc(0.3 + var(--e) * 0.5);
+}
+
+.breath-ring {
+  border-radius: 999px;
+  border: 1px solid var(--rose);
+}
+
+.breath-ring--outer {
+  width: 12.5rem;
+  height: 12.5rem;
+  transform: scale(calc(0.6 + var(--e) * 0.4));
+  opacity: calc(0.18 + var(--e) * 0.4);
+}
+
+.breath-ring--inner {
+  width: 9.75rem;
+  height: 9.75rem;
+  border-color: var(--gold);
+  transform: scale(calc(0.66 + var(--e) * 0.34));
+  opacity: calc(0.22 + var(--e) * 0.45);
+}
+
+/* Seed lights ride outward on the breath, each on its own spoke. */
+.breath-seed {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--sage);
+  transform: rotate(var(--angle))
+    translateY(calc(-3.6rem - var(--e) * 2.9rem))
+    rotate(calc(-1 * var(--angle)))
+    scale(calc(0.7 + var(--e) * 0.6));
+  opacity: calc(0.25 + var(--e) * 0.6);
+}
+
+.breath-core {
+  width: 8.5rem;
+  height: 8.5rem;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle at 50% 42%,
+    color-mix(in oklab, var(--rose) 40%, transparent) 0%,
+    color-mix(in oklab, var(--rose) 14%, transparent) 55%,
+    transparent 72%
+  );
+  transform: scale(calc(0.62 + var(--e) * 0.38));
+  opacity: calc(0.4 + var(--e) * 0.6);
+}
+
+@keyframes phase-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-phase-in {
+  animation: phase-in 420ms var(--ease-calm) both;
+}
+
+/* With reduced motion the orb holds still and the words do the guiding. */
+@media (prefers-reduced-motion: reduce) {
+  .breath-stage > * {
+    transition: none !important;
+    will-change: auto;
+  }
+
+  .breath-halo,
+  .breath-ring,
+  .breath-seed,
+  .breath-core {
+    transform: none;
+  }
+
+  .breath-seed {
+    transform: rotate(var(--angle)) translateY(-5rem) rotate(calc(-1 * var(--angle)));
+  }
+}
+
 /* Range inputs: large, obvious, thumb-friendly on touch. */
 .range-input {
   -webkit-appearance: none;

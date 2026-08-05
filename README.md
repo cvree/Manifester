@@ -68,12 +68,30 @@ app.
 **Player**
 
 - One large play/pause control with a soft breathing animation while it runs.
+- A **breathing guide**: a glowing orb that expands as you breathe in and
+  settles as you breathe out, with the phase name and a countdown underneath.
+  Default 4 seconds in, 6 seconds out — presets for Calm, Even, Box and Unwind,
+  plus custom timing for every phase. Optional soft tone and vibration cues at
+  each change of phase. It pauses and resumes with the session.
+- **Delay between loops**, 0–60 seconds, counted down on screen (*"Next loop in
+  6s"*) and frozen exactly where it was if you pause.
 - Time remaining, or elapsed time when there is no timer.
 - Progress through the current pass, and how many passes you have listened to.
 - Voice volume, sound volume, and speed adjust live.
 - A mini player follows you to the other tabs while a session is running.
 - When the timer ends everything fades out and the screen says *Your loop is
   complete.*
+
+**Download audio**
+
+- Export a loop as a real **MP3** you can put on any phone or player.
+- Lengths of 5, 10, 20, 30 or 60 minutes, or anything up to 2 hours.
+- The file contains a recording of **your own voice**, repeated with your chosen
+  delay, over your background sound, at your volume balance.
+- File size shown before you start; progress, cancel, success and error states
+  throughout; a WAV fallback if a browser cannot load the MP3 encoder.
+- Everything is rendered on your device in a Web Worker, so the app stays
+  usable while it works, and nothing is ever uploaded.
 
 **Sounds**
 
@@ -110,6 +128,43 @@ third-party audio of any kind**. Nothing was sampled, scraped, or borrowed.
 
 Any other sound you hear is audio you imported yourself. Please only import audio
 you have the right to use.
+
+---
+
+## Why the export records your voice instead of the app's
+
+**No web page can capture speech synthesis output.** `SpeechSynthesisUtterance`
+is rendered by the operating system straight to the audio device; it never
+passes through anything a page can reach. There is no `MediaStream`, no
+`AudioNode`, no `MediaRecorder` path to it, in any browser. An exported file
+therefore cannot contain the app's spoken voice, and any app claiming otherwise
+is either recording your whole screen or sending your text to a server.
+
+So Manifester does the honest thing: it records **your** voice, once, and builds
+the file around that. `getUserMedia` plus `MediaRecorder` is a real, supported,
+offline path — and for affirmations, hearing yourself is arguably the point.
+
+### How the file is actually made
+
+Rendering an hour of audio in one `OfflineAudioContext` would need about 635 MB
+of float samples, which no phone will give you. The work is split instead:
+
+1. **Main thread** renders a *bounded* 90-second background bed with
+   `OfflineAudioContext` (Web Audio's offline renderer is many times faster than
+   real time) and decodes the voice recording. Both are small.
+2. **A Web Worker** then writes the real timeline sample by sample — looping the
+   bed through a crossfade so the seam is inaudible, dropping the voice in every
+   `recording length + delay` samples — and feeds each block straight into the
+   MP3 encoder. Memory stays flat whether the export is 5 minutes or 2 hours.
+
+The mix is scaled so the peak lands near −3 dBFS while keeping the voice-to-music
+balance you chose; the in-app balance is tuned for listening *under* a spoken
+voice and would otherwise export very quietly.
+
+Encoding is [`@breezystack/lamejs`](https://www.npmjs.com/package/@breezystack/lamejs)
+(LGPL-3.0), loaded dynamically inside the worker so it costs nothing until you
+actually export. If it fails to load, the worker produces a WAV instead and says
+so.
 
 ---
 
@@ -274,12 +329,19 @@ src/
   lib/
     speech.ts       chunking, voice loading, the looping speaker
     voiceRanking.ts scores device voices and picks the best of each style
+    breathing.ts    pure breath-phase maths
+    useBreathing.ts drives the orb from the wall clock
+    feedback.ts     haptics and generated interface tones
+    recorder.ts     microphone capture for exports
+    exportAudio.ts  offline bed rendering, decoding, normalisation
     audio.ts        background sound engine (synth + imported files)
     audioBus.ts     owns the AudioContext and the sound channel
     ambient.ts      the two generated ambiences
     storage.ts      IndexedDB + localStorage
     timer.ts        wall-clock session countdown
     motion.ts       reduced motion, low-power and platform detection
+  workers/
+    encode.worker.ts  mixes the timeline and encodes MP3/WAV
   styles/
     theme.css     Cosmic Garden Minimal — the whole design system
 ```
@@ -329,6 +391,16 @@ them go away:
   why the text is chunked and re-queued rather than sent in one piece.
 - **Private browsing blocks storage.** Saving is disabled and the app says so
   rather than failing quietly.
+- **iPhone cannot vibrate from a web app.** `navigator.vibrate` is not
+  implemented in Safari at all, so the haptic cues are Android and desktop only.
+  The app detects this and disables the toggle with an explanation rather than
+  offering something that does nothing. Sound cues work everywhere.
+- **Exports take a few minutes for long files.** Encoding runs at roughly five
+  to six seconds per minute of audio on a laptop, and slower on a phone. It runs
+  in a worker with progress and a cancel button, and the app stays usable
+  throughout.
+- **Microphone permission is per-site and per-browser.** If you deny it, the
+  browser will not ask again until you re-allow it in site settings.
 
 ---
 

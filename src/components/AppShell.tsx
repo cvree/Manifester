@@ -3,6 +3,7 @@ import gsap from 'gsap'
 import { useRef } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { cx } from '../lib/cx'
+import { cue } from '../lib/feedback'
 import { useReducedMotion } from '../lib/motion'
 import { useSession } from '../state/SessionProvider'
 import { useTheme } from '../state/ThemeProvider'
@@ -143,6 +144,7 @@ export function AppShell() {
             <li key={to} className="flex-1">
               <NavLink
                 to={to}
+                onClick={() => cue('tap')}
                 className={({ isActive }) =>
                   cx(
                     'flex min-h-[3.25rem] flex-col items-center justify-center gap-1 rounded-2xl px-1 py-1.5',

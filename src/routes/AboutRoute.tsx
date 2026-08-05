@@ -49,6 +49,26 @@ export function AboutRoute() {
         </ul>
       </Card>
 
+      <Card data-rise title="About downloading audio">
+        <p className="text-[0.95rem] leading-relaxed text-ink-muted">
+          A downloaded file can contain your background sound and{' '}
+          <em className="not-italic text-ink">a recording of your own voice</em>,
+          repeated with your chosen delay.
+        </p>
+        <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-muted">
+          It cannot contain the app's speaking voice, and no web app can manage
+          that. Your device generates that speech outside the page entirely —
+          there is no way for a website to listen to it. Rather than pretend
+          otherwise, Manifester lets you record yourself once and builds the file
+          around that. Many people find their own voice works better for this
+          anyway.
+        </p>
+        <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-muted">
+          Files are rendered on your device, in the background, and never
+          uploaded anywhere.
+        </p>
+      </Card>
+
       <Card data-rise title="How the sound works">
         <p className="text-[0.95rem] leading-relaxed text-ink-muted">
           The two built-in ambiences, Moon Garden and Soft Horizon, are not audio
