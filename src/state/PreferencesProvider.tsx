@@ -27,6 +27,14 @@ export interface Preferences {
   /** Interface taps and confirmations. */
   uiSounds: boolean
   uiHaptics: boolean
+  /**
+   * The master switch for anything that talks to an AI.
+   *
+   * Separate from whether a key is stored, so turning it off does not throw
+   * the key away and turning it back on is not a re-setup. While it is off
+   * nothing reaches a provider, and the app stops offering to connect one.
+   */
+  aiEnabled: boolean
 }
 
 const DEFAULTS: Preferences = {
@@ -39,6 +47,7 @@ const DEFAULTS: Preferences = {
   breathHapticCues: true,
   uiSounds: true,
   uiHaptics: true,
+  aiEnabled: true,
 }
 
 const KEY = 'preferences'

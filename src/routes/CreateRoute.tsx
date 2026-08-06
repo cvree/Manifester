@@ -10,7 +10,14 @@ import { useNavigate } from 'react-router'
 import { Button } from '../components/Button'
 import { Card, FieldLabel } from '../components/Card'
 import { CustomizePanel } from '../components/CustomizePanel'
-import { CheckIcon, CloseIcon, PlayIcon, SeedIcon } from '../components/Icons'
+import {
+  CheckIcon,
+  CloseIcon,
+  PlayIcon,
+  PlusIcon,
+  SeedIcon,
+  SparkIcon,
+} from '../components/Icons'
 import { RitualPreview } from '../components/RitualPreview'
 import { TextArea, TextField } from '../components/TextArea'
 import { TimerSettings } from '../components/TimerSettings'
@@ -27,7 +34,12 @@ import {
   timerSummary,
   voiceSummary,
 } from '../lib/summaries'
+import { aiAddToWords, aiImproveWords, withTimeout } from '../lib/ai/enhance'
+import type { Credentials } from '../lib/ai/credentials'
+import { findProvider } from '../lib/ai/providers'
+import { useCredentials } from '../lib/ai/useCredentials'
 import { useBreathing } from '../lib/useBreathing'
+import { addToWords, improveWords, type WordcraftResult } from '../lib/wordcraft'
 import { useLibrary } from '../state/LibraryProvider'
 import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
@@ -43,6 +55,35 @@ const STARTERS = [
 
 /** Long enough for the button to settle before the route changes. */
 const START_TRANSITION_MS = 620
+
+/** What the writing helper last did, and the text it did it to. */
+interface HelperState {
+  note: string
+  /** The draft as it was, for Undo. Null when nothing was replaced. */
+  before: string | null
+  /** What was written. Undo is only offered while the draft still matches. */
+  after: string
+}
+
+/**
+ * Shown until the helper has been used, and after an Undo.
+ *
+ * It has to change with the connection, because the sentence that matters —
+ * where the words go — is the one that stops being true the moment a key is
+ * set up. A resting hint claiming "on your device" beside a button that posts
+ * to Anthropic would be the app's only lie.
+ */
+function helperHint(credentials: Credentials | null, aiEnabled: boolean): string {
+  const shared =
+    'Add builds on what you have written. Improve keeps your meaning and makes the wording present and positive.'
+  if (credentials) {
+    return `${shared} Both send your loop to ${findProvider(credentials.provider).name} when you press them.`
+  }
+  // Only invite someone to connect an AI if they have not already said no.
+  return aiEnabled
+    ? `${shared} Both run here on your device. For stronger suggestions, connect an AI under Customize.`
+    : `${shared} Both run here on your device.`
+}
 
 export function CreateRoute() {
   const navigate = useNavigate()
@@ -67,6 +108,17 @@ export function CreateRoute() {
   const [saved, setSaved] = useState(false)
   const [starting, setStarting] = useState(false)
   const [showQuickStart, setShowQuickStart] = useState(false)
+  const [helper, setHelper] = useState<HelperState | null>(null)
+  const [busy, setBusy] = useState<'add' | 'improve' | null>(null)
+  const storedCredentials = useCredentials()
+
+  /*
+   * The master switch outranks a stored key. Everything downstream — which
+   * engine runs, what the hint says, what the footer promises — keys off this
+   * one value being null, so turning AI off genuinely turns it off rather
+   * than merely hiding the entrance.
+   */
+  const credentials = preferences.aiEnabled ? storedCredentials : null
   const actionsRef = useRef<HTMLDivElement>(null)
 
   const words = countWords(draft.text)
@@ -140,6 +192,76 @@ export function CreateRoute() {
     const separator = draft.text.trim() ? '\n\n' : ''
     updateDraft({ text: `${draft.text}${separator}${phrase}` })
   }
+
+  /*
+   * Both helpers are the same gesture: one tap, the words change, and the
+   * previous version is held on to until the draft moves again. Rewriting
+   * somebody's own words is only reasonable if putting them back is as easy
+   * as it was to change them.
+   */
+  const applyResult = useCallback(
+    (before: string, result: WordcraftResult) => {
+      if (!result.changed) {
+        cue('tap')
+        setHelper({ note: result.note, before: null, after: before })
+        return
+      }
+      cue('save')
+      updateDraft({ text: result.text })
+      setHelper({ note: result.note, before, after: result.text })
+    },
+    [updateDraft],
+  )
+
+  /*
+   * Two engines, one button. With a key set up the provider writes; without
+   * one — or when the provider is unreachable, out of credit, or simply
+   * having a bad morning — the offline rule engine does. It is never a dead
+   * end: the worst case is a plainer suggestion and a sentence saying why.
+   */
+  const runHelper = useCallback(
+    async (
+      kind: 'add' | 'improve',
+      online: (credentials: Credentials, signal: AbortSignal) => Promise<WordcraftResult>,
+      offline: () => WordcraftResult,
+    ) => {
+      if (busy) return
+      const before = draft.text
+
+      if (!credentials) {
+        applyResult(before, offline())
+        return
+      }
+
+      setBusy(kind)
+      const { signal, done } = withTimeout()
+      try {
+        applyResult(before, await online(credentials, signal))
+      } catch (error) {
+        const why = error instanceof Error ? error.message : String(error)
+        const fallback = offline()
+        applyResult(before, {
+          ...fallback,
+          note: `${why} Used the built-in helper instead.`,
+        })
+      } finally {
+        done()
+        setBusy(null)
+      }
+    },
+    [applyResult, busy, credentials, draft.text],
+  )
+
+  // Only while the draft is still exactly what the helper left behind —
+  // otherwise Undo would throw away whatever was typed since.
+  const canUndo = helper?.before != null && draft.text === helper.after
+
+  const handleUndo = useCallback(() => {
+    if (helper?.before == null) return
+    cue('tap')
+    updateDraft({ text: helper.before })
+    setHelper(null)
+  }, [helper, updateDraft])
 
   const actions = (
     <div className="flex gap-3">
@@ -257,6 +379,71 @@ export function CreateRoute() {
                 </button>
               ))}
             </div>
+
+            {/*
+              The two helpers sit under the starter phrases because they
+              answer the same question one step later: a chip is for a blank
+              page, these are for a page with something already on it.
+            */}
+            <div className="mt-5 border-t border-[var(--quiet-border)] pt-5">
+              <p className="type-label mb-3">Let Manifester help</p>
+              {/*
+                Full width and stacked on a phone, where the two labels are
+                together wider than the column and would otherwise wrap into
+                two ragged rows of different lengths.
+              */}
+              <div className="grid gap-2 sm:flex sm:flex-wrap">
+                <Button
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  loading={busy === 'add'}
+                  disabled={busy != null}
+                  onClick={() =>
+                    void runHelper(
+                      'add',
+                      (creds, signal) =>
+                        aiAddToWords(draft.text, draft.title, creds, signal),
+                      () => addToWords(draft.text, draft.title),
+                    )
+                  }
+                  leading={<PlusIcon className="text-[0.95rem]" />}
+                >
+                  {busy === 'add' ? 'Writing…' : 'Add to my words'}
+                </Button>
+                <Button
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  loading={busy === 'improve'}
+                  disabled={!canStart || busy != null}
+                  onClick={() =>
+                    void runHelper(
+                      'improve',
+                      (creds, signal) => aiImproveWords(draft.text, creds, signal),
+                      () => improveWords(draft.text),
+                    )
+                  }
+                  leading={<SparkIcon className="text-[0.95rem]" />}
+                >
+                  {busy === 'improve' ? 'Reshaping…' : 'Improve my words'}
+                </Button>
+              </div>
+              {/* Undo belongs beside the sentence describing what to undo. */}
+              <div className="mt-2.5 flex items-start justify-between gap-3">
+                <p className="type-meta" aria-live="polite">
+                  {helper?.note ?? helperHint(credentials, preferences.aiEnabled)}
+                </p>
+                {canUndo && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="-mt-1.5 shrink-0"
+                    onClick={handleUndo}
+                  >
+                    Undo
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </Card>
 
@@ -324,7 +511,10 @@ export function CreateRoute() {
 
         <p className="type-meta px-1 text-center lg:col-start-1 lg:text-left">
           Your saved loops stay on this device. Manifester does not require an
-          account and does not send your text to a server.
+          account and has no server of its own.
+          {credentials
+            ? ` The two helper buttons above send that loop to ${findProvider(credentials.provider).name}; nothing else leaves this device.`
+            : ' Nothing you write leaves this device.'}
         </p>
       </div>
 

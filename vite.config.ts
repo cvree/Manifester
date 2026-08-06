@@ -56,6 +56,17 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        /*
+         * The three AI provider SDKs are deliberately left out of the offline
+         * bundle. They are ~660 KB together — nearly doubling the install —
+         * and they are useless without a network anyway, since all they do is
+         * make an HTTPS request. Precaching them would tax every person who
+         * never turns the feature on, which is the default.
+         *
+         * They stay in `dist` and load on demand the first time someone opens
+         * the AI panel; the browser caches them normally from there.
+         */
+        globIgnores: ['**/ai-provider-*.js'],
         navigateFallback: `${base}index.html`,
         cleanupOutdatedCaches: true,
         clientsClaim: true,
@@ -69,5 +80,21 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        /*
+         * Give the provider SDKs predictable chunk names so the service
+         * worker can be told to skip them. Left to itself the bundler names
+         * these after each package's entry file — `sdk-*`, `web-*` — which is
+         * both unrecognisable and too generic to write an ignore rule against.
+         */
+        manualChunks(id: string) {
+          if (/node_modules[\\/](@anthropic-ai|openai|@google)[\\/]/.test(id)) {
+            return 'ai-provider'
+          }
+          return undefined
+        },
+      },
+    },
   },
 })

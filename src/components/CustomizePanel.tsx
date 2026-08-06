@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { setStoredCredentials, useCredentials } from '../lib/ai/useCredentials'
 import { cue, hapticsSupported } from '../lib/feedback'
 import {
   brainwaveSummary,
@@ -13,6 +14,7 @@ import {
 import { useLibrary } from '../state/LibraryProvider'
 import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
+import { AiSetupPanel, aiSummary } from './AiSetupPanel'
 import { BrainwavePanel } from './BrainwavePanel'
 import { BreathingSettings } from './BreathingSettings'
 import { DelaySettings } from './DelaySettings'
@@ -23,6 +25,7 @@ import {
   MicIcon,
   PauseIcon,
   PulseIcon,
+  SparkIcon,
   TuneIcon,
   VoiceIcon,
   WaveIcon,
@@ -43,6 +46,7 @@ type PanelKey =
   | 'recording'
   | 'export'
   | 'feel'
+  | 'ai'
 
 const TITLES: Record<PanelKey, { title: string; description: string }> = {
   voice: {
@@ -77,6 +81,10 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
     title: 'Haptics and interface sounds',
     description: 'How the app answers when you touch it.',
   },
+  ai: {
+    title: 'AI writing help',
+    description: 'Optional. Connect Claude or Gemini with your own key.',
+  },
 }
 
 /**
@@ -100,6 +108,7 @@ export function CustomizePanel() {
   } = useSession()
   const { allTracks } = useLibrary()
   const { preferences, update: updatePreferences } = usePreferences()
+  const credentials = useCredentials()
   const [open, setOpen] = useState<PanelKey | null>(null)
 
   const { settings } = draft
@@ -168,6 +177,13 @@ export function CustomizePanel() {
           title="Download audio"
           summary={exportSummary(settings, settings.recordingId != null)}
           onClick={() => openPanel('export')}
+        />
+        <SettingRow
+          icon={<SparkIcon />}
+          title="AI writing help"
+          summary={aiSummary(credentials, preferences.aiEnabled)}
+          onClick={() => openPanel('ai')}
+          accent={credentials != null && preferences.aiEnabled}
         />
         <SettingRow
           icon={<TuneIcon />}
@@ -257,6 +273,15 @@ export function CustomizePanel() {
           hasRecording={settings.recordingId != null}
           soundLabel={soundSummary(settings, allTracks)}
           voiceLabel={voiceSummary(settings, resolvedDeviceVoice)}
+        />
+      </Sheet>
+
+      <Sheet open={open === 'ai'} onClose={() => setOpen(null)} {...TITLES.ai}>
+        <AiSetupPanel
+          credentials={credentials}
+          onChange={setStoredCredentials}
+          enabled={preferences.aiEnabled}
+          onEnabledChange={(aiEnabled) => updatePreferences({ aiEnabled })}
         />
       </Sheet>
 
