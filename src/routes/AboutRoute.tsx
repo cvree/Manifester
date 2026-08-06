@@ -1,8 +1,11 @@
 import { ReactLenis } from 'lenis/react'
 import type { ReactNode } from 'react'
+import { AiSetupPanel } from '../components/AiSetupPanel'
 import { Card } from '../components/Card'
 import { InstallInstructions } from '../components/InstallPrompt'
+import { setStoredCredentials, useCredentials } from '../lib/ai/useCredentials'
 import { useReducedMotion } from '../lib/motion'
+import { usePreferences } from '../state/PreferencesProvider'
 
 /**
  * The one long-scrolling screen in the app, so it is the only place Lenis is
@@ -10,6 +13,8 @@ import { useReducedMotion } from '../lib/motion'
  */
 export function AboutRoute() {
   const reducedMotion = useReducedMotion()
+  const credentials = useCredentials()
+  const { preferences, update: updatePreferences } = usePreferences()
 
   const content = (
     <div className="mx-auto max-w-2xl space-y-6 lg:max-w-3xl">
@@ -88,12 +93,29 @@ export function AboutRoute() {
           does something.
         </p>
         <p className="type-body mt-3">
-          There is a single switch at the top of that panel that turns all of
-          it off. Off means off: nothing is sent, no provider is contacted, and
-          the app stops offering to connect one. Any key you have already saved
-          is kept but left unused, so changing your mind later is one tap
-          rather than setting it up again.
+          You can set all of this up, or switch it off entirely, in the next
+          card — you do not have to go and find it on the Create screen.
         </p>
+      </Card>
+
+      {/*
+        The same panel as the one under Customize, deliberately duplicated
+        here rather than linked to. This is the page people open when they
+        want to know what the app is doing and how to stop it, so "turn it
+        off" and "here is exactly how to connect your own key" belong on it
+        — not one navigation hop away behind a settings list.
+      */}
+      <Card
+        data-rise
+        title="AI writing help — set up or switch off"
+        description="The switch and the full step-by-step are both here."
+      >
+        <AiSetupPanel
+          credentials={credentials}
+          onChange={setStoredCredentials}
+          enabled={preferences.aiEnabled}
+          onEnabledChange={(aiEnabled) => updatePreferences({ aiEnabled })}
+        />
       </Card>
 
       <Card data-rise title="About downloading audio">

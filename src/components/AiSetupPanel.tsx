@@ -185,7 +185,7 @@ export function AiSetupPanel({
         className="interactive -ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-xl px-1 text-[0.9rem] text-ink-muted hover:text-ink"
       >
         <ChevronIcon className="rotate-90 text-[0.95rem]" />
-        All three options
+        Back to the options
       </button>
 
       <div>

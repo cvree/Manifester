@@ -100,17 +100,32 @@ ${title.trim() ? `They titled it: ${title.trim()}` : 'It has no title yet.'}
 Their lines:
 ${quoteDraft(text)}
 
-Write exactly ${ADDED_LINES} NEW lines that belong in this same loop.
+Write exactly ${ADDED_LINES} NEW lines that make this loop stronger.
 
-- Continue what they are already reaching for. Do not change the subject.
-- Match their vocabulary and how plainly or poetically they write.
-- Do not repeat, reword, or paraphrase any line above. These must be genuinely new ground.
-- Add something the loop is missing rather than another angle on what is already there.`
+First work out what they are actually reaching for underneath these words —
+the specific thing in their life, not the general theme. Then write lines that
+give that reach more force.
+
+- Stay inside their world. Use their subject, their situation, their
+  vocabulary, their level of plainness. Someone reading the finished loop
+  should not be able to tell which lines they wrote and which they did not.
+- Every line must add power the loop does not have yet. Go somewhere new:
+  a different angle on the same reach, something the earlier lines imply but
+  never say outright, the harder thing they have been circling.
+- Never repeat, reword or paraphrase a line above. If your line would still
+  be true after deleting one of theirs, it is too close — write a different one.
+- Make each line strong enough to stand alone, and true enough that they will
+  believe it in their own voice.
+
+They will press this button again. Leave the loop feeling built up, not
+padded out.`
     : `Someone is starting an affirmation loop and has written nothing yet.
 
-${title.trim() ? `They titled it: ${title.trim()} — write for that.` : 'They have not titled it, so write lines that would steady almost anyone.'}
+${title.trim() ? `They titled it: ${title.trim()} — write for exactly that, not for the general theme around it.` : 'They have not titled it, so write lines that would steady almost anyone.'}
 
-Write exactly ${ADDED_LINES} lines to start them off.`
+Write exactly ${ADDED_LINES} lines to start them off. Make them strong and
+specific enough to be worth keeping, and plain enough to edit into their own
+words.`
 
   const reply = await askProvider(credentials.provider, credentials.key, prompt, signal)
   const picked = dropDuplicates(sanitiseLines(reply), existing).slice(0, ADDED_LINES)
@@ -153,15 +168,33 @@ export async function aiImproveWords(
     return { text, note: 'Write a line first.', changed: false }
   }
 
-  const prompt = `Rewrite each of these affirmation lines so it lands harder when spoken aloud.
+  const prompt = `Rewrite each of these lines to be as powerfully positive and as objective as you can make it, without changing what the person meant.
 
 ${existing.map((line, index) => `${index + 1}. ${line}`).join('\n')}
 
-- Keep their meaning and their voice. This is an edit, not a replacement.
-- Put every line in the present tense and the first person.
-- Turn anything they are avoiding into the thing they actually want.
-- Trade wishing and trying for deciding: "I want to be calm" becomes "I am calm".
-- If a line is already good, return it unchanged rather than fiddling with it.
+Powerful means:
+- Present tense, first person, stated as a fact about now. "I am calm", never
+  "I will be calm", "I want to be calm", or "I am trying to be calm".
+- Declarative. Cut every hedge — maybe, hopefully, someday, a bit, I think.
+- Strong enough to mean something when said out loud to an empty room.
+
+Positive means:
+- Say the thing they want, never the thing they are escaping. "I don't want to
+  feel like a failure" becomes "I am learning and growing". No "not", "never",
+  "no longer", "stop", "less".
+
+Objective means:
+- Concrete over vague. Name the actual thing rather than gesturing at a mood.
+- True, or true enough that they will not flinch saying it. Do not inflate a
+  line into something they cannot believe — "I am enough" survives being said
+  on a bad day; "I am unstoppable" does not, and a line they reject is worse
+  than the one they wrote.
+- No promises about the future, other people, money, or health. These are
+  statements about how they meet their life, not predictions about it.
+
+Keep their meaning and their voice — this is an edit, not a replacement. If a
+line is already all three things, return it exactly as it is rather than
+fiddling with it.
 
 Return exactly ${existing.length} lines, in the same order, one per line, unnumbered.`
 
