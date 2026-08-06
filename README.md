@@ -46,8 +46,13 @@ app.
   stack into one focused column.
 - The **live preview** breathes with your chosen pattern, cycles your lines the
   way the loop will read them, takes its colour from the ambience you picked, and
-  states the voice, sound, length and delay in one glance. A *Hear a line* button
-  speaks your own first line in your chosen voice.
+  states the voice, sound, length, delay and rhythm in one glance. A *Hear a line*
+  button speaks your own first line in your chosen voice.
+- **Every tile in that preview is a shortcut**, not a readout: tapping Voice,
+  Sound, Delay or Rhythm opens the setting it reports, and Length scrolls to the
+  session-length card. The Rhythm tile is shown even when the rhythm is off,
+  reading *Off* — otherwise the one setting you could not reach from the shortcut
+  panel would be the one you had not turned on yet.
 - Only five things stay on screen: title, words, session length, Start and Save.
   Everything else lives in **Customize your ritual** — a list of rows that each
   state their own value (*Moon Garden · 40%*, *Calm · 4 in / 6 out*, *3-second
@@ -61,14 +66,23 @@ app.
   anymore" → "I am learning and growing"), trades wishing for deciding, and
   attaches a felt sense to a line or two. Both are one tap and both are
   undoable.
-- **Optionally powered by an AI you bring the key for.** Under *Customize → AI
-  writing help* you can connect **Claude** or **Gemini** with your own API key,
-  in a guided flow that spells out every step, what it costs in cents, and what
-  the company does with your words. Connected, the suggestions are written
-  around your actual draft instead of drawn from a built-in list — so pressing
-  *Add* repeatedly keeps producing new material instead of running dry. It is
-  off by default, one tap to remove, and falls back to the offline engine
-  whenever the network or the key gives out. See [Privacy](#privacy).
+- **Optionally powered by an AI you bring the key for.** Connect **Claude** or
+  **Gemini** with your own API key, in a guided flow that spells out every step,
+  what it costs in cents, and what the company does with your words. Connected,
+  the suggestions are written around your actual draft instead of drawn from a
+  built-in list — so pressing *Add* repeatedly keeps producing new material
+  instead of running dry. It falls back to the offline engine whenever the
+  network or the key gives out. See [Privacy](#privacy).
+- **The AI is opt-in, and switching it off is a single control.** The same panel
+  — a master switch plus the full step-by-step — appears in two places: under
+  *Customize → AI writing help* on Create, and on the **About** page, which is
+  where people look when they want to know what an app is doing and how to stop
+  it. Off means off: nothing is contacted, and the app stops offering to connect
+  anything. A saved key is kept but left unused, so changing your mind is one tap
+  rather than a second setup.
+- Press *Add* or *Improve* without a key and the result says which engine wrote
+  it, then offers **Set up an AI** beside **No thanks, hide this**. The offer only
+  appears after a real press, and never again once declined.
 - Long text is split into short passages behind the scenes so browsers do not cut
   it off part-way through, then spoken end to end.
 - Title your loop and save it.
@@ -214,6 +228,14 @@ Band edges differ between clinical and research references, so the app presents
 them as conventional ranges rather than universal boundaries. The target rates
 themselves are fixed and exact.
 
+On the **Sounds** tab, picking a rhythm starts it playing immediately and picking
+*Off* stops it — choosing one and then hunting for a Preview button was two steps
+for a single intention. This is safe to do because the handler is reached
+synchronously from the tap that chose the preset, which is the only moment a
+browser will let an `AudioContext` start. The control that remains is small and
+says *Stop the sound*, because by then you are listening to it rather than
+previewing it.
+
 Those rates are far below hearing and are never played as pitches. By default a
 200 Hz sine carrier is amplitude-modulated at the target rate:
 
@@ -258,24 +280,37 @@ touching the other ([`src/lib/audioBus.ts`](src/lib/audioBus.ts)):
 
 ```text
 ambience ─┐
-          ├─→ generated (sound volume) ─→ ceiling ─→ master ─→ output
+          ├─→ generated (sound volume × makeup) ─→ ceiling ─→ master ─→ output
   rhythm ─┘
 ```
 
 The spoken affirmation does not pass through here at all — speech synthesis
 happens outside the page — so the voice is never squashed and stays the clearest
-thing in the mix.
+thing in the mix. That also means **the live voice's loudness is not the app's to
+set**: `SpeechSynthesisUtterance.volume` is spec'd to `[0, 1]` and browsers clamp
+it there, and on iOS speech follows the ringer or media volume. If the voice
+sounds quiet, that is the device, not a setting.
+
+`MUSIC_MAKEUP_GAIN` is a fixed 1.5× boost applied to everything generated, on top
+of the user's setting. The mix was originally built conservatively and left most
+of its headroom unused, which made the app feel quiet even with the slider at the
+top. 1.5 is not a taste call — it is the largest boost that keeps ordinary
+listening *entirely inside* the ceiling's linear region, and staying inside it is
+what preserves the transparency the binaural path depends on (below). Buying more
+volume than that would have quietly degraded the brainwave rhythm.
 
 The ceiling is a fixed soft-clip curve rather than a `DynamicsCompressorNode`. A
 compressor is the more musical answer, but how it behaves is up to the engine and
 the differences are not small: measured against `node-web-audio-api` it applies
 about 2.5 dB of makeup gain below its own threshold where Chrome applies none,
 which would make the whole app louder on one engine than another. A waveshaper is
-arithmetic. It is exactly the identity below 0.7 — ordinary listening peaks around
-0.11, and the loudest single soundscape at full volume reaches about 0.33 — and it
-cannot emit above its own maximum however much arrives. That linearity is also
-what lets it sit in the path of a binaural pair without disturbing the channel
-separation the beat depends on.
+arithmetic. It is exactly the identity below 0.7, and it cannot emit above its own
+maximum however much arrives. That linearity is also what lets it sit in the path
+of a binaural pair without disturbing the channel separation the beat depends on
+— which is precisely why the makeup gain above stops where it does. A test asserts
+the exact ratio between a direct path and the bus path, so if the boost ever grows
+enough to push ordinary content into the knee, that test fails rather than the
+rhythm silently degrading.
 
 Every audible gain change goes through one primitive
 ([`src/lib/audioParams.ts`](src/lib/audioParams.ts)) that pins the value a ramp
