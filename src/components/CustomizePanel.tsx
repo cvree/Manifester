@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { setStoredCredentials, useCredentials } from '../lib/ai/useCredentials'
 import { cue, hapticsSupported } from '../lib/feedback'
 import {
@@ -37,7 +36,7 @@ import { Toggle } from './Toggle'
 import { VoiceRecorderPanel } from './VoiceRecorderPanel'
 import { VoiceSettings } from './VoiceSettings'
 
-type PanelKey =
+export type PanelKey =
   | 'voice'
   | 'sound'
   | 'brainwave'
@@ -95,7 +94,16 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
  * bottom on a phone, centred on a desktop — instead of pushing the page
  * further down.
  */
-export function CustomizePanel() {
+interface CustomizePanelProps {
+  /**
+   * Which sheet is open, owned by Create. The ritual preview's summary tiles
+   * open these same sheets, so the state cannot live in here.
+   */
+  open: PanelKey | null
+  onOpenChange: (key: PanelKey | null) => void
+}
+
+export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
   const {
     draft,
     updateSettings,
@@ -109,13 +117,12 @@ export function CustomizePanel() {
   const { allTracks } = useLibrary()
   const { preferences, update: updatePreferences } = usePreferences()
   const credentials = useCredentials()
-  const [open, setOpen] = useState<PanelKey | null>(null)
 
   const { settings } = draft
 
   const openPanel = (key: PanelKey) => {
     cue('tap')
-    setOpen(key)
+    onOpenChange(key)
   }
 
   return (
@@ -195,7 +202,7 @@ export function CustomizePanel() {
 
       <Sheet
         open={open === 'voice'}
-        onClose={() => setOpen(null)}
+        onClose={() => onOpenChange(null)}
         {...TITLES.voice}
       >
         <VoiceSettings
@@ -211,7 +218,7 @@ export function CustomizePanel() {
 
       <Sheet
         open={open === 'sound'}
-        onClose={() => setOpen(null)}
+        onClose={() => onOpenChange(null)}
         {...TITLES.sound}
       >
         <SoundSettings
@@ -223,7 +230,7 @@ export function CustomizePanel() {
 
       <Sheet
         open={open === 'brainwave'}
-        onClose={() => setOpen(null)}
+        onClose={() => onOpenChange(null)}
         {...TITLES.brainwave}
       >
         <BrainwavePanel settings={settings.brainwave} onChange={setBrainwave} />
@@ -231,7 +238,7 @@ export function CustomizePanel() {
 
       <Sheet
         open={open === 'breathing'}
-        onClose={() => setOpen(null)}
+        onClose={() => onOpenChange(null)}
         {...TITLES.breathing}
       >
         <BreathingSettings
@@ -242,7 +249,7 @@ export function CustomizePanel() {
 
       <Sheet
         open={open === 'delay'}
-        onClose={() => setOpen(null)}
+        onClose={() => onOpenChange(null)}
         {...TITLES.delay}
       >
         <DelaySettings
@@ -253,7 +260,7 @@ export function CustomizePanel() {
 
       <Sheet
         open={open === 'recording'}
-        onClose={() => setOpen(null)}
+        onClose={() => onOpenChange(null)}
         {...TITLES.recording}
       >
         <VoiceRecorderPanel
@@ -264,7 +271,7 @@ export function CustomizePanel() {
 
       <Sheet
         open={open === 'export'}
-        onClose={() => setOpen(null)}
+        onClose={() => onOpenChange(null)}
         {...TITLES.export}
       >
         <ExportPanel
@@ -276,7 +283,7 @@ export function CustomizePanel() {
         />
       </Sheet>
 
-      <Sheet open={open === 'ai'} onClose={() => setOpen(null)} {...TITLES.ai}>
+      <Sheet open={open === 'ai'} onClose={() => onOpenChange(null)} {...TITLES.ai}>
         <AiSetupPanel
           credentials={credentials}
           onChange={setStoredCredentials}
@@ -285,7 +292,7 @@ export function CustomizePanel() {
         />
       </Sheet>
 
-      <Sheet open={open === 'feel'} onClose={() => setOpen(null)} {...TITLES.feel}>
+      <Sheet open={open === 'feel'} onClose={() => onOpenChange(null)} {...TITLES.feel}>
         <div className="space-y-5">
           <Toggle
             label="Interface sounds"

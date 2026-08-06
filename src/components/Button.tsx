@@ -19,8 +19,11 @@ const VARIANTS: Record<Variant, string> = {
   primary: cx(
     'border-transparent text-[var(--bg-0)]',
     'bg-[linear-gradient(175deg,color-mix(in_oklab,var(--rose-deep)_86%,white)_0%,var(--rose-deep)_62%)]',
+    // The glow deepens on hover as well as brightening, so the whole button
+    // reads as lifting off the page rather than just changing colour.
     'shadow-[0_1px_0_rgb(255_255_255/0.28)_inset,0_8px_24px_-10px_var(--glow)]',
-    'hover:brightness-[1.04] active:brightness-95',
+    'hover:brightness-[1.05] hover:shadow-[0_1px_0_rgb(255_255_255/0.3)_inset,0_14px_30px_-10px_var(--glow)]',
+    'active:brightness-[0.97]',
   ),
   secondary: cx(
     'border-[var(--control-border)] bg-[var(--control)] text-ink',
@@ -30,6 +33,18 @@ const VARIANTS: Record<Variant, string> = {
   ghost: 'border-transparent bg-transparent text-ink-muted hover:bg-[var(--quiet)] hover:text-ink',
   danger:
     'border-[var(--control-border)] bg-transparent text-[var(--rose-deep)] hover:bg-[var(--rose-soft)]',
+}
+
+/*
+ * Ghost is the only variant that should not float. It has no border and no
+ * fill, so lifting it detaches a piece of text from the page with nothing
+ * underneath it — the hover tint is the whole affordance there.
+ */
+const RAISED: Record<Variant, boolean> = {
+  primary: true,
+  secondary: true,
+  ghost: false,
+  danger: true,
 }
 
 const SIZES: Record<Size, string> = {
@@ -59,6 +74,7 @@ export function Button({
       aria-busy={loading || undefined}
       className={cx(
         'interactive inline-flex items-center justify-center gap-2.5 border font-medium',
+        RAISED[variant] && 'pressable',
         VARIANTS[variant],
         SIZES[size],
         block && 'w-full',

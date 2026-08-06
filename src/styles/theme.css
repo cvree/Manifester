@@ -191,6 +191,13 @@
 
   --ease-calm: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-breath: cubic-bezier(0.4, 0, 0.2, 1);
+  /*
+   * A small overshoot, used only when a control springs back from a press.
+   * It is the one place in the app allowed to bounce: everything else eases
+   * calmly, so the bounce reads as "that button answered you" rather than as
+   * the interface being busy.
+   */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* ── Base ───────────────────────────────────────────────────── */
@@ -421,16 +428,32 @@
    * 44px; `min-height` is set on the classes that use this.
    */
   .interactive {
+    /*
+     * A `<button>` gets the default arrow cursor, not a pointer — so without
+     * this line every control in the app quietly reads as scenery on a
+     * desktop. It is the cheapest clickability fix there is.
+     */
+    cursor: pointer;
+    /* No grey flash on iOS, and no 300ms wait before :active paints. */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
     transition:
       background-color 200ms var(--ease-calm),
       border-color 200ms var(--ease-calm),
       color 200ms var(--ease-calm),
-      transform 160ms var(--ease-calm),
-      box-shadow 200ms var(--ease-calm);
+      transform 220ms var(--ease-spring),
+      box-shadow 220ms var(--ease-calm),
+      filter 200ms var(--ease-calm);
   }
 
-  .interactive:active:not(:disabled) {
-    transform: scale(0.985);
+  /*
+   * Press reads at 3.5% rather than the old 1.5%, which was below the
+   * threshold you can actually see on a phone. It snaps in fast and releases
+   * on the spring above, so a tap feels answered rather than animated.
+   */
+  .interactive:active:not(:disabled):not([aria-disabled='true']) {
+    transform: scale(0.965);
+    transition-duration: 80ms;
   }
 
   .interactive:disabled,
@@ -441,8 +464,41 @@
   }
 
   @media (hover: hover) {
-    .interactive:hover:not(:disabled) {
+    .interactive:hover:not(:disabled):not([aria-disabled='true']) {
       border-color: var(--control-border-hover);
+    }
+  }
+
+  /*
+   * Anything that should read as a raised, pressable object: it lifts a
+   * little under the cursor and is pushed back down past its resting place
+   * when held. Rows in a list deliberately do not get this — a settings row
+   * that floats looks broken, so it stays on `.interactive` alone.
+   */
+  .pressable {
+    box-shadow: 0 1px 2px rgb(58 50 44 / 0.06);
+  }
+
+  @media (hover: hover) {
+    .pressable:hover:not(:disabled):not([aria-disabled='true']) {
+      transform: translateY(-1.5px);
+      box-shadow: 0 6px 16px -6px rgb(58 50 44 / 0.28);
+    }
+  }
+
+  .pressable:active:not(:disabled):not([aria-disabled='true']) {
+    transform: translateY(0) scale(0.965);
+    box-shadow: 0 1px 2px rgb(58 50 44 / 0.1) inset;
+    transition-duration: 80ms;
+  }
+
+  .dark .pressable {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.24);
+  }
+
+  @media (hover: hover) {
+    .dark .pressable:hover:not(:disabled):not([aria-disabled='true']) {
+      box-shadow: 0 6px 18px -6px rgb(0 0 0 / 0.5);
     }
   }
 
@@ -1117,6 +1173,16 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /*
+   * The hover lift is decoration and goes; the shadow still deepens, so a
+   * control under the cursor is still obviously live. The press scale stays
+   * — it is not an animation, it is the answer to a tap, and removing it
+   * would leave a touch screen with no feedback at all.
+   */
+  .pressable:hover:not(:disabled):not([aria-disabled='true']) {
+    transform: none;
   }
 
   .shimmer-ink {

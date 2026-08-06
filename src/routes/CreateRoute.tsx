@@ -9,7 +9,7 @@ import {
 import { useNavigate } from 'react-router'
 import { Button } from '../components/Button'
 import { Card, FieldLabel } from '../components/Card'
-import { CustomizePanel } from '../components/CustomizePanel'
+import { CustomizePanel, type PanelKey } from '../components/CustomizePanel'
 import {
   CheckIcon,
   CloseIcon,
@@ -18,7 +18,7 @@ import {
   SeedIcon,
   SparkIcon,
 } from '../components/Icons'
-import { RitualPreview } from '../components/RitualPreview'
+import { RitualPreview, type RitualSetting } from '../components/RitualPreview'
 import { TextArea, TextField } from '../components/TextArea'
 import { TimerSettings } from '../components/TimerSettings'
 import { recordEngagement } from '../lib/engagement'
@@ -110,6 +110,8 @@ export function CreateRoute() {
   const [showQuickStart, setShowQuickStart] = useState(false)
   const [helper, setHelper] = useState<HelperState | null>(null)
   const [busy, setBusy] = useState<'add' | 'improve' | null>(null)
+  const [panel, setPanel] = useState<PanelKey | null>(null)
+  const timerRef = useRef<HTMLDivElement>(null)
   const storedCredentials = useCredentials()
 
   /*
@@ -147,6 +149,20 @@ export function CreateRoute() {
     )
     observer.observe(node)
     return () => observer.disconnect()
+  }, [])
+
+  /*
+   * What a summary tile in the ritual preview does when tapped. Four of the
+   * five open the sheet that owns the setting; session length has no sheet —
+   * it is a card on this page — so that one scrolls to it instead. Either
+   * way the tile keeps its promise: it takes you to the control.
+   */
+  const openSetting = useCallback((setting: RitualSetting) => {
+    if (setting === 'timer') {
+      timerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+    setPanel(setting === 'rhythm' ? 'brainwave' : setting)
   }, [])
 
   const lines = useMemo(() => affirmationLines(draft.text), [draft.text])
@@ -373,7 +389,7 @@ export function CreateRoute() {
                   key={phrase}
                   type="button"
                   onClick={() => appendStarter(phrase)}
-                  className="interactive surface-control min-h-11 px-4 text-left text-[0.88rem] text-ink-muted hover:text-ink"
+                  className="interactive pressable surface-control min-h-11 px-4 text-left text-[0.88rem] text-ink-muted hover:bg-[var(--surface-strong)] hover:text-ink"
                 >
                   {phrase}
                 </button>
@@ -480,21 +496,23 @@ export function CreateRoute() {
             canPreview={speechSupported}
             onPreview={() => previewVoice(undefined, lines[0])}
             onStopPreview={stopPreview}
+            onOpenSetting={openSetting}
           />
         </div>
 
-        <Card
-          data-rise
-          level="panel"
-          title="Session length"
-          description="How long the loop keeps going before it fades out."
-          className="lg:col-start-1"
-        >
-          <TimerSettings
-            minutes={draft.settings.timerMinutes}
-            onChange={(timerMinutes) => updateSettings({ timerMinutes })}
-          />
-        </Card>
+        {/* Wrapped so the Length tile in the preview has something to scroll to. */}
+        <div ref={timerRef} data-rise className="lg:col-start-1">
+          <Card
+            level="panel"
+            title="Session length"
+            description="How long the loop keeps going before it fades out."
+          >
+            <TimerSettings
+              minutes={draft.settings.timerMinutes}
+              onChange={(timerMinutes) => updateSettings({ timerMinutes })}
+            />
+          </Card>
+        </div>
 
         <div ref={actionsRef} data-rise className="lg:col-start-1">
           {actions}
@@ -506,7 +524,7 @@ export function CreateRoute() {
         </div>
 
         <div data-rise className="lg:col-start-1">
-          <CustomizePanel />
+          <CustomizePanel open={panel} onOpenChange={setPanel} />
         </div>
 
         <p className="type-meta px-1 text-center lg:col-start-1 lg:text-left">

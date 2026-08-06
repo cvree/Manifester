@@ -8,6 +8,7 @@ import type { BreathingRuntime } from '../lib/useBreathing'
 import type { LoopSettings } from '../lib/types'
 import { BreathingVisualizer } from './BreathingVisualizer'
 import {
+  ChevronIcon,
   ClockIcon,
   PauseIcon,
   PlayIcon,
@@ -15,6 +16,9 @@ import {
   VoiceIcon,
   WaveIcon,
 } from './Icons'
+
+/** The five things the summary tiles stand for, in the order they are shown. */
+export type RitualSetting = 'voice' | 'sound' | 'timer' | 'delay' | 'rhythm'
 
 interface RitualPreviewProps {
   title: string
@@ -33,6 +37,12 @@ interface RitualPreviewProps {
   onStopPreview: () => void
   previewing: boolean
   canPreview: boolean
+  /**
+   * Take me to the control behind this tile. The preview does not know
+   * whether that means opening a sheet or scrolling the page — Create owns
+   * both the sheet state and the layout, so it decides.
+   */
+  onOpenSetting: (setting: RitualSetting) => void
   className?: string
 }
 
@@ -101,6 +111,7 @@ export function RitualPreview({
   onStopPreview,
   previewing,
   canPreview,
+  onOpenSetting,
   className,
 }: RitualPreviewProps) {
   const reducedMotion = useReducedMotion()
@@ -190,7 +201,7 @@ export function RitualPreview({
           }}
           disabled={!canPreview}
           className={cx(
-            'interactive mt-6 inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
+            'interactive pressable mt-6 inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
             previewing
               ? 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]'
               : 'border-[var(--control-border)] bg-[var(--control)] text-ink',
@@ -205,21 +216,52 @@ export function RitualPreview({
           {previewing ? 'Stop preview' : 'Hear a line'}
         </button>
 
-        {/* The summary of everything the loop is made of. */}
-        <dl className="mt-7 grid w-full grid-cols-2 gap-2.5">
-          <SummaryTile icon={<VoiceIcon />} label="Voice" value={voice} />
-          <SummaryTile icon={<WaveIcon />} label="Sound" value={sound} />
-          <SummaryTile icon={<ClockIcon />} label="Length" value={timer} />
-          <SummaryTile icon={<PauseIcon />} label="Delay" value={delay} />
+        {/*
+          The summary of everything the loop is made of — and the shortcut to
+          changing it. These tiles looked exactly like controls and did
+          nothing, which is the worst state for a thing to be in: it taught
+          you that this half of the screen was scenery. Each one now goes
+          straight to the setting it reports.
+
+          It is a grid of buttons rather than a `<dl>` because a button cannot
+          legally contain `<dt>`/`<dd>`, and being an operable control matters
+          more here than the description-list semantics did.
+        */}
+        <div className="mt-7 grid w-full grid-cols-2 gap-2.5">
+          <SummaryTile
+            icon={<VoiceIcon />}
+            label="Voice"
+            value={voice}
+            onClick={() => onOpenSetting('voice')}
+          />
+          <SummaryTile
+            icon={<WaveIcon />}
+            label="Sound"
+            value={sound}
+            onClick={() => onOpenSetting('sound')}
+          />
+          <SummaryTile
+            icon={<ClockIcon />}
+            label="Length"
+            value={timer}
+            onClick={() => onOpenSetting('timer')}
+          />
+          <SummaryTile
+            icon={<PauseIcon />}
+            label="Delay"
+            value={delay}
+            onClick={() => onOpenSetting('delay')}
+          />
           {rhythm && (
             <SummaryTile
               icon={<PulseIcon />}
               label="Rhythm"
               value={rhythm}
+              onClick={() => onOpenSetting('rhythm')}
               className="col-span-2"
             />
           )}
-        </dl>
+        </div>
 
         <p className="type-meta mt-4 text-center">
           {lines.length > 0
@@ -239,29 +281,52 @@ function SummaryTile({
   icon,
   label,
   value,
+  onClick,
   className,
 }: {
   icon: ReactNode
   label: string
   value: string
+  onClick: () => void
   className?: string
 }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={() => {
+        cue('tap')
+        onClick()
+      }}
+      // The value is already visible, but a screen reader needs to know the
+      // tile is a way in and not just a readout.
+      aria-label={`${label}: ${value}. Change`}
       className={cx(
-        'surface-control flex min-w-0 items-center gap-2.5 px-3 py-2.5',
+        'interactive pressable surface-control group flex min-h-[3.5rem] min-w-0 items-center gap-2.5 px-3 py-2.5 text-left',
+        'hover:bg-[var(--surface-strong)]',
         className,
       )}
     >
-      <span aria-hidden="true" className="shrink-0 text-[0.95rem] text-ink-faint">
+      <span
+        aria-hidden="true"
+        className="shrink-0 text-[0.95rem] text-ink-faint transition-colors duration-200 group-hover:text-[var(--rose-deep)]"
+      >
         {icon}
       </span>
-      <div className="min-w-0">
-        <dt className="text-[0.7rem] font-semibold uppercase tracking-[0.09em] text-ink-faint">
+      <span className="min-w-0 grow">
+        <span className="block text-[0.7rem] font-semibold uppercase tracking-[0.09em] text-ink-faint">
           {label}
-        </dt>
-        <dd className="truncate text-[0.85rem] text-ink">{value}</dd>
-      </div>
-    </div>
+        </span>
+        <span className="block truncate text-[0.85rem] text-ink">{value}</span>
+      </span>
+      {/*
+        Always visible, not hover-only. A phone has no hover, and the phone is
+        where this app lives — an affordance that only appears under a cursor
+        would leave the tiles looking exactly as dead as they used to.
+      */}
+      <ChevronIcon
+        aria-hidden="true"
+        className="shrink-0 -rotate-90 text-[0.85rem] text-ink-faint opacity-50 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
+      />
+    </button>
   )
 }

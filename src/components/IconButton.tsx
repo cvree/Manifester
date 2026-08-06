@@ -23,8 +23,11 @@ export function IconButton({
       title={label}
       {...props}
       className={cx(
-        'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-[1.15rem]',
-        'border-[var(--border)] bg-surface transition-colors duration-200',
+        // `interactive` carries the cursor, the press and the transition —
+        // a bare `transition-colors` here would override that shorthand and
+        // silently drop the transform, leaving the press unanimated.
+        'interactive pressable inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-[1.15rem]',
+        'border-[var(--border)] bg-surface',
         'hover:bg-[var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-40',
         tone === 'danger'
           ? 'text-[var(--rose-deep)] hover:bg-[var(--rose-soft)]'

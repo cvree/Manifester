@@ -33,7 +33,9 @@ export function SettingRow({
       className={cx(
         'interactive group flex min-h-[4.25rem] w-full items-center gap-4 px-4 py-3 text-left sm:px-5',
         'border-b border-[var(--quiet-border)] last:border-b-0',
-        'hover:bg-[var(--quiet)]',
+        // A row is part of a list, so it tints rather than lifts — but the
+        // press still has to register, hence the darker active state.
+        'hover:bg-[var(--quiet)] active:bg-[var(--control-sunken)]',
       )}
     >
       <span
