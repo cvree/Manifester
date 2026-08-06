@@ -63,6 +63,14 @@ interface HelperState {
   before: string | null
   /** What was written. Undo is only offered while the draft still matches. */
   after: string
+  /**
+   * Show the "connect an AI / no thanks" pair under the note.
+   *
+   * Only set after someone has actually pressed a helper button without a key
+   * — the offer arrives when they have just seen what the offline version
+   * does, which is the one moment it is useful rather than an advert.
+   */
+  offerAi?: boolean
 }
 
 /**
@@ -102,7 +110,7 @@ export function CreateRoute() {
     start,
   } = useSession()
   const { allTracks, loops, saveLoop, storageError } = useLibrary()
-  const { preferences } = usePreferences()
+  const { preferences, update: updatePreferences } = usePreferences()
   const reducedMotion = useReducedMotion()
 
   const [saved, setSaved] = useState(false)
@@ -216,15 +224,15 @@ export function CreateRoute() {
    * as it was to change them.
    */
   const applyResult = useCallback(
-    (before: string, result: WordcraftResult) => {
+    (before: string, result: WordcraftResult, offerAi = false) => {
       if (!result.changed) {
         cue('tap')
-        setHelper({ note: result.note, before: null, after: before })
+        setHelper({ note: result.note, before: null, after: before, offerAi })
         return
       }
       cue('save')
       updateDraft({ text: result.text })
-      setHelper({ note: result.note, before, after: result.text })
+      setHelper({ note: result.note, before, after: result.text, offerAi })
     },
     [updateDraft],
   )
@@ -245,7 +253,19 @@ export function CreateRoute() {
       const before = draft.text
 
       if (!credentials) {
-        applyResult(before, offline())
+        const result = offline()
+        // Say what just happened and what the alternative is — but only to
+        // someone who has not already switched AI off.
+        applyResult(
+          before,
+          preferences.aiEnabled
+            ? {
+                ...result,
+                note: `${result.note} That was the built-in helper — an AI writes around your own words instead.`,
+              }
+            : result,
+          preferences.aiEnabled,
+        )
         return
       }
 
@@ -265,7 +285,7 @@ export function CreateRoute() {
         setBusy(null)
       }
     },
-    [applyResult, busy, credentials, draft.text],
+    [applyResult, busy, credentials, draft.text, preferences.aiEnabled],
   )
 
   // Only while the draft is still exactly what the helper left behind —
@@ -459,6 +479,39 @@ export function CreateRoute() {
                   </Button>
                 )}
               </div>
+
+              {/*
+                Offered once they have pressed a button and seen the offline
+                result — with the decline sitting right beside it, because an
+                invitation you cannot refuse is just nagging.
+              */}
+              {helper?.offerAi && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      cue('tap')
+                      setPanel('ai')
+                    }}
+                    leading={<SparkIcon className="text-[0.95rem]" />}
+                  >
+                    Set up an AI
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      cue('tap')
+                      updatePreferences({ aiEnabled: false })
+                      setHelper((current) =>
+                        current ? { ...current, offerAi: false } : current,
+                      )
+                    }}
+                  >
+                    No thanks, hide this
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </Card>

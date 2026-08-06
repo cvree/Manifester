@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { findAmbientPreset } from './ambient'
-import { buildBusGraph } from './audioBus'
+import { MUSIC_MAKEUP_GAIN, buildBusGraph } from './audioBus'
 import { rampParam } from './audioParams'
 import {
   createBrainwaveGraph,
@@ -309,7 +309,7 @@ describe('ambience never clicks', () => {
           seed: 5,
         })
         void incoming
-        expect(graph.generated.gain.value).toBeCloseTo(0.5)
+        expect(graph.generated.gain.value).toBeCloseTo(0.5 * MUSIC_MAKEUP_GAIN)
       },
       [{ at: 3, act: () => outgoing!.stop(1.5) }],
       1,
@@ -345,8 +345,13 @@ describe('ambience never clicks', () => {
         })
         gain = graph.generated.gain
       },
-      // The same scheduling `AudioBus.setMusicVolume` performs.
-      [{ at: 3, act: () => rampParam(gain!, 1, 0.12, 3) }],
+      /*
+       * The same scheduling `AudioBus.setMusicVolume` performs — including
+       * the makeup boost, because that method ramps to the *bus* gain, not to
+       * the raw setting. Ramping to a bare 1 here would compare a boosted
+       * quiet level against an unboosted loud one and understate the change.
+       */
+      [{ at: 3, act: () => rampParam(gain!, 1 * MUSIC_MAKEUP_GAIN, 0.12, 3) }],
       1,
       22_050,
     )

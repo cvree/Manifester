@@ -83,24 +83,55 @@ describe('bounded randomness', () => {
     yield makeRng(0xbeef)
   }
 
+  /*
+   * Every draw is still checked; what changed is the bookkeeping.
+   *
+   * Calling `expect` inside the hot loop meant ~430,000 matcher invocations,
+   * and the matcher overhead — not the arithmetic — pushed this test to
+   * 28–58s against a 30s limit. It failed roughly half the time, on machine
+   * load rather than on anything about the code, which makes a green suite
+   * meaningless. Collecting violations and asserting once keeps identical
+   * coverage, runs in a moment, and reports the first offending draw with the
+   * values that broke it instead of a bare matcher diff.
+   */
+  function firstViolation(
+    label: string,
+    value: number,
+    min: number,
+    max: number,
+  ): string | null {
+    if (Number.isFinite(value) && value >= min && value <= max) return null
+    return `${label} was ${value}, outside [${min}, ${max}]`
+  }
+
   it('never lets a rain droplet exceed its ceiling', () => {
+    const violations: string[] = []
+
     for (const rng of draws()) {
       for (let i = 0; i < 2000; i += 1) {
         for (const intensity of [0, 0.62, 0.8, 1, 5, -1]) {
           const drop = randomDroplet(rng, intensity)
-          expect(drop.peak).toBeLessThanOrEqual(TRANSIENT_CEILINGS.droplet)
-          expect(drop.peak).toBeGreaterThanOrEqual(0)
-          expect(drop.frequency).toBeGreaterThanOrEqual(1200)
-          expect(drop.frequency).toBeLessThanOrEqual(4500)
-          expect(drop.attack).toBeGreaterThanOrEqual(0.001)
-          expect(drop.attack).toBeLessThanOrEqual(0.005)
-          expect(drop.decay).toBeGreaterThanOrEqual(0.03)
-          expect(drop.decay).toBeLessThanOrEqual(0.16)
-          expect(Math.abs(drop.pan)).toBeLessThanOrEqual(0.72)
-          expect(drop.rate).toBeGreaterThan(0)
+          const checks = [
+            firstViolation('peak', drop.peak, 0, TRANSIENT_CEILINGS.droplet),
+            firstViolation('frequency', drop.frequency, 1200, 4500),
+            firstViolation('attack', drop.attack, 0.001, 0.005),
+            firstViolation('decay', drop.decay, 0.03, 0.16),
+            firstViolation('pan', Math.abs(drop.pan), 0, 0.72),
+            drop.rate > 0 ? null : `rate was ${drop.rate}, expected above 0`,
+          ].filter(Boolean)
+
+          if (checks.length > 0) {
+            violations.push(`intensity ${intensity}: ${checks.join('; ')}`)
+            // One bad draw is the whole answer; no need for the other 71,999.
+            break
+          }
         }
+        if (violations.length > 0) break
       }
+      if (violations.length > 0) break
     }
+
+    expect(violations).toEqual([])
   })
 
   it('never lets a fire crackle exceed its ceiling', () => {

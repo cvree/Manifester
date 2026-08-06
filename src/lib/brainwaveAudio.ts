@@ -87,7 +87,8 @@ export const DEFAULT_BRAINWAVE: BrainwaveSettings = {
   preset: 'alpha',
   targetHz: 10,
   mode: 'amplitude-modulation',
-  volume: 0.35,
+  // The rhythm sits under the master sound volume, so it was doubly quiet.
+  volume: 0.55,
   depth: 0.7,
 }
 

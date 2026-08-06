@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AMBIENT_PRESETS, findAmbientPreset } from './ambient'
-import { MAX_MUSIC_VOLUME, buildBusGraph } from './audioBus'
+import { MAX_MUSIC_VOLUME, MUSIC_MAKEUP_GAIN, buildBusGraph } from './audioBus'
 import { createBrainwaveGraph } from './brainwaveAudio'
 import { peakOf, render, rmsOf } from './testing/audioHarness'
 
@@ -9,7 +9,9 @@ describe('the generated-sound mix', () => {
     await render(0.2, (ctx) => {
       const graph = buildBusGraph(ctx, ctx.destination, 0.4)
 
-      expect(graph.generated.gain.value).toBeCloseTo(0.4)
+      // The node carries the setting times the fixed makeup boost, not the
+      // raw setting — the slider still reads 40%.
+      expect(graph.generated.gain.value).toBeCloseTo(0.4 * MUSIC_MAKEUP_GAIN)
       // Neither layer carries the user's volume itself, so turning one off
       // cannot change the other's level.
       expect(graph.music.gain.value).toBe(1)
@@ -70,7 +72,18 @@ describe('the generated-sound mix', () => {
       22_050,
     )
 
-    expect(peakOf(shaped.channels[0])).toBeCloseTo(peakOf(plain.channels[0]), 3)
+    /*
+     * The ceiling itself is still the identity here: the only difference
+     * between the two paths is the deliberate makeup boost. Asserting the
+     * exact ratio is what keeps this a transparency test — if the boost ever
+     * grows enough to push this 0.45 probe past the linear region, the shaped
+     * peak stops being 1.5x the plain one and this fails, which is precisely
+     * the warning we want.
+     */
+    expect(peakOf(shaped.channels[0])).toBeCloseTo(
+      peakOf(plain.channels[0]) * MUSIC_MAKEUP_GAIN,
+      3,
+    )
   })
 
   it('cannot emit above full scale however much is thrown at it', async () => {
@@ -186,14 +199,18 @@ describe('the generated-sound mix', () => {
   it('lets Sound volume go to twice its old ceiling, clamped beyond that', async () => {
     await render(0.2, (ctx) => {
       const doubled = buildBusGraph(ctx, ctx.destination, MAX_MUSIC_VOLUME)
-      expect(doubled.generated.gain.value).toBeCloseTo(MAX_MUSIC_VOLUME)
+      expect(doubled.generated.gain.value).toBeCloseTo(
+        MAX_MUSIC_VOLUME * MUSIC_MAKEUP_GAIN,
+      )
       expect(MAX_MUSIC_VOLUME).toBeCloseTo(2)
 
       // A value past the ceiling is clamped there, not passed through raw —
       // otherwise a corrupt or hand-edited setting could drive the mix as hard
       // as it liked.
       const overdriven = buildBusGraph(ctx, ctx.destination, 50)
-      expect(overdriven.generated.gain.value).toBeCloseTo(MAX_MUSIC_VOLUME)
+      expect(overdriven.generated.gain.value).toBeCloseTo(
+        MAX_MUSIC_VOLUME * MUSIC_MAKEUP_GAIN,
+      )
     })
   })
 
@@ -242,7 +259,7 @@ describe('the generated-sound mix', () => {
       22_050,
     )
 
-    expect(observed).toBeCloseTo(0.5)
+    expect(observed).toBeCloseTo(0.5 * MUSIC_MAKEUP_GAIN)
     // And the crossfade never sums into distortion.
     expect(peakOf(channels[0])).toBeLessThanOrEqual(1)
     expect(rmsOf(channels[0])).toBeGreaterThan(0.001)

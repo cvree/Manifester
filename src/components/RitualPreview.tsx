@@ -252,15 +252,19 @@ export function RitualPreview({
             value={delay}
             onClick={() => onOpenSetting('delay')}
           />
-          {rhythm && (
-            <SummaryTile
-              icon={<PulseIcon />}
-              label="Rhythm"
-              value={rhythm}
-              onClick={() => onOpenSetting('rhythm')}
-              className="col-span-2"
-            />
-          )}
+          {/*
+            Always shown, including when the rhythm is off. It used to appear
+            only once enabled, which meant the one setting you could not reach
+            from here was the one you had not turned on yet — exactly backwards
+            for a panel whose job is to be the shortcut.
+          */}
+          <SummaryTile
+            icon={<PulseIcon />}
+            label="Rhythm"
+            value={rhythm ?? 'Off'}
+            onClick={() => onOpenSetting('rhythm')}
+            className="col-span-2"
+          />
         </div>
 
         <p className="type-meta mt-4 text-center">

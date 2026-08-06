@@ -35,6 +35,30 @@ const RAMP_SECONDS = 0.12
  */
 export const MAX_MUSIC_VOLUME = 2
 
+/**
+ * A fixed boost applied to everything generated, on top of the user's setting.
+ *
+ * The mix was built conservatively and left most of its headroom unused: the
+ * loudest soundscape at 100% peaked around 0.33 against a ceiling that stays
+ * perfectly linear all the way to 0.7. That is roughly 6 dB of room nobody was
+ * using, and it made the app feel quiet even with the slider at the top —
+ * especially on a phone, where the ambience competes with a room.
+ *
+ * 1.5 is the largest boost that keeps normal listening *entirely inside* that
+ * linear region, and staying inside it is not merely a nicety about
+ * distortion. The ceiling is transparent below 0.7, which is what allows it to
+ * sit in the path of a binaural pair without altering the channel separation
+ * the beat depends on — see `createSoftCeiling`. Push ordinary content into
+ * the knee and the brainwave rhythm is the thing that quietly degrades. So the
+ * boost stops where transparency does; only someone deliberately at the very
+ * top of the slider reaches the knee, and the ceiling guarantees even that
+ * cannot clip.
+ *
+ * It lives here rather than in the presets so every generated source — every
+ * ambience, the rhythm, and anything added later — gets it in one place.
+ */
+export const MUSIC_MAKEUP_GAIN = 1.5
+
 export interface BusGraph {
   /** Final trim, wired to the context's output. */
   master: GainNode
@@ -65,7 +89,7 @@ export function buildBusGraph(
   ceiling.connect(master)
 
   const generated = ctx.createGain()
-  generated.gain.value = clampMusicVolume(soundVolume)
+  generated.gain.value = busGainFor(soundVolume)
   generated.connect(ceiling)
 
   const music = ctx.createGain()
@@ -136,7 +160,7 @@ export class AudioBus {
       // the easiest ways to put a click in a running mix.
       rampParam(
         this.graph.generated.gain,
-        this.musicLevel,
+        busGainFor(this.musicLevel),
         RAMP_SECONDS,
         this.ctx.currentTime,
       )
@@ -170,4 +194,13 @@ export class AudioBus {
 
 function clampMusicVolume(value: number): number {
   return Math.min(MAX_MUSIC_VOLUME, Math.max(0, value))
+}
+
+/**
+ * The setting as the mix should hear it. The clamp is on the user's value, so
+ * the slider still reads 0–200%; the boost is applied after, where it cannot
+ * be mistaken for something the person chose.
+ */
+function busGainFor(value: number): number {
+  return clampMusicVolume(value) * MUSIC_MAKEUP_GAIN
 }

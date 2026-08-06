@@ -144,6 +144,41 @@ export function SoundsRoute() {
     previewRef.current?.setAmbienceOptions({ rainCharacter: sound.rainCharacter })
   }, [sound.rainCharacter])
 
+  /**
+   * Change a rhythm setting and let the person hear the result immediately.
+   *
+   * Choosing a rhythm and then having to find a Preview button was two steps
+   * for one intention. Selecting anything other than Off now starts the sound
+   * on the spot; selecting Off stops it. This is safe to do here because the
+   * handler is reached synchronously from the tap that chose the preset, which
+   * is the only moment a browser will let an AudioContext start.
+   */
+  const changeRhythm = useCallback(
+    (patch: Partial<typeof brainwave>) => {
+      setBrainwave(patch)
+
+      const voice = rhythmPreviewRef.current
+      const bus = previewBusRef.current
+      if (!voice || !bus) return
+
+      if (patch.enabled === false) {
+        voice.stop()
+        setRhythmPreviewing(false)
+        return
+      }
+
+      // Turning it on, or switching preset while on. Anything else (volume,
+      // depth, mode) is already followed by the effect below.
+      if (patch.enabled === true) {
+        bus.ensure()
+        bus.setMusicVolume(Math.min(0.6, Math.max(0.35, draft.settings.musicVolume)))
+        voice.apply({ ...brainwave, ...patch, enabled: true })
+        setRhythmPreviewing(true)
+      }
+    },
+    [brainwave, draft.settings.musicVolume, setBrainwave],
+  )
+
   const toggleRhythmPreview = useCallback(() => {
     const voice = rhythmPreviewRef.current
     const bus = previewBusRef.current
@@ -294,9 +329,10 @@ export function SoundsRoute() {
         >
           <BrainwavePanel
             settings={brainwave}
-            onChange={setBrainwave}
+            onChange={changeRhythm}
             previewing={rhythmPreviewing}
             onTogglePreview={toggleRhythmPreview}
+            autoPlays
           />
         </Card>
 

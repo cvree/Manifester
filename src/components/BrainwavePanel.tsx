@@ -26,6 +26,12 @@ interface BrainwavePanelProps {
   /** Omitted where auditioning does not apply, e.g. mid-session. */
   previewing?: boolean
   onTogglePreview?: () => void
+  /**
+   * True where choosing a rhythm already starts it playing. The control then
+   * stops being "Preview this" and becomes a way to silence it, which is the
+   * only thing left worth offering.
+   */
+  autoPlays?: boolean
 }
 
 /**
@@ -41,6 +47,7 @@ export function BrainwavePanel({
   onChange,
   previewing = false,
   onTogglePreview,
+  autoPlays = false,
 }: BrainwavePanelProps) {
   const groupId = useId()
   const selected = settings.enabled ? settings.preset : null
@@ -101,10 +108,17 @@ export function BrainwavePanel({
             </dd>
           </dl>
 
+          {/*
+            Where selecting already starts the sound, this is not a "preview"
+            any more — the person is listening to it. All that is left worth
+            offering is a way to stop, kept small so it does not read as the
+            step you have to take before anything happens.
+          */}
           {onTogglePreview && (
             <Button
               variant="secondary"
-              block
+              size={autoPlays ? 'sm' : 'md'}
+              block={!autoPlays}
               onClick={onTogglePreview}
               leading={
                 previewing ? (
@@ -114,9 +128,13 @@ export function BrainwavePanel({
                 )
               }
             >
-              {previewing
-                ? `Stop preview of ${meta.label}`
-                : `Preview ${meta.label} at ${formatHz(meta.targetHz)}`}
+              {autoPlays
+                ? previewing
+                  ? 'Stop the sound'
+                  : 'Play it again'
+                : previewing
+                  ? `Stop preview of ${meta.label}`
+                  : `Preview ${meta.label} at ${formatHz(meta.targetHz)}`}
             </Button>
           )}
 
