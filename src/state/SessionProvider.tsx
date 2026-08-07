@@ -53,6 +53,14 @@ interface SessionSnapshot {
   cycles: number
   chunkIndex: number
   chunkTotal: number
+  /**
+   * The exact words being spoken right now, straight from the voice engine.
+   *
+   * The player shows this rather than looking a line up by index. An index has
+   * to be interpreted, and interpreting it wrongly is how the screen ended up
+   * showing one thing while the voice said another.
+   */
+  chunkText: string
   trackName: string | null
   notice: string | null
   /** Seconds left in the delay between loops, or `null` while speaking. */
@@ -109,6 +117,7 @@ const EMPTY_SESSION: SessionSnapshot = {
   cycles: 0,
   chunkIndex: 0,
   chunkTotal: 0,
+  chunkText: '',
   trackName: null,
   notice: null,
   delayRemaining: null,
@@ -399,8 +408,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           loop: true,
         },
         {
-          onChunk: (chunkIndex, chunkTotal) =>
-            setSession((current) => ({ ...current, chunkIndex, chunkTotal })),
+          onChunk: (chunkIndex, chunkTotal, chunkText) =>
+            setSession((current) => ({ ...current, chunkIndex, chunkTotal, chunkText })),
           onCycle: (cycles) => setSession((current) => ({ ...current, cycles })),
           onError: (message) =>
             setSession((current) => ({ ...current, notice: message })),

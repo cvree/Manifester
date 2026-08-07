@@ -14,12 +14,12 @@ import {
   findProvider,
   geminiKeyStyle,
   normaliseKey,
+  PROVIDER,
   providerLabel,
-  PROVIDERS,
   verifyConnection,
   type Provider,
-  type ProviderId,
 } from '../lib/ai/providers'
+import { useRetiredProvider } from '../lib/ai/useCredentials'
 import { Button } from './Button'
 import { CheckIcon, ChevronIcon, SparkIcon } from './Icons'
 import { Toggle } from './Toggle'
@@ -52,9 +52,9 @@ export function AiSetupPanel({
   enabled,
   onEnabledChange,
 }: AiSetupPanelProps) {
-  const [choosing, setChoosing] = useState<ProviderId | null>(null)
   /** Set while swapping the key on an already-connected provider. */
   const [replacing, setReplacing] = useState(false)
+  const retired = useRetiredProvider()
 
   const master = (
     <Toggle
@@ -63,7 +63,7 @@ export function AiSetupPanel({
         enabled
           ? credentials
             ? `The two helper buttons use ${findProvider(credentials.provider).name}.`
-            : 'Connect a provider below, or leave this off and keep the built-in helper.'
+            : `Connect ${PROVIDER.name} below, or leave this off and keep the built-in helper.`
           : 'Off. Both helper buttons use the built-in offline version, and nothing is sent anywhere.'
       }
       checked={enabled}
@@ -76,9 +76,9 @@ export function AiSetupPanel({
 
   /*
    * Off hides the whole apparatus, not just the calls. Someone who has decided
-   * they do not want this should not keep being shown a menu of providers —
-   * and if a key is already stored it stays stored, so turning it back on is
-   * one tap rather than a second setup.
+   * they do not want this should not keep being shown the setup — and if a key
+   * is already stored it stays stored, so turning it back on is one tap rather
+   * than a second setup.
    */
   if (!enabled) {
     return (
@@ -115,7 +115,6 @@ export function AiSetupPanel({
             cue('tap')
             await forgetCredentials()
             onChange(null)
-            setChoosing(null)
             setReplacing(false)
           }}
         />
@@ -123,53 +122,53 @@ export function AiSetupPanel({
     )
   }
 
-  const setupFor = replacing ? credentials?.provider ?? null : choosing
-
-  if (!setupFor) {
-    return (
-      <div className="space-y-5">
-        {master}
-        <Explainer />
-        <div>
-          <p className="type-label mb-3">Pick one</p>
-          <div className="space-y-2.5">
-            {PROVIDERS.map((provider) => (
-              <ProviderCard
-                key={provider.id}
-                provider={provider}
-                onClick={() => {
-                  cue('select')
-                  setChoosing(provider.id)
-                }}
-              />
-            ))}
-          </div>
-        </div>
-        <p className="type-meta">
-          You can change or remove this at any time, and everything keeps working
-          without it.
-        </p>
-      </div>
-    )
-  }
-
+  /*
+   * One provider, so no menu. There used to be a "pick one" list, and it
+   * turned the first screen into a decision — between a free option and one
+   * that wanted a payment card first — when what somebody actually needs here
+   * is the next step.
+   */
   return (
     <div className="space-y-5">
       {master}
+      {retired && !replacing && <RetiredNote name={retired} />}
+      {!replacing && <Explainer />}
       <SetupForm
-        provider={findProvider(setupFor)}
+        provider={credentials ? findProvider(credentials.provider) : PROVIDER}
         replacing={replacing}
-        onBack={() => {
+        onBack={replacing ? () => {
           cue('tap')
-          setChoosing(null)
           setReplacing(false)
-        }}
+        } : null}
         onConnected={(next) => {
           onChange(next)
-          setChoosing(null)
           setReplacing(false)
         }}
       />
+    </div>
+  )
+}
+
+/**
+ * What happened to a key for a provider that is no longer offered.
+ *
+ * Claude was an option. Somebody who set it up and came back to a panel that
+ * simply said "not connected" would reasonably think the app had lost their
+ * key, so it says what it did and why, once.
+ */
+function RetiredNote({ name }: { name: string }) {
+  return (
+    <div
+      role="status"
+      className="rounded-2xl border border-[var(--gold)] bg-[var(--gold-soft)] px-4 py-3.5"
+    >
+      <p className="type-label mb-1.5">Your {name} key has been removed</p>
+      <p className="text-[0.9rem] leading-relaxed text-ink">
+        Manifester now uses {PROVIDER.name} only — it is free, and one set of
+        steps is easier than a choice between two. A {name} key could no longer
+        be used for anything here, so it was deleted from this device rather
+        than left sitting in storage. Nothing you have written was touched.
+      </p>
     </div>
   )
 }
@@ -191,7 +190,8 @@ function SetupForm({
 }: {
   provider: Provider
   replacing: boolean
-  onBack: () => void
+  /** Null when there is nowhere to go back to — the setup is the first screen. */
+  onBack: (() => void) | null
   onConnected: (credentials: Credentials) => void
 }) {
   const [key, setKey] = useState('')
@@ -207,9 +207,7 @@ function SetupForm({
   const check = key ? checkKeyFormat(provider.id, key) : null
   const blocked = check?.level === 'error'
   const styleNote =
-    provider.id === 'gemini' && normaliseKey(key).length >= 8
-      ? describeGeminiKeyStyle(geminiKeyStyle(key))
-      : null
+    normaliseKey(key).length >= 8 ? describeGeminiKeyStyle(geminiKeyStyle(key)) : null
 
   const connect = async () => {
     if (inFlight.current) return
@@ -254,14 +252,16 @@ function SetupForm({
 
   return (
     <div className="space-y-5">
-      <button
-        type="button"
-        onClick={onBack}
-        className="interactive -ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-xl px-1 text-[0.9rem] text-ink-muted hover:text-ink"
-      >
-        <ChevronIcon className="rotate-90 text-[0.95rem]" aria-hidden="true" />
-        {replacing ? 'Back — keep the key I have' : 'Back to the options'}
-      </button>
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="interactive -ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-xl px-1 text-[0.9rem] text-ink-muted hover:text-ink"
+        >
+          <ChevronIcon className="rotate-90 text-[0.95rem]" aria-hidden="true" />
+          Back — keep the key I have
+        </button>
+      )}
 
       <div>
         <h3 className="type-subheading">
@@ -400,48 +400,11 @@ function Explainer() {
         instead of chosen from a built-in list, and they never run out.
       </p>
       <p className="type-body">
-        It needs a key from one of two companies. A key is a long password that
-        lets this app use your account. Getting one takes about two minutes.
+        It needs a free key from Google. A key is a long password that lets this
+        app use your account. Getting one takes about two minutes, there is no
+        payment card, and the steps are below.
       </p>
     </div>
-  )
-}
-
-function ProviderCard({
-  provider,
-  onClick,
-}: {
-  provider: Provider
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        'interactive group flex w-full items-center gap-4 rounded-2xl border px-4 py-4 text-left',
-        'border-[var(--border)] bg-[var(--surface-sunken)] hover:border-[var(--border-strong)]',
-      )}
-    >
-      <span className="min-w-0 grow">
-        <span className="block text-[1rem] font-medium text-ink">
-          {provider.name}
-          <span className="ml-2 text-[0.82rem] font-normal text-ink-faint">
-            by {provider.company}
-          </span>
-        </span>
-        <span className="mt-1 block text-[0.88rem] leading-relaxed text-ink-muted">
-          {provider.blurb}
-        </span>
-        <span className="mt-1.5 block text-[0.82rem] text-ink-faint">
-          {provider.cost}
-        </span>
-      </span>
-      <ChevronIcon
-        aria-hidden="true"
-        className="shrink-0 -rotate-90 text-[1.05rem] text-ink-faint transition-transform duration-200 group-hover:translate-x-0.5"
-      />
-    </button>
   )
 }
 

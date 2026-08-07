@@ -45,18 +45,19 @@ beforeEach(() => {
 describe('connecting, disconnecting, and connecting again', () => {
   it('keeps the key and the model it was checked against', async () => {
     await saveCredentials(connected)
-    const loaded = await loadCredentials()
+    const { credentials, retired } = await loadCredentials()
 
-    expect(loaded?.key).toBe(AUTH_KEY)
-    expect(loaded?.model).toBe('gemini-3.6-flash')
-    expect(loaded?.verifiedAt).toBe(connected.verifiedAt)
+    expect(credentials?.key).toBe(AUTH_KEY)
+    expect(credentials?.model).toBe('gemini-3.6-flash')
+    expect(credentials?.verifiedAt).toBe(connected.verifiedAt)
+    expect(retired).toBeNull()
   })
 
   it('really removes the key on disconnect', async () => {
     await saveCredentials(connected)
     await forgetCredentials()
 
-    expect(await loadCredentials()).toBeNull()
+    expect((await loadCredentials()).credentials).toBeNull()
     expect([...store.values.values()]).toEqual([])
   })
 
@@ -65,8 +66,8 @@ describe('connecting, disconnecting, and connecting again', () => {
     await forgetCredentials()
     await saveCredentials({ ...connected, key: `AQ.Ab8ZZ${'9'.repeat(48)}` })
 
-    const loaded = await loadCredentials()
-    expect(loaded?.key.startsWith('AQ.Ab8ZZ')).toBe(true)
+    const { credentials } = await loadCredentials()
+    expect(credentials?.key.startsWith('AQ.Ab8ZZ')).toBe(true)
   })
 
   it('reads a record saved before models were remembered', async () => {
@@ -77,14 +78,35 @@ describe('connecting, disconnecting, and connecting again', () => {
       agreedAt: 1,
     })
 
-    const loaded = await loadCredentials()
-    expect(loaded?.key).toBe(AUTH_KEY)
-    expect(loaded?.model).toBeUndefined()
+    const { credentials } = await loadCredentials()
+    expect(credentials?.key).toBe(AUTH_KEY)
+    expect(credentials?.model).toBeUndefined()
   })
 
   it('ignores a half-written record rather than half-connecting', async () => {
     store.values.set('aiCredentials', { provider: 'gemini', agreedAt: 1 })
-    expect(await loadCredentials()).toBeNull()
+    expect((await loadCredentials()).credentials).toBeNull()
+  })
+
+  /*
+   * Claude was an option and is not any more. A device that connected it still
+   * has a real API key in its IndexedDB, and every screen that looks a provider
+   * up by id would throw on it.
+   */
+  it('deletes a key for a provider that is no longer offered, and says so', async () => {
+    store.values.set('aiCredentials', {
+      provider: 'claude',
+      key: `sk-ant-api03-${'x'.repeat(60)}`,
+      agreedAt: 1,
+    })
+
+    const { credentials, retired } = await loadCredentials()
+
+    expect(credentials).toBeNull()
+    expect(retired).toBe('Claude')
+    // Gone from storage, not merely ignored: an unusable credential at rest is
+    // worse than none.
+    expect([...store.values.values()]).toEqual([])
   })
 
   it('tells the rest of the app straight away', () => {
@@ -95,6 +117,19 @@ describe('connecting, disconnecting, and connecting again', () => {
     // No throw, and the null is what a caller with no key expects to see.
     expect(true).toBe(true)
   })
+
+  /*
+   * The other half of this — that the explanation actually reaches the screen
+   * — is not asserted here, and the reason is worth writing down rather than
+   * leaving as a gap.
+   *
+   * The bug was a React one: `retired` sat in a module variable beside the
+   * store, the store emitted after loading, `useSyncExternalStore` compared
+   * the snapshot, found the same `null` it already had, and correctly declined
+   * to re-render. Nothing about that is visible from here — this suite runs in
+   * Node with no DOM, so a hook cannot be rendered. It is covered by driving
+   * the built app in a browser with a seeded Claude record instead.
+   */
 })
 
 describe('showing a stored key back', () => {

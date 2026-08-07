@@ -19,6 +19,8 @@ const MAX_CHUNK_CHARS = 180
 const STALL_TIMEOUT_MS = 2500
 /** Chrome desktop stops speaking after ~15s unless nudged. */
 const KEEPALIVE_INTERVAL_MS = 9000
+/** How long to wait for `onstart` before assuming the engine will not send one. */
+const ANNOUNCE_FALLBACK_MS = 300
 
 /**
  * The ceiling for the `voiceVolume` setting.
@@ -53,49 +55,68 @@ const isAppleMobile = (): boolean =>
 /* ── Chunking ────────────────────────────────────────────────── */
 
 /**
- * Split text into speakable chunks, preferring paragraph then sentence
- * boundaries so the pauses land where a reader would naturally take them.
+ * Split text into speakable chunks — one per written line.
+ *
+ * A line is the unit the whole app already thinks in: it is what the editor
+ * counts, what the preview lists, and what the player puts on screen. Making
+ * it the unit the voice speaks too is what keeps the words on screen and the
+ * words in your ears the same words.
+ *
+ * This used to merge lines together up to the character budget, which read
+ * perfectly well as prose and was quietly wrong here: six short affirmations
+ * went out as a single utterance while the player, indexing its line list by
+ * the chunk number, sat on line one for all six. The screen was not lagging —
+ * it was pointing at something else entirely.
+ *
+ * Only a line too long to speak in one go is split further, and then at
+ * sentence, clause and word boundaries in that order, so the pauses still land
+ * where a reader would take them.
  */
 export function chunkText(text: string, maxChars = MAX_CHUNK_CHARS): string[] {
-  const normalised = text.replace(/\r\n/g, '\n').trim()
-  if (!normalised) return []
-
   const chunks: string[] = []
 
-  for (const paragraph of normalised.split(/\n{2,}/)) {
-    const trimmedParagraph = paragraph.trim()
-    if (!trimmedParagraph) continue
-
-    // Keep the terminating punctuation with its sentence.
-    const sentences =
-      trimmedParagraph.match(/[^.!?…\n]+(?:[.!?…]+["'”’)]*|\n|$)/g) ??
-      [trimmedParagraph]
-
-    let buffer = ''
-    const flush = () => {
-      const value = buffer.trim()
-      if (value) chunks.push(value)
-      buffer = ''
+  for (const rawLine of text.replace(/\r\n/g, '\n').split('\n')) {
+    const line = rawLine.trim()
+    if (!line) continue
+    if (line.length <= maxChars) {
+      chunks.push(line)
+      continue
     }
-
-    for (const rawSentence of sentences) {
-      const sentence = rawSentence.trim()
-      if (!sentence) continue
-
-      if (sentence.length > maxChars) {
-        flush()
-        chunks.push(...splitLongSentence(sentence, maxChars))
-        continue
-      }
-
-      if ((buffer + ' ' + sentence).trim().length > maxChars) flush()
-      buffer = buffer ? `${buffer} ${sentence}` : sentence
-    }
-
-    flush()
+    chunks.push(...splitLongLine(line, maxChars))
   }
 
   return chunks
+}
+
+/** A single line longer than one utterance should be: break it up sensibly. */
+function splitLongLine(line: string, maxChars: number): string[] {
+  // Keep the terminating punctuation with its sentence.
+  const sentences = line.match(/[^.!?…]+(?:[.!?…]+["'”’)]*|$)/g) ?? [line]
+
+  const parts: string[] = []
+  let buffer = ''
+  const flush = () => {
+    const value = buffer.trim()
+    if (value) parts.push(value)
+    buffer = ''
+  }
+
+  for (const rawSentence of sentences) {
+    const sentence = rawSentence.trim()
+    if (!sentence) continue
+
+    if (sentence.length > maxChars) {
+      flush()
+      parts.push(...splitLongSentence(sentence, maxChars))
+      continue
+    }
+
+    if ((buffer + ' ' + sentence).trim().length > maxChars) flush()
+    buffer = buffer ? `${buffer} ${sentence}` : sentence
+  }
+
+  flush()
+  return parts
 }
 
 /** Break a run-on sentence at commas, then at word boundaries. */
@@ -229,7 +250,16 @@ export interface SpeechLoopOptions {
 }
 
 export interface SpeechLoopHandlers {
-  onChunk?: (index: number, total: number) => void
+  /**
+   * The words that are being spoken *now*.
+   *
+   * Fired when the engine reports it has started this utterance, not when the
+   * app queued it. The gap between those two moments is a few milliseconds for
+   * a voice installed on the device and can be half a second for one that is
+   * fetched over the network — long enough, on a phone, to read as the screen
+   * running ahead of the voice.
+   */
+  onChunk?: (index: number, total: number, text: string) => void
   onCycle?: (completedCycles: number) => void
   onFinish?: () => void
   onError?: (message: string) => void
@@ -247,6 +277,7 @@ export class SpeechLooper {
   private pending = new Set<SpeechSynthesisUtterance>()
   private pauseTimer: number | null = null
   private stallTimer: number | null = null
+  private announceTimer: number | null = null
   private keepAlive: number | null = null
   private running = false
   /** When the current inter-repeat silence is due to end. */
@@ -353,6 +384,7 @@ export class SpeechLooper {
     this.pausedGapMs = null
     this.clearTimer('pauseTimer')
     this.clearTimer('stallTimer')
+    this.clearTimer('announceTimer')
     this.stopKeepAlive()
     if (isSpeechSupported()) {
       try {
@@ -409,8 +441,25 @@ export class SpeechLooper {
       this.advance(generation)
     }
 
+    /*
+     * Say what is being spoken, once, at the moment it starts.
+     *
+     * `onstart` is the honest signal and every current engine fires it. The
+     * timer behind it is for the one that does not: better a screen that is a
+     * third of a second late than a screen still showing the previous line for
+     * the whole utterance.
+     */
+    const index = this.index
+    let announced = false
+    const announce = () => {
+      if (announced || generation !== this.generation) return
+      announced = true
+      this.clearTimer('announceTimer')
+      this.handlers.onChunk?.(index, this.chunks.length, text)
+    }
+    utterance.onstart = announce
+
     this.pending.add(utterance)
-    this.handlers.onChunk?.(this.index, this.chunks.length)
 
     try {
       synth.speak(utterance)
@@ -420,6 +469,8 @@ export class SpeechLooper {
       return
     }
 
+    this.clearTimer('announceTimer')
+    this.announceTimer = window.setTimeout(announce, ANNOUNCE_FALLBACK_MS)
     this.armStallWatchdog(generation)
   }
 
@@ -506,7 +557,7 @@ export class SpeechLooper {
     handlers.onFinish?.()
   }
 
-  private clearTimer(which: 'pauseTimer' | 'stallTimer'): void {
+  private clearTimer(which: 'pauseTimer' | 'stallTimer' | 'announceTimer'): void {
     const id = this[which]
     if (id != null) {
       clearTimeout(id)

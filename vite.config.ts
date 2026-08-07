@@ -83,13 +83,16 @@ export default defineConfig({
     rollupOptions: {
       output: {
         /*
-         * Give the provider SDKs predictable chunk names so the service
-         * worker can be told to skip them. Left to itself the bundler names
-         * these after each package's entry file — `sdk-*`, `web-*` — which is
-         * both unrecognisable and too generic to write an ignore rule against.
+         * Give the provider SDK a predictable chunk name so the service
+         * worker can be told to skip it. Left to itself the bundler names it
+         * after the package's entry file — `web-*` — which is both
+         * unrecognisable and too generic to write an ignore rule against.
+         *
+         * `@google` is the only one now; the pattern stays an alternation so
+         * that adding a provider back is a word rather than a rewrite.
          */
         manualChunks(id: string) {
-          if (/node_modules[\\/](@anthropic-ai|openai|@google)[\\/]/.test(id)) {
+          if (/node_modules[\\/](@google)[\\/]/.test(id)) {
             return 'ai-provider'
           }
           return undefined

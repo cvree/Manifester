@@ -83,7 +83,7 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
   },
   ai: {
     title: 'AI writing help',
-    description: 'Optional. Connect Claude or Gemini with your own key.',
+    description: 'Optional. Connect Gemini with your own free key.',
   },
 }
 

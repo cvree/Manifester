@@ -84,16 +84,23 @@ export function PlayerRoute() {
   }, [playing])
 
   const lines = useMemo(() => affirmationLines(draft.text), [draft.text])
+
   /*
-   * Short loops go out as a single utterance, so there is no "current line" to
-   * point at — showing the whole text is the honest thing. Longer ones are
-   * split into passages, and then the passage index really is what is being
-   * spoken right now.
+   * The words on screen are the words the voice engine says it is speaking,
+   * reported as each line starts — not a line looked up by a chunk number.
+   *
+   * That lookup was the bug. Speech was chunked to a character budget while
+   * the display was indexed by line, so the two only agreed by coincidence:
+   * a handful of short affirmations went out as one utterance and the screen
+   * showed line one throughout, and a longer loop drifted a line further out
+   * with every pass. Now one line is one utterance and the engine names it,
+   * so there is nothing left to get wrong.
+   *
+   * Before anything has been spoken — idle, or the breath before the first
+   * line — the whole draft is shown, which is the honest answer to "what is
+   * this loop?" when the answer to "what am I hearing?" is "nothing yet".
    */
-  const currentLine =
-    session.chunkTotal > 1
-      ? (lines[session.chunkIndex % Math.max(1, lines.length)] ?? lines[0])
-      : draft.text.trim() || lines[0]
+  const currentLine = session.chunkText || draft.text.trim() || lines[0]
 
   if (idle && !hasText) {
     return (
@@ -295,7 +302,12 @@ export function PlayerRoute() {
                     {session.delayRemaining != null
                       ? `Next pass in ${session.delayRemaining}s`
                       : session.chunkTotal > 0
-                        ? `Part ${session.chunkIndex + 1} of ${session.chunkTotal}`
+                        ? // "Line" only when a chunk really is a line. A line
+                          // too long to speak in one breath is split, and then
+                          // this is counting parts of it.
+                          `${session.chunkTotal === lines.length ? 'Line' : 'Part'} ${
+                            session.chunkIndex + 1
+                          } of ${session.chunkTotal}`
                         : 'Speaking'}
                   </span>
                   {session.trackName && (

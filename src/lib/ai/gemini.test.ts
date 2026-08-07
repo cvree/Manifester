@@ -34,6 +34,7 @@ import {
   checkKeyFormat,
   findProvider,
   geminiKeyStyle,
+  isProviderId,
   normaliseKey,
   PROVIDERS,
   readInteractionText,
@@ -176,17 +177,32 @@ describe('a key from Google AI Studio today', () => {
   })
 
   it('mentions a key from another company without refusing it', () => {
-    const check = checkKeyFormat('gemini', `sk-ant-api03-${'x'.repeat(40)}`)
-    expect(check?.level).toBe('hint')
-    expect(check?.message).toContain('Anthropic')
-    expect(checkKeyFormat('claude', AUTH_KEY)?.level).toBe('hint')
+    for (const foreign of [`sk-ant-api03-${'x'.repeat(40)}`, `sk-proj-${'x'.repeat(40)}`]) {
+      const check = checkKeyFormat('gemini', foreign)
+      expect(check?.level).toBe('hint')
+      // Still connectable: the person in front of the screen may know
+      // something this function does not.
+      expect(check?.level).not.toBe('error')
+    }
+    expect(checkKeyFormat('gemini', `sk-ant-api03-${'x'.repeat(40)}`)?.message).toContain(
+      'Anthropic',
+    )
   })
 
-  it('offers only providers a browser can actually reach', () => {
-    // ChatGPT is absent on purpose: api.openai.com sends no CORS header, so
-    // the request never leaves the browser. If someone re-adds it without a
-    // proxy, this fails and explains itself.
-    expect(PROVIDERS.map((provider) => provider.id)).toEqual(['claude', 'gemini'])
+  it('offers exactly one provider, and one a browser can reach', () => {
+    /*
+     * Gemini alone. Claude was offered too and was removed: it needed a
+     * payment card before it would answer, and two options turned the first
+     * screen into a decision rather than an instruction.
+     *
+     * ChatGPT was never here: api.openai.com sends no CORS header, so the
+     * request never leaves the browser. If someone re-adds either without
+     * reading the note at the top of providers.ts, this fails and explains
+     * itself.
+     */
+    expect(PROVIDERS.map((provider) => provider.id)).toEqual(['gemini'])
+    expect(isProviderId('gemini')).toBe(true)
+    expect(isProviderId('claude')).toBe(false)
   })
 })
 

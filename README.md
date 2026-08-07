@@ -66,9 +66,11 @@ app.
   anymore" → "I am learning and growing"), trades wishing for deciding, and
   attaches a felt sense to a line or two. Both are one tap and both are
   undoable.
-- **Optionally powered by an AI you bring the key for.** Connect **Claude** or
-  **Gemini** with your own API key, in a guided flow that spells out every step,
-  what it costs in cents, and what the company does with your words. Connected,
+- **Optionally powered by an AI you bring the key for.** Connect **Gemini**
+  with your own free Google key, in a guided flow that spells out every step,
+  what it costs, and what Google does with your words. There is one provider
+  and no menu: it is free, it needs no payment card, and a single set of
+  numbered steps is a better first screen than a choice. Connected,
   the suggestions are written around your actual draft instead of drawn from a
   built-in list — so pressing *Add* repeatedly keeps producing new material
   instead of running dry. It falls back to the offline engine whenever the
@@ -106,8 +108,12 @@ app.
 - Press *Add* or *Improve* without a key and the result says which engine wrote
   it, then offers **Set up an AI** beside **No thanks, hide this**. The offer only
   appears after a real press, and never again once declined.
-- Long text is split into short passages behind the scenes so browsers do not cut
-  it off part-way through, then spoken end to end.
+- **One written line is one spoken line**, so the words on the player are the
+  words in your ears. The voice is given a line at a time and reports back the
+  moment it starts speaking one; the player shows exactly that text rather than
+  guessing from a counter. Only a line too long to say in one breath is split
+  further, at sentence, clause and word boundaries in that order — which is
+  also what keeps browsers from cutting a long passage off part-way through.
 - Title your loop and save it.
 - Session length: 5, 10, 20, 30 minutes, a custom value up to 8 hours, or "until
   I stop".
@@ -538,18 +544,24 @@ better engineering answer.
   to the console. *Disconnect* removes it from the device for good.
 - **Requests carry `store: false`**, so the interaction is not kept on Google's
   side for later retrieval, and Manifester never asks for one back.
-- **Choose the provider with your eyes open.** Anthropic does not train on API
-  content and no human reads it. Google's Gemini *free* tier is different: its
-  [API terms](https://ai.google.dev/gemini-api/terms) say unpaid-tier content is
-  used to improve Google products and that human reviewers may read it. For a
-  page of private affirmations that is a real cost, so the setup screen says so
-  in a warning box rather than a footnote. Paying for Gemini turns it off — as
-  does being in the UK, Switzerland or the EEA, where Google applies the paid
-  terms to the free tier too.
+- **Free costs something, and the setup screen says so before you paste.**
+  Google's Gemini [API terms](https://ai.google.dev/gemini-api/terms) say
+  unpaid-tier content is used to improve Google products and that human
+  reviewers may read it. For a page of private affirmations that is a real
+  cost, so it appears in a warning box rather than a footnote. Paying for
+  Gemini turns it off — as does being in the UK, Switzerland or the EEA, where
+  Google applies the paid terms to the free tier too. If that trade is not one
+  you want, leave the feature off: the offline helper is the default and needs
+  no key at all.
+- **Claude was offered and has been removed.** Not for writing badly — it wrote
+  beautifully — but because it wanted a payment card before it would answer,
+  and two options turned the first screen into a decision instead of an
+  instruction. A key stored from that era can no longer be used for anything
+  here, so it is deleted from the device on first load and the panel says so;
+  an unusable credential sitting at rest is worse than none.
 - **ChatGPT is not offered, and cannot be.** `api.openai.com` sends no
   `Access-Control-Allow-Origin` header, so a browser blocks the request before
-  it leaves — verified from the same page where Anthropic and Google both
-  answer normally. Supporting it would require a server holding the key, which
+  it leaves — verified from the same page where Google answers normally. Supporting it would require a server holding the key, which
   is the infrastructure this design exists to avoid; a public CORS proxy would
   route both the key and the affirmations through a stranger. See the comment
   at the top of [`src/lib/ai/providers.ts`](src/lib/ai/providers.ts).
@@ -707,6 +719,10 @@ the result.
 - **Compatibility.** A loop record written by the previous version — no
   `brainwave` key, no `rainCharacter` — loads with the feature off and everything
   else intact. A tampered `targetHz` is rebuilt from its preset.
+- **Words on screen against words in the ear.** The spoken chunks are asserted
+  to be exactly the lines the player counts, for short lines, blank lines,
+  Windows line endings and a paragraph that has to be split — because the two
+  agreeing is the whole feature, and they used to agree only by coincidence.
 - **The AI connection**, against a stand-in for `@google/genai`, because the
   interesting behaviour is the decisions and not the network. A modern `AQ.`
   auth key and an older `AIza` key both reach the wire; so does a shape nobody
@@ -735,7 +751,7 @@ src/
   routes/         Create, Player, Library (loops + sounds), About
   state/          Theme, Library (IndexedDB), Session (playback engines)
   lib/
-    speech.ts       chunking, voice loading, the looping speaker
+    speech.ts       line-per-utterance chunking, voices, the looping speaker
     voiceRanking.ts scores device voices and picks the best of each style
     breathing.ts    pure breath-phase maths, patterns and forms
     breathAudio.ts  the breath's own synthesised voices
@@ -755,7 +771,7 @@ src/
     engagement.ts   when the install suggestion has been earned
     wordcraft.ts    the offline writing helper: rewrite rules, no model
     ai/
-      providers.ts    Claude and Gemini: key handling, models, the calls
+      providers.ts    Gemini: key handling, model fallback, the calls
       errors.ts       failure kinds, recovery wording, timeout vs cancel
       enhance.ts      the two prompts, output validation, offline fallback
       credentials.ts  the key on this device, and how it is masked

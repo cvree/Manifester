@@ -81,7 +81,7 @@ interface HelperState {
  * It has to change with the connection, because the sentence that matters —
  * where the words go — is the one that stops being true the moment a key is
  * set up. A resting hint claiming "on your device" beside a button that posts
- * to Anthropic would be the app's only lie.
+ * to Google would be the app's only lie.
  */
 function helperHint(credentials: Credentials | null, aiEnabled: boolean): string {
   const shared =

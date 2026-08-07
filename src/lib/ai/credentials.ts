@@ -12,7 +12,7 @@
  */
 
 import { readKv, writeKv } from '../storage'
-import type { ProviderId } from './providers'
+import { isProviderId, type ProviderId } from './providers'
 
 export interface Credentials {
   provider: ProviderId
@@ -36,14 +36,43 @@ export interface Credentials {
 
 const KEY = 'aiCredentials'
 
-export async function loadCredentials(): Promise<Credentials | null> {
+export interface LoadedCredentials {
+  credentials: Credentials | null
+  /**
+   * The name of a provider this app used to support, whose key was found and
+   * removed. Set once, so a screen can explain what happened rather than
+   * simply appearing disconnected one morning.
+   */
+  retired: string | null
+}
+
+/**
+ * Read the stored key, and deal honestly with one from a provider that is gone.
+ *
+ * Claude was an option and is not any more. A key for it can no longer be used
+ * for anything, and a live API credential sitting at rest that this app will
+ * never send anywhere is worse than no credential at all — so it is deleted
+ * here, and the caller is told, rather than quietly kept.
+ */
+export async function loadCredentials(): Promise<LoadedCredentials> {
   try {
     const stored = await readKv<Credentials>(KEY)
-    if (!stored?.provider || !stored.key || !stored.agreedAt) return null
-    return stored
+    if (!stored?.provider || !stored.key || !stored.agreedAt) {
+      return { credentials: null, retired: null }
+    }
+    if (!isProviderId(stored.provider)) {
+      await forgetCredentials()
+      return { credentials: null, retired: nameRetiredProvider(stored.provider) }
+    }
+    return { credentials: stored, retired: null }
   } catch {
-    return null
+    return { credentials: null, retired: null }
   }
+}
+
+/** Providers this app has offered in the past, for one explanatory sentence. */
+function nameRetiredProvider(id: string): string {
+  return id === 'claude' ? 'Claude' : id
 }
 
 export async function saveCredentials(credentials: Credentials): Promise<void> {

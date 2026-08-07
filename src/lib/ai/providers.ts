@@ -1,5 +1,5 @@
 /**
- * The two AI services Manifester can borrow, and how to reach each one.
+ * The AI service Manifester can borrow, and how to reach it.
  *
  * Every call goes straight from this page to the provider — there is no
  * Manifester server in between, and there could not be: the app is a folder of
@@ -7,23 +7,30 @@
  * set it up rather than to us. It is stored on this device only, and sent to
  * exactly one place: the company whose key it is.
  *
- * Each SDK is loaded with a dynamic `import()` at the moment it is first
+ * The SDK is loaded with a dynamic `import()` at the moment it is first
  * needed. The offline core of the app — write, speak, breathe, loop — never
- * downloads any of them, so turning this feature off costs nothing at all.
+ * downloads it, so turning this feature off costs nothing at all.
  */
 
 /*
- * ChatGPT is deliberately absent, and it is worth writing down why so nobody
- * adds it back and ships a button that cannot work.
+ * One provider, and it is worth writing down why so nobody re-adds the others
+ * without reading this.
  *
- * `api.openai.com` sends no `Access-Control-Allow-Origin` header, so a browser
- * refuses the request before it is ever sent — measured here as a bare
- * `TypeError: Failed to fetch`, from the same page where Anthropic and Google
- * both answered normally. Only OpenAI can change that. The workaround is a
- * server that holds the key and forwards the call, which is exactly the
- * infrastructure this bring-your-own-key design exists to avoid. A public CORS
- * proxy would "fix" it by routing somebody's private affirmations and a live
- * API key through a stranger's server, which is not a trade worth making.
+ * Claude was offered alongside Gemini and has been removed. Not because it
+ * wrote badly — it wrote beautifully — but because offering two made the
+ * first screen a decision instead of an instruction, and the second option
+ * needed a payment card before it would answer at all. A free key and one set
+ * of numbered steps is a better app than a menu.
+ *
+ * ChatGPT was never offered and cannot be. `api.openai.com` sends no
+ * `Access-Control-Allow-Origin` header, so a browser refuses the request
+ * before it is ever sent — measured here as a bare `TypeError: Failed to
+ * fetch`, from the same page where Google answered normally. Only OpenAI can
+ * change that. The workaround is a server that holds the key and forwards the
+ * call, which is exactly the infrastructure this bring-your-own-key design
+ * exists to avoid. A public CORS proxy would "fix" it by routing somebody's
+ * private affirmations and a live API key through a stranger's server, which
+ * is not a trade worth making.
  */
 import {
   AiFailure,
@@ -32,7 +39,7 @@ import {
   type ProviderLabel,
 } from './errors'
 
-export type ProviderId = 'claude' | 'gemini'
+export type ProviderId = 'gemini'
 
 /** One model to try, with the settings that model understands. */
 interface Attempt {
@@ -86,27 +93,6 @@ export interface Provider {
 
 export const PROVIDERS: Provider[] = [
   {
-    id: 'claude',
-    name: 'Claude',
-    company: 'Anthropic',
-    blurb: 'Warmest writing of the two. Best at keeping your voice.',
-    consoleUrl: 'https://console.anthropic.com/settings/keys',
-    steps: [
-      'Open console.anthropic.com and sign in, or make a free account.',
-      'You will land on the API keys page. Press “Create Key”.',
-      'Give it any name — “Manifester” works — and press Create.',
-      'Press the copy button. This is the only time the key is shown.',
-      'Come back here and paste it in the box below.',
-      'Anthropic asks for a payment card before the key works. Add $5; at this app’s usage that lasts a very long time.',
-    ],
-    keyExample: 'sk-ant-…',
-    cost: 'About 1¢ per press. $5 of credit is roughly 500 presses.',
-    privacy:
-      'Anthropic does not train on words sent through the API, and no person reads them.',
-    humanReview: false,
-    attempts: [{ model: 'claude-opus-5' }],
-  },
-  {
     id: 'gemini',
     name: 'Gemini',
     company: 'Google',
@@ -144,6 +130,21 @@ export const PROVIDERS: Provider[] = [
     ],
   },
 ]
+
+/**
+ * Is this string still a provider this app can talk to?
+ *
+ * It matters because the answer has changed. A device that connected Claude
+ * before it was removed still has that record in its IndexedDB, and every
+ * screen that reaches for a provider by id would throw on it — a stored key
+ * from last week turning the About page white.
+ */
+export function isProviderId(value: unknown): value is ProviderId {
+  return typeof value === 'string' && PROVIDERS.some((provider) => provider.id === value)
+}
+
+/** The one provider, for the screens that no longer need to ask which. */
+export const PROVIDER: Provider = PROVIDERS[0]
 
 export function findProvider(id: ProviderId): Provider {
   const provider = PROVIDERS.find((item) => item.id === id)
@@ -198,7 +199,6 @@ export type KeyCheck =
  * even then the answer is a note beside the box, not a locked button.
  */
 const FAMILIAR_PREFIXES: Record<ProviderId, string[]> = {
-  claude: ['sk-ant-'],
   gemini: ['AQ.', 'AIza'],
 }
 
@@ -349,7 +349,7 @@ export async function askProvider(
   signal: AbortSignal,
   preferModel?: string,
 ): Promise<ProviderReply> {
-  if (id === 'claude') return callClaude(key, prompt, signal, MAX_TOKENS)
+  if (id !== 'gemini') throw new AiFailure('unknown', `Unknown provider: ${id}`, id)
   return callGemini(key, prompt, signal, { preferModel, maxTokens: MAX_TOKENS })
 }
 
@@ -370,59 +370,12 @@ export async function verifyConnection(
   signal: AbortSignal,
 ): Promise<{ model: string }> {
   const prompt = 'Reply with the single word: ready'
-  if (id === 'claude') {
-    const reply = await callClaude(key, prompt, signal, TEST_TOKENS)
-    return { model: reply.model }
-  }
+  if (id !== 'gemini') throw new AiFailure('unknown', `Unknown provider: ${id}`, id)
   const reply = await callGemini(key, prompt, signal, {
     maxTokens: TEST_TOKENS,
     allowEmpty: true,
   })
   return { model: reply.model }
-}
-
-async function callClaude(
-  key: string,
-  prompt: string,
-  signal: AbortSignal,
-  maxTokens: number,
-): Promise<ProviderReply> {
-  const label = providerLabel('claude')
-  const model = findProvider('claude').attempts[0].model
-  throwIfAborted(signal, label)
-  try {
-    const { default: Anthropic } = await import('@anthropic-ai/sdk')
-    const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true, maxRetries: 0 })
-    const message = await client.messages.create(
-      {
-        model,
-        max_tokens: maxTokens,
-        // Thinking is on by default on this model and shares the max_tokens
-        // budget with the reply, so the budget above is generous and the effort
-        // is low: this is a short rewrite, not a research task.
-        output_config: { effort: 'low' },
-        system: SYSTEM,
-        messages: [{ role: 'user', content: prompt }],
-      },
-      { signal },
-    )
-    if (message.stop_reason === 'refusal') {
-      throw new AiFailure(
-        'empty',
-        'Claude declined to answer that one. Your words are untouched — try rewording the line it stopped on.',
-        'claude',
-      )
-    }
-    return {
-      text: message.content
-        .filter((block) => block.type === 'text')
-        .map((block) => block.text)
-        .join('\n'),
-      model,
-    }
-  } catch (error) {
-    throw classifyFailure(error, label, signal)
-  }
 }
 
 interface GeminiOptions {

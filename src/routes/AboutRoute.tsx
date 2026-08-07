@@ -79,13 +79,14 @@ export function AboutRoute() {
         </p>
         <p className="type-body mt-3">
           Under <em className="not-italic text-ink">Customize → AI writing
-          help</em> you can connect Claude or Gemini instead, using your own
-          key. The suggestions get markedly better — they are written around
-          your actual words rather than chosen from a built-in list, and they
-          never run out however many times you press. The trade is real and
-          worth stating plainly: while it is connected, pressing either button
-          sends that loop to that company. The setup screen says what each one
-          does with it before you choose.
+          help</em> you can connect Google’s Gemini instead, using your own
+          key. It is free, no payment card is asked for, and the suggestions
+          get markedly better — they are written around your actual words
+          rather than chosen from a built-in list, and they never run out
+          however many times you press. The trade is real and worth stating
+          plainly: while it is connected, pressing either button sends that
+          loop to Google, and on the free tier Google may use it. The setup
+          screen says so before you paste anything.
         </p>
         <p className="type-body mt-3">
           Paste the key, press Connect, and Manifester spends one very short
