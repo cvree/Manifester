@@ -1,13 +1,23 @@
 import { ReactLenis, useLenis } from 'lenis/react'
-import { useCallback, type ComponentType, type ReactNode, type SVGProps } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+} from 'react'
 import { AiSetupPanel } from '../components/AiSetupPanel'
+import { AppearanceSettings } from '../components/AppearanceSettings'
 import { Card } from '../components/Card'
 import {
+  ArrowUpIcon,
   BreathIcon,
   ClockIcon,
   DownloadIcon,
   HeadphonesIcon,
   MicIcon,
+  PaletteIcon,
   PauseIcon,
   PulseIcon,
   SparkIcon,
@@ -17,21 +27,21 @@ import {
 } from '../components/Icons'
 import { InstallInstructions } from '../components/InstallPrompt'
 import { setStoredCredentials, useCredentials } from '../lib/ai/useCredentials'
+import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
-import {
-  BREATH_PRESETS,
-  BREATH_STYLES,
-  breathsPerMinute,
-  describePattern,
-  MOOD_LABEL,
-  MOOD_ORDER,
-} from '../lib/breathing'
 import { BRAINWAVE_LIST, formatHz, supportsBinaural } from '../lib/brainwaveAudio'
 import { prefersReducedMotion, useReducedMotion } from '../lib/motion'
 import { usePreferences } from '../state/PreferencesProvider'
 
 /** Air between the top of the window and the section it just landed on. */
 const JUMP_GAP = 16
+
+/**
+ * How far down the window a section has to reach before the rail calls it the
+ * one you are reading. A little below the top edge, so the highlight changes
+ * as a heading settles into view rather than the instant it appears.
+ */
+const READING_LINE = 140
 
 /**
  * Move the page to a section.
@@ -84,18 +94,71 @@ function useJumpToSection() {
  */
 const SECTIONS: Array<{ id: string; label: string }> = [
   { id: 'how-it-works', label: 'How it works' },
+  { id: 'appearance', label: 'Colour' },
   { id: 'install', label: 'Install it' },
   { id: 'privacy', label: 'Privacy' },
   { id: 'ai', label: 'AI writing help' },
   { id: 'settings', label: 'Every setting' },
-  { id: 'rituals', label: 'Ways to use it' },
-  { id: 'sound', label: 'The sounds' },
-  { id: 'breathing', label: 'Breathing' },
   { id: 'rhythms', label: 'Rhythms' },
   { id: 'voices', label: 'Better voices' },
-  { id: 'browsers', label: 'Browser limits' },
   { id: 'help', label: 'Troubleshooting' },
 ]
+
+/**
+ * Which section the page is currently showing.
+ *
+ * A long page with a fixed contents rail and no sense of where you are is a
+ * map with no "you are here" on it. This is deliberately not an
+ * IntersectionObserver: the question is not "which sections are visible" —
+ * three usually are — but "which one has most recently passed the reading
+ * line", and that is one comparison per section on a rAF-throttled scroll.
+ */
+function useActiveSection(): string {
+  const [active, setActive] = useState(SECTIONS[0].id)
+
+  useEffect(() => {
+    let frame = 0
+
+    const measure = () => {
+      frame = 0
+
+      let current = SECTIONS[0].id
+      for (const { id } of SECTIONS) {
+        const element = document.getElementById(id)
+        if (element && element.getBoundingClientRect().top <= READING_LINE) {
+          current = id
+        }
+      }
+
+      /*
+       * The last card is shorter than the window, so it can never reach the
+       * line on its own. Anyone who has scrolled to the bottom is reading it.
+       */
+      const atBottom =
+        window.scrollY + window.innerHeight >=
+        document.documentElement.scrollHeight - 4
+      if (atBottom) current = SECTIONS[SECTIONS.length - 1].id
+
+      setActive(current)
+    }
+
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(measure)
+    }
+
+    measure()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [])
+
+  return active
+}
 
 /**
  * Every setting in the app, where it lives, and what it changes.
@@ -170,50 +233,6 @@ const SETTINGS: Array<{
     name: 'AI writing help',
     where: 'Customize, or the card above',
     what: 'Off unless you turn it on, and it is the only thing that ever leaves this device.',
-  },
-]
-
-/**
- * Three worked examples.
- *
- * Everything named in these is a real preset, sound or value in the app — they
- * are settings you can copy, not moods. Someone who has never opened Customize
- * gets more from one concrete recipe than from ten adjectives.
- */
-const RITUALS: Array<{
-  title: string
-  when: string
-  recipe: Array<[string, string]>
-}> = [
-  {
-    title: 'A five-minute morning',
-    when: 'Standing at the kettle, before the day starts asking for things.',
-    recipe: [
-      ['Breath', 'Calm · 4 in, 6 out'],
-      ['Sound', 'Soft Horizon'],
-      ['Length', '5 minutes'],
-      ['Delay', '3 seconds'],
-    ],
-  },
-  {
-    title: 'Winding down',
-    when: 'Lying down, lights off, phone face down beside you.',
-    recipe: [
-      ['Breath', 'Unwind · 4 in, 7 hold, 8 out'],
-      ['Sound', 'Rain on Window, quiet'],
-      ['Rhythm', 'Delta · 2 Hz, low'],
-      ['Length', '20 minutes'],
-    ],
-  },
-  {
-    title: 'Before something hard',
-    when: 'Ten minutes in the car, or at a desk with the door shut.',
-    recipe: [
-      ['Breath', 'Box · 4 each side'],
-      ['Sound', 'Moon Garden'],
-      ['Rhythm', 'Beta · 20 Hz, headphones'],
-      ['Delay', 'No delay'],
-    ],
   },
 ]
 
@@ -342,6 +361,26 @@ export function AboutRoute() {
             </ol>
           </Card>
 
+          {/*
+            Sits this high on purpose. It is the one card on the page you can
+            *do* something with, and the something it does is visible on every
+            other screen in the app the moment you tap it.
+          */}
+          <Card
+            data-rise
+            id="appearance"
+            className="scroll-mt-6"
+            title={
+              <span className="flex items-center gap-2.5">
+                <PaletteIcon className="text-[1.2rem] text-[var(--rose-deep)]" />
+                Make it yours
+              </span>
+            }
+            description="Turn the whole garden to a colour you like. It is remembered on this device."
+          >
+            <AppearanceSettings />
+          </Card>
+
           <Card
             data-rise
             id="install"
@@ -433,95 +472,6 @@ export function AboutRoute() {
                 </li>
               ))}
             </ul>
-          </Card>
-
-          <Card
-            data-rise
-            id="rituals"
-            className="scroll-mt-6"
-            title="Three ways to use it"
-            description="Nothing here is prescribed. They are starting points to copy and then ignore."
-          >
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {RITUALS.map(({ title, when, recipe }) => (
-                <article key={title} className="surface-quiet p-4">
-                  <h3 className="type-subheading">{title}</h3>
-                  <p className="type-meta mt-1.5">{when}</p>
-                  <dl className="mt-3.5 space-y-1.5">
-                    {recipe.map(([label, value]) => (
-                      <div key={label} className="flex gap-2.5 text-[0.84rem]">
-                        <dt className="w-14 shrink-0 text-ink-faint">{label}</dt>
-                        <dd className="min-w-0 text-ink">{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </article>
-              ))}
-            </div>
-          </Card>
-
-          <Card data-rise id="sound" className="scroll-mt-6" title="How the sound works">
-            <p className="type-body">
-              None of the built-in sounds are audio files. Moon Garden, Soft Horizon,
-              Rain on Window, Ocean Tide and Fireplace Glow are all generated live
-              from oscillators and filtered noise in your browser, which is why they
-              load instantly and keep working with no connection. The rain's droplets
-              and the fire's crackles are scheduled a couple of seconds ahead with
-              bounded randomness, so they never settle into a loop you can hear.
-              Anything else you hear is audio you imported yourself.
-            </p>
-          </Card>
-
-          <Card
-            data-rise
-            id="breathing"
-            className="scroll-mt-6"
-            title="The breathing guide"
-            description="Ten patterns and six ways of drawing them. Every timing is adjustable by half a second."
-          >
-            <p className="type-body">
-              A breath here is four phases — in, hold, out, rest — and any of them
-              may be zero. Progress is measured against the wall clock rather than
-              counted frames, so a busy phone or a backgrounded tab never lets the
-              guide drift away from the person following it. As a rule of thumb, a
-              longer out-breath settles you and a longer in-breath lifts you.
-            </p>
-
-            {MOOD_ORDER.map((mood) => (
-              <div key={mood} className="mt-6">
-                <p className="type-label">{MOOD_LABEL[mood]}</p>
-                <ul className="mt-2.5">
-                  {BREATH_PRESETS.filter((preset) => preset.mood === mood).map(
-                    (preset) => (
-                      <SpecRow
-                        key={preset.id}
-                        name={preset.name}
-                        value={`${breathsPerMinute(preset.pattern).toFixed(1)} / min`}
-                        note={preset.description}
-                        meta={describePattern(preset.pattern)}
-                      />
-                    ),
-                  )}
-                </ul>
-              </div>
-            ))}
-
-            <div className="mt-7 border-t border-[var(--quiet-border)] pt-5">
-              <p className="type-label">The six shapes</p>
-              <p className="type-body mt-2.5">
-                Every shape follows the identical breath — what changes is what
-                you are watching while it happens. Choose whichever one you can
-                keep looking at.
-              </p>
-              <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-                {BREATH_STYLES.map((style) => (
-                  <div key={style.id}>
-                    <dt className="type-subheading text-[1rem]">{style.name}</dt>
-                    <dd className="type-meta mt-0.5">{style.description}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
           </Card>
 
           <Card
@@ -630,37 +580,6 @@ export function AboutRoute() {
 
           <Card
             data-rise
-            id="browsers"
-            className="scroll-mt-6"
-            title="What browsers can and cannot do"
-          >
-            <ul className="type-body space-y-3">
-              <Bullet>
-                The list of voices comes from your device. iPhone, Android, Windows and
-                Mac all offer different ones, and Manifester cannot add to that list —
-                though it can tell you where to download better ones.
-              </Bullet>
-              <Bullet>
-                Some voices ignore the pitch and volume settings. On iOS in particular,
-                speech usually follows your ringer or media volume instead.
-              </Bullet>
-              <Bullet>
-                Speech stops when an iPhone locks its screen. Manifester asks to keep
-                the screen awake during a session, but some settings override that.
-              </Bullet>
-              <Bullet>
-                Long text is split into short passages behind the scenes, because
-                several browsers cut off long single utterances part-way through.
-              </Bullet>
-              <Bullet>
-                If nothing speaks at all, tap play once more. Browsers require a real
-                tap before they will allow audio.
-              </Bullet>
-            </ul>
-          </Card>
-
-          <Card
-            data-rise
             id="help"
             className="scroll-mt-6"
             title="If something is not working"
@@ -679,18 +598,12 @@ export function AboutRoute() {
             </dl>
           </Card>
 
-          <Card data-rise title="A gentle note">
-            <p className="type-body">
-              Manifester is a listening tool, not advice, treatment or a promise about
-              what will happen in your life. It is here to help you build a calm ritual
-              around words you have chosen for yourself. If something is weighing on
-              you, please talk to someone you trust.
+          <div data-rise className="flex flex-col items-center gap-4 px-1 pb-2">
+            <BackToTop />
+            <p className="type-meta text-center">
+              Made with care. No accounts, no servers, no subscriptions.
             </p>
-          </Card>
-
-          <p className="type-meta px-1 pb-2 text-center">
-            Made with care. No accounts, no servers, no subscriptions.
-          </p>
+          </div>
         </div>
       </div>
     </div>
@@ -711,12 +624,16 @@ export function AboutRoute() {
  * One list, two lives: a quiet two-column card at the top of a phone screen,
  * and a sticky single column beside the page on a desktop.
  *
- * The labels are short to the point of terse on purpose. Twelve full section
+ * The labels are short to the point of terse on purpose. Nine full section
  * titles stacked down a phone is a screenful of contents before a word of the
  * page — two columns of two-word labels is a glance.
+ *
+ * The entry you are currently reading is marked, so the rail answers "where
+ * am I" as well as "what is here".
  */
 function Contents() {
   const jump = useJumpToSection()
+  const active = useActiveSection()
 
   return (
     <nav
@@ -726,28 +643,72 @@ function Contents() {
     >
       <p className="type-label mb-2 px-2">On this page</p>
       <ol className="grid grid-cols-2 gap-0.5 lg:grid-cols-1">
-        {SECTIONS.map((section, index) => (
-          <li key={section.id}>
-            <button
-              type="button"
-              onClick={() => {
-                cue('tap')
-                jump(section.id)
-              }}
-              className="interactive flex min-h-11 w-full items-center gap-2.5 rounded-[0.9rem] px-2 text-left text-[0.9rem] text-ink-muted hover:bg-[var(--quiet)] hover:text-ink"
-            >
-              <span
-                aria-hidden="true"
-                className="type-numeral w-5 shrink-0 text-[0.75rem] text-ink-faint"
+        {SECTIONS.map((section, index) => {
+          const here = section.id === active
+          return (
+            <li key={section.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  cue('tap')
+                  jump(section.id)
+                }}
+                aria-current={here ? 'true' : undefined}
+                className={cx(
+                  'interactive flex min-h-11 w-full items-center gap-2.5 rounded-[0.9rem] px-2 text-left text-[0.9rem]',
+                  here
+                    ? 'bg-[var(--rose-soft)] text-[var(--rose-deep)]'
+                    : 'text-ink-muted hover:bg-[var(--quiet)] hover:text-ink',
+                )}
               >
-                {String(index + 1).padStart(2, '0')}
-              </span>
-              <span className="min-w-0">{section.label}</span>
-            </button>
-          </li>
-        ))}
+                <span
+                  aria-hidden="true"
+                  className={cx(
+                    'type-numeral w-5 shrink-0 text-[0.75rem]',
+                    here ? 'text-[var(--rose-deep)]' : 'text-ink-faint',
+                  )}
+                >
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <span className="min-w-0">{section.label}</span>
+              </button>
+            </li>
+          )
+        })}
       </ol>
     </nav>
+  )
+}
+
+/**
+ * The way back up.
+ *
+ * The rail is sticky on a desktop and scrolled far away on a phone, which is
+ * exactly where this matters — reaching the end of a long page should not mean
+ * a thumb-flick marathon to get anywhere else.
+ */
+function BackToTop() {
+  const lenis = useLenis()
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        cue('tap')
+        if (lenis) {
+          lenis.scrollTo(0)
+        } else {
+          window.scrollTo({
+            top: 0,
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+          })
+        }
+      }}
+      className="interactive pressable flex min-h-11 items-center gap-2 rounded-pill border border-[var(--control-border)] bg-[var(--panel)] px-4 text-[0.9rem] text-ink-muted hover:text-ink"
+    >
+      <ArrowUpIcon className="text-[1rem]" />
+      Back to top
+    </button>
   )
 }
 

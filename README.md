@@ -198,6 +198,12 @@ link to your sounds.
 **Everywhere**
 
 - Day and night colour themes.
+- **Eight palettes from one palette** — a hue dial on the About screen turns
+  every colour in the app at once. The rotation happens in OKLCH, so only the
+  hue moves: lightness, chroma, contrast and the spacing between the three
+  accents all survive untouched, which is why no position on the dial can look
+  worse than the one it shipped with. See
+  [Rotating the palette](#rotating-the-palette).
 - Full `prefers-reduced-motion` support — every animation is skipped, not just
   shortened.
 - Large touch targets (44 px minimum everywhere), labelled controls, visible
@@ -652,6 +658,44 @@ Lenis is mounted only on the About screen, which is the one long-scrolling page 
 it never wraps the player, the sheets, the sliders or any input. Both bow out
 completely when `prefers-reduced-motion` is set.
 
+### Rotating the palette
+
+The usual way to let people recolour an app is to ship several palettes and
+hope each of them is as good as the first. Manifester ships one, and turns it.
+
+Every colour with a hue worth having is declared twice in
+[`src/styles/theme.css`](src/styles/theme.css): once as a `-base` literal — the
+colour exactly as it was picked — and once as that literal with a rotation
+added to its hue:
+
+```css
+--rose: oklch(from var(--rose-base) l c calc(h + var(--hue-shift)) / alpha);
+```
+
+Three things make this work rather than merely function:
+
+- **OKLCH.** Lightness there is perceptual and independent of hue, so rotating
+  `h` alone cannot make text harder to read or a surface jump forward. Every
+  contrast ratio in the app survives the dial.
+- **One shared rotation.** Rose, sage and gold move together, so the angles
+  between the three accents — the thing that actually makes a palette feel
+  designed — are preserved at every stop. The canvas and the aurora move with
+  them, which is why the whole screen reads as the light changing rather than
+  as a widget being recoloured.
+- **`--hue-shift` is a registered `@property`,** so it can be transitioned.
+  Picking a colour sweeps the entire app to it over 700 ms instead of cutting.
+
+`.dark` redefines only the `-base` literals, so both themes rotate through the
+same block, and the whole mechanism is one number on the root element. The
+swatches on the About screen draw themselves with the same expression at their
+own rotation, so a swatch cannot drift out of step with what tapping it does.
+
+Relative colour syntax is the entire mechanism and has no sensible polyfill, so
+the identity palette is declared first and the rotation lives behind
+`@supports`. A browser without it gets the app exactly as designed, and the
+dial is simply not offered (`supportsHueShift()` in
+[`src/lib/hue.ts`](src/lib/hue.ts)).
+
 ---
 
 ## Local development
@@ -748,6 +792,7 @@ src/
     RitualPreview.tsx     the live picture of the finished ritual
     CustomizePanel.tsx    the advanced settings, as summarised rows + sheets
     SettingRow.tsx        one row of that list, stating its own value
+    AppearanceSettings    the hue dial and the day/night switch
   routes/         Create, Player, Library (loops + sounds), About
   state/          Theme, Library (IndexedDB), Session (playback engines)
   lib/
@@ -767,6 +812,7 @@ src/
     storage.ts      IndexedDB + localStorage
     timer.ts        wall-clock session countdown
     motion.ts       reduced motion, low-power, breakpoint and platform detection
+    hue.ts          the eight stops on the palette dial, and what they mean
     summaries.ts    the one-line summary of every advanced setting
     engagement.ts   when the install suggestion has been earned
     wordcraft.ts    the offline writing helper: rewrite rules, no model

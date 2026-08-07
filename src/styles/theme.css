@@ -15,22 +15,43 @@
  *
  *  Palette: warm cream and moonlit lavender ground, dusty rose lead,
  *  sage support, soft gold accent, twilight depth.
+ *
+ *  Every colour with a hue worth having is declared twice: once as a `-base`
+ *  literal, and once as that literal with `--hue-shift` added to its hue. See
+ *  "The hue dial" below — the short version is that the numbers in this file
+ *  are the *only* palette, and the dial rotates it rather than replacing it.
  * ─────────────────────────────────────────────────────────────
  */
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Registered so it can be transitioned. Rotating the palette is one of the
+ * few moments in the app worth animating: every colour on screen travels to
+ * the new hue together, which reads as the light changing rather than as a
+ * theme being swapped.
+ */
+@property --hue-shift {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
 :root {
   color-scheme: light;
 
+  /* Degrees added to every hue below. Written by the theme provider. */
+  --hue-shift: 0;
+  transition: --hue-shift 700ms cubic-bezier(0.22, 1, 0.36, 1);
+
   /* ── Canvas ── */
-  --bg-0: #f8f3ec;
-  --bg-1: #efe9f3;
-  --bg-2: #e7e1ee;
+  --bg-0-base: #f8f3ec;
+  --bg-1-base: #efe9f3;
+  --bg-2-base: #e7e1ee;
 
   /* ── Level 2 — elevated ritual panel ── */
   --panel: rgb(255 253 249 / 0.82);
-  --panel-solid: #fffdf9;
+  --panel-solid-base: #fffdf9;
   --panel-border: rgb(58 50 44 / 0.09);
   --panel-highlight: rgb(255 255 255 / 0.85);
   --panel-shadow:
@@ -61,25 +82,25 @@
   --ink-faint: #8a7c71;
 
   /* ── Accents ── */
-  --rose: #c07a84;
-  --rose-deep: #9d5a65;
-  --rose-soft: rgb(192 122 132 / 0.13);
-  --sage: #6f9073;
-  --sage-soft: rgb(111 144 115 / 0.14);
-  --gold: #c19850;
-  --gold-soft: rgb(193 152 80 / 0.16);
-  --twilight: #2e3a59;
+  --rose-base: #c07a84;
+  --rose-deep-base: #9d5a65;
+  --rose-soft-base: rgb(192 122 132 / 0.13);
+  --sage-base: #6f9073;
+  --sage-soft-base: rgb(111 144 115 / 0.14);
+  --gold-base: #c19850;
+  --gold-soft-base: rgb(193 152 80 / 0.16);
+  --twilight-base: #2e3a59;
 
   /* ── Effects ── */
-  --glow: rgb(192 122 132 / 0.34);
+  --glow-base: rgb(192 122 132 / 0.34);
   --shadow-card: var(--panel-shadow);
   --shadow-lift: var(--panel-shadow-lift);
-  --aurora-a: rgb(192 122 132 / 0.34);
-  --aurora-b: rgb(111 144 115 / 0.26);
-  --aurora-c: rgb(193 152 80 / 0.24);
-  --moonlight: rgb(255 252 244 / 0.55);
-  --spark: rgb(46 58 89 / 0.45);
-  --pollen: rgb(193 152 80 / 0.6);
+  --aurora-a-base: rgb(192 122 132 / 0.34);
+  --aurora-b-base: rgb(111 144 115 / 0.26);
+  --aurora-c-base: rgb(193 152 80 / 0.24);
+  --moonlight-base: rgb(255 252 244 / 0.55);
+  --spark-base: rgb(46 58 89 / 0.45);
+  --pollen-base: rgb(193 152 80 / 0.6);
   --noise-opacity: 0.03;
   --scrim: rgb(46 40 35 / 0.32);
 }
@@ -87,12 +108,12 @@
 .dark {
   color-scheme: dark;
 
-  --bg-0: #14111f;
-  --bg-1: #1a1728;
-  --bg-2: #201c30;
+  --bg-0-base: #14111f;
+  --bg-1-base: #1a1728;
+  --bg-2-base: #201c30;
 
   --panel: rgb(247 241 232 / 0.062);
-  --panel-solid: #221e33;
+  --panel-solid-base: #221e33;
   --panel-border: rgb(247 241 232 / 0.11);
   --panel-highlight: rgb(255 255 255 / 0.16);
   --panel-shadow: 0 1px 1px rgb(0 0 0 / 0.28), 0 12px 32px -18px rgb(0 0 0 / 0.68);
@@ -117,24 +138,115 @@
   --ink-muted: #c2b8c3;
   --ink-faint: #9a90a3;
 
-  --rose: #e5aab1;
-  --rose-deep: #f2c8cc;
-  --rose-soft: rgb(229 170 177 / 0.15);
-  --sage: #a9c9aa;
-  --sage-soft: rgb(169 201 170 / 0.15);
-  --gold: #e7cb94;
-  --gold-soft: rgb(231 203 148 / 0.16);
-  --twilight: #b7c3e6;
+  --rose-base: #e5aab1;
+  --rose-deep-base: #f2c8cc;
+  --rose-soft-base: rgb(229 170 177 / 0.15);
+  --sage-base: #a9c9aa;
+  --sage-soft-base: rgb(169 201 170 / 0.15);
+  --gold-base: #e7cb94;
+  --gold-soft-base: rgb(231 203 148 / 0.16);
+  --twilight-base: #b7c3e6;
 
-  --glow: rgb(229 170 177 / 0.36);
-  --aurora-a: rgb(229 170 177 / 0.26);
-  --aurora-b: rgb(120 150 122 / 0.26);
-  --aurora-c: rgb(231 203 148 / 0.17);
-  --moonlight: rgb(214 222 255 / 0.16);
-  --spark: rgb(243 236 226 / 0.55);
-  --pollen: rgb(231 203 148 / 0.62);
+  --glow-base: rgb(229 170 177 / 0.36);
+  --aurora-a-base: rgb(229 170 177 / 0.26);
+  --aurora-b-base: rgb(120 150 122 / 0.26);
+  --aurora-c-base: rgb(231 203 148 / 0.17);
+  --moonlight-base: rgb(214 222 255 / 0.16);
+  --spark-base: rgb(243 236 226 / 0.55);
+  --pollen-base: rgb(231 203 148 / 0.62);
   --noise-opacity: 0.045;
   --scrim: rgb(8 6 14 / 0.58);
+}
+
+/* ── The hue dial ───────────────────────────────────────────── */
+
+/*
+ * The palette every other line in this file and every component in the app
+ * actually reads. It exists in two forms:
+ *
+ *   1. the identity below — each colour exactly as the designer picked it;
+ *   2. the same colour with `--hue-shift` degrees added to its hue, for
+ *      browsers with relative colour syntax.
+ *
+ * The rotation happens in OKLCH, so lightness and chroma come through
+ * untouched: text keeps its contrast, the three accents keep their spacing
+ * around the wheel, and the canvas keeps the barely-there tint that stops it
+ * reading as grey. That is the entire trick — there is no second palette to
+ * maintain, and no rotation that can land somewhere ugly.
+ *
+ * `.dark` above redefines only the `-base` literals, so both themes rotate
+ * through this one block.
+ */
+:root {
+  --bg-0: var(--bg-0-base);
+  --bg-1: var(--bg-1-base);
+  --bg-2: var(--bg-2-base);
+  --panel-solid: var(--panel-solid-base);
+
+  --rose: var(--rose-base);
+  --rose-deep: var(--rose-deep-base);
+  --rose-soft: var(--rose-soft-base);
+  --sage: var(--sage-base);
+  --sage-soft: var(--sage-soft-base);
+  --gold: var(--gold-base);
+  --gold-soft: var(--gold-soft-base);
+  --twilight: var(--twilight-base);
+
+  --glow: var(--glow-base);
+  --aurora-a: var(--aurora-a-base);
+  --aurora-b: var(--aurora-b-base);
+  --aurora-c: var(--aurora-c-base);
+  --moonlight: var(--moonlight-base);
+  --spark: var(--spark-base);
+  --pollen: var(--pollen-base);
+}
+
+@supports (color: oklch(from white l c calc(h + 30))) {
+  :root {
+    --bg-0: oklch(from var(--bg-0-base) l c calc(h + var(--hue-shift)) / alpha);
+    --bg-1: oklch(from var(--bg-1-base) l c calc(h + var(--hue-shift)) / alpha);
+    --bg-2: oklch(from var(--bg-2-base) l c calc(h + var(--hue-shift)) / alpha);
+    --panel-solid: oklch(
+      from var(--panel-solid-base) l c calc(h + var(--hue-shift)) / alpha
+    );
+
+    --rose: oklch(from var(--rose-base) l c calc(h + var(--hue-shift)) / alpha);
+    --rose-deep: oklch(
+      from var(--rose-deep-base) l c calc(h + var(--hue-shift)) / alpha
+    );
+    --rose-soft: oklch(
+      from var(--rose-soft-base) l c calc(h + var(--hue-shift)) / alpha
+    );
+    --sage: oklch(from var(--sage-base) l c calc(h + var(--hue-shift)) / alpha);
+    --sage-soft: oklch(
+      from var(--sage-soft-base) l c calc(h + var(--hue-shift)) / alpha
+    );
+    --gold: oklch(from var(--gold-base) l c calc(h + var(--hue-shift)) / alpha);
+    --gold-soft: oklch(
+      from var(--gold-soft-base) l c calc(h + var(--hue-shift)) / alpha
+    );
+    --twilight: oklch(
+      from var(--twilight-base) l c calc(h + var(--hue-shift)) / alpha
+    );
+
+    --glow: oklch(from var(--glow-base) l c calc(h + var(--hue-shift)) / alpha);
+    --aurora-a: oklch(
+      from var(--aurora-a-base) l c calc(h + var(--hue-shift)) / alpha
+    );
+    --aurora-b: oklch(
+      from var(--aurora-b-base) l c calc(h + var(--hue-shift)) / alpha
+    );
+    --aurora-c: oklch(
+      from var(--aurora-c-base) l c calc(h + var(--hue-shift)) / alpha
+    );
+    --moonlight: oklch(
+      from var(--moonlight-base) l c calc(h + var(--hue-shift)) / alpha
+    );
+    --spark: oklch(from var(--spark-base) l c calc(h + var(--hue-shift)) / alpha);
+    --pollen: oklch(
+      from var(--pollen-base) l c calc(h + var(--hue-shift)) / alpha
+    );
+  }
 }
 
 @theme inline {
@@ -1289,6 +1401,41 @@ html:not(.dark) .breath-aurora__veil {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* ── Hue swatches ───────────────────────────────────────────── */
+
+/*
+ * One orb per stop on the dial, showing that stop's actual rose, gold and
+ * sage — not an approximation of them. The rotation is written straight onto
+ * the element as `--h`, and the same OKLCH expression the palette uses does
+ * the rest, so a swatch cannot drift out of step with what tapping it does.
+ *
+ * `--rose-base` and friends are inherited from the root and carry no `var()`
+ * of their own, which is what lets a *local* `--h` change the outcome here
+ * while the page-wide palette stays on the root's own `--hue-shift`.
+ */
+.hue-swatch {
+  --h: 0;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background:
+    radial-gradient(
+      circle at 30% 24%,
+      oklch(from var(--gold-base) l c calc(h + var(--h))) 0%,
+      transparent 56%
+    ),
+    radial-gradient(
+      circle at 76% 80%,
+      oklch(from var(--sage-base) l c calc(h + var(--h))) 0%,
+      transparent 60%
+    ),
+    oklch(from var(--rose-base) l c calc(h + var(--h)));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    inset 0 0 0 1px rgb(0 0 0 / 0.06);
 }
 
 /* ── Sound scenes ───────────────────────────────────────────── */

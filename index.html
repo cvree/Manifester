@@ -36,7 +36,8 @@
     />
 
     <script>
-      // Set the theme before first paint so there is no light/dark flash.
+      // Set the theme and the palette's hue before first paint, so there is
+      // neither a light/dark flash nor a moment of the wrong colour.
       (function () {
         var root = document.documentElement
         root.classList.remove('no-js')
@@ -47,6 +48,9 @@
             (stored !== 'day' &&
               window.matchMedia('(prefers-color-scheme: dark)').matches)
           if (dark) root.classList.add('dark')
+
+          var hue = parseInt(localStorage.getItem('manifester:hue'), 10)
+          if (hue) root.style.setProperty('--hue-shift', String(hue))
         } catch (e) {
           /* private mode — fall back to the light theme */
         }

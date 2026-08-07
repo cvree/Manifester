@@ -147,21 +147,42 @@ export function CosmicBackground({ active = false }: CosmicBackgroundProps) {
       }))
     }
 
-    const readColours = () => {
-      const styles = getComputedStyle(document.documentElement)
-      return {
-        spark: styles.getPropertyValue('--spark').trim() || 'rgba(46, 58, 89, 0.5)',
-        pollen:
-          styles.getPropertyValue('--pollen').trim() || 'rgba(193, 152, 80, 0.6)',
-      }
+    /*
+     * The point colours are read off a probe element rather than straight out
+     * of the custom properties, because `--spark` and `--pollen` may hold a
+     * relative-colour expression — `oklch(from … calc(h + var(--hue-shift)))`
+     * — which is a recipe rather than a colour. Painting it on something and
+     * asking what came out is what turns it into one the canvas can use.
+     */
+    const probe = document.createElement('span')
+    probe.setAttribute('aria-hidden', 'true')
+    probe.style.cssText =
+      'position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;visibility:hidden'
+    document.body.appendChild(probe)
+
+    const resolve = (name: string, fallback: string) => {
+      probe.style.color = `var(${name})`
+      return getComputedStyle(probe).color || fallback
     }
+
+    const readColours = () => ({
+      spark: resolve('--spark', 'rgba(46, 58, 89, 0.5)'),
+      pollen: resolve('--pollen', 'rgba(193, 152, 80, 0.6)'),
+    })
 
     let colours = readColours()
     let time = 0
+    let frames = 0
 
     const draw = () => {
       if (!running) return
       time += 0.016
+
+      /*
+       * Twice a second, which is often enough that the motes travel with the
+       * palette while the hue dial sweeps, and rare enough to cost nothing.
+       */
+      if (frames++ % 30 === 0) colours = readColours()
       ctx.clearRect(0, 0, width, height)
 
       for (const mote of motes) {
@@ -205,15 +226,6 @@ export function CosmicBackground({ active = false }: CosmicBackgroundProps) {
       }
     }
 
-    // The point colours differ between the day and night themes.
-    const themeObserver = new MutationObserver(() => {
-      colours = readColours()
-    })
-    themeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    })
-
     resize()
     frame = requestAnimationFrame(draw)
     window.addEventListener('resize', resize)
@@ -224,7 +236,7 @@ export function CosmicBackground({ active = false }: CosmicBackgroundProps) {
       cancelAnimationFrame(frame)
       window.removeEventListener('resize', resize)
       document.removeEventListener('visibilitychange', onVisibility)
-      themeObserver.disconnect()
+      probe.remove()
     }
   }, [reducedMotion])
 

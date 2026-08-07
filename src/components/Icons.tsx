@@ -80,6 +80,16 @@ export const SunIcon = (props: IconProps) => (
   </Icon>
 )
 
+/* A painter's palette — the hue dial, and nothing else. */
+export const PaletteIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 3.8a8.2 8.2 0 0 0 0 16.4c1.2 0 1.9-.8 1.9-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8h1.4a4.1 4.1 0 0 0 4.1-4.1c0-3.5-3.7-6.3-8.2-6.3Z" />
+    <circle cx="8" cy="11.2" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="11.4" cy="7.9" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="15.8" cy="9.6" r="1.1" fill="currentColor" stroke="none" />
+  </Icon>
+)
+
 export const PlusIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M12 5v14M5 12h14" />
