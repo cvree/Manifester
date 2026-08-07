@@ -662,19 +662,6 @@
   }
 }
 
-@keyframes drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  33% {
-    transform: translate3d(4%, -6%, 0) scale(1.08);
-  }
-  66% {
-    transform: translate3d(-5%, 4%, 0) scale(0.96);
-  }
-}
-
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -686,8 +673,165 @@
   }
 }
 
-.animate-drift {
-  animation: drift 42s ease-in-out infinite;
+/* ── The atmosphere ─────────────────────────────────────────── */
+
+/*
+ * One rule holds this whole layer together:
+ *
+ *   a decorative gradient must fall to full transparency well inside the
+ *   element that draws it.
+ *
+ * Break it and the element's own rectangle becomes a hard edge, and any
+ * transform then walks that edge across the screen. That is exactly what used
+ * to happen here. Each light pool was a viewport-sized box — `inset: 0` — with
+ * its gradient centre pushed out to the margin: `at 68% -4%` for the
+ * moonlight, `at 86% 30%` for the pool on the right. The gradient was still at
+ * a third of its strength where the box stopped, so the box edge cut through
+ * bright light. Drifting them by ±6% and, worse, scaling one of them down to
+ * 0.96 brought those cuts inside the viewport, and the eye read them for what
+ * they were: a horizontal wall creeping down from the top, and a vertical one
+ * on the right.
+ *
+ * So a pool is no longer a rectangle with light in one corner. It is an
+ * oversized blob centred on its own light, faded out by 60% of the way to its
+ * own edge — which leaves a transparent margin wider than anything the
+ * animation can spend. Nothing can be exposed at those edges because there is
+ * nothing drawn there.
+ *
+ * The only clip left in the system is the container's, and that one sits
+ * exactly on the viewport edge, where a clip cannot be seen.
+ */
+
+.sky-pool {
+  position: absolute;
+  /*
+   * Pointer and scroll parallax. Kept in single-digit pixels and applied
+   * here, so the pool's *own* animation never has to share the transform
+   * property with it.
+   */
+  transform: translate3d(
+    calc(var(--px) * var(--parallax-x, 0px)),
+    calc(var(--py) * var(--parallax-y, 0px)),
+    0
+  );
+  transition: opacity 1.8s var(--ease-calm);
+}
+
+/*
+ * The light itself. `closest-side` measures the ellipse against the blob it
+ * is drawn on, so the falloff stays in proportion at every viewport shape —
+ * the stop below is a fraction of the blob, not a number of pixels, and there
+ * is no aspect ratio at which it can creep out to the edge.
+ */
+.sky-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--tint) 0%, transparent 60%);
+  /* The resting pose, and what reduced motion is left holding. */
+  opacity: 0.92;
+}
+
+/*
+ * Breathing, not travelling.
+ *
+ * Illumination swelling and fading in place, with a drift small enough to
+ * read as the light moving rather than as a layer sliding. 8% of a blob that
+ * is already wider than the screen is a couple of percent of the viewport;
+ * at full swell the glow still ends at 0.65 of the way to its own edge.
+ */
+@keyframes sky-swell {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(0.94);
+    opacity: 0.78;
+  }
+  50% {
+    transform: translate3d(var(--swell-x, 0), var(--swell-y, 0), 0) scale(1.08);
+    opacity: 1;
+  }
+}
+
+.sky-glow--breathing {
+  animation: sky-swell var(--swell-duration, 42s) ease-in-out infinite;
+  animation-delay: var(--swell-delay, 0s);
+}
+
+/*
+ * The four pools, in viewport units because the container is fixed to the
+ * viewport. Each is placed by its centre — the offsets are simply that centre
+ * minus half the blob — so moving a light means moving one pair of numbers
+ * and the transparent margin comes along with it.
+ */
+
+/* Moonlight, high and slightly off-centre. Its centre sits above the top edge;
+   only the lower half of a smooth falloff is ever on screen. */
+.sky-pool--moon {
+  --tint: var(--moonlight);
+  --parallax-x: -10px;
+  --parallax-y: -6px;
+  --swell-x: 1%;
+  --swell-y: 1.5%;
+  left: 22%;
+  top: -35%;
+  width: 92%;
+  height: 62%;
+}
+
+.sky-pool--a {
+  --tint: var(--aurora-a);
+  --parallax-x: -5px;
+  --parallax-y: -3px;
+  --swell-x: 2.5%;
+  --swell-y: -2%;
+  left: -52%;
+  top: -37%;
+  width: 136%;
+  height: 102%;
+}
+
+.sky-pool--b {
+  --tint: var(--aurora-b);
+  --parallax-x: 4px;
+  --parallax-y: -3px;
+  --swell-x: -2%;
+  --swell-y: 2%;
+  left: 21%;
+  top: -18%;
+  width: 130%;
+  height: 96%;
+}
+
+.sky-pool--c {
+  --tint: var(--aurora-c);
+  --parallax-x: -4px;
+  --parallax-y: 4px;
+  --swell-x: 1.5%;
+  --swell-y: -2.5%;
+  left: -31%;
+  top: 53%;
+  width: 158%;
+  height: 106%;
+}
+
+/*
+ * The garden contours. Deliberately larger than the viewport on three sides,
+ * because this one is stroked artwork rather than a falloff: its edges are
+ * real, and the only way they cannot be seen is for them not to be there.
+ */
+.sky-contours {
+  position: absolute;
+  left: -6%;
+  /*
+   * `width`, not a matching `right`. An `<svg>` is a replaced element, so
+   * `left` and `right` together with `width: auto` do not stretch it — the
+   * width comes from the intrinsic 2:1 ratio and `right` is simply dropped,
+   * which parked the artwork's own right edge at 86% of the screen.
+   */
+  width: 112%;
+  bottom: -4%;
+  height: 68%;
+  transform: translate3d(calc(var(--px) * 8px), calc(var(--py) * 5px), 0);
 }
 
 /* ── Sheets ─────────────────────────────────────────────────── */

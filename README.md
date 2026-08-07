@@ -618,6 +618,26 @@ entirely under reduced motion or on low-memory / low-core devices, and the
 pointer parallax only ever binds on a device that reports a fine pointer, so it
 never competes with touch scrolling.
 
+**A decorative gradient must reach transparency inside its own element.** This
+is the rule the atmosphere is built on, and it is worth stating because
+breaking it is subtle and the symptom is not. Each aurora pool used to be a
+viewport-sized box with its gradient centre pushed out to the margin — `at 68%
+-4%` for the moonlight, `at 86% 30%` for the pool on the right. The gradient was
+still at a third of its strength where the box stopped, so the box edge cut
+through bright light; drifting the box by ±6% and scaling it to 0.96 then walked
+that cut into the viewport as a horizontal wall creeping down from the top and a
+vertical one on the right.
+
+A pool is now an oversized blob centred on its own light and faded out by 60% of
+the way to its own edge, so its rectangle is invisible by construction: there is
+nothing drawn where the element ends, whatever the animation does to it. The
+breathing is illumination swelling in place — opacity and a few percent of scale
+— rather than a layer travelling across the screen. The only clip left in the
+system is the container's, and that one sits exactly on the viewport edge, where
+a clip cannot be perceived. The geometry is under "The atmosphere" in
+[`theme.css`](src/styles/theme.css); the centres and radii reproduce the
+original composition exactly.
+
 **No headless dialog library.** [`Sheet.tsx`](src/components/Sheet.tsx) is the
 one modal surface in the app — a bottom sheet on a phone, a centred dialog from
 `md` up — with a focus trap, escape handling, scroll locking and focus return in

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
+import { cx } from '../lib/cx'
 import { isLowPowerDevice, useReducedMotion } from '../lib/motion'
 
 /**
@@ -7,12 +8,20 @@ import { isLowPowerDevice, useReducedMotion } from '../lib/motion'
  * Five layers, cheapest first, so the expensive ones can be dropped without
  * the scene falling apart:
  *
- *  1. a static twilight wash;
- *  2. a moonlit glow near the top edge;
+ *  1. a static twilight wash, on this element itself — the one thing here
+ *     that never moves, so there is always a ground beneath the rest;
+ *  2. a moonlit pool near the top edge;
  *  3. three slow aurora-like light pools (plain radial gradients — large
  *     blurred elements are the classic way to melt a phone GPU);
  *  4. two very faint organic garden curves, drawn once as SVG paths;
  *  5. a small canvas of drifting pollen and firefly points.
+ *
+ * Everything from 2 down is oversized and fades out inside its own bounds, so
+ * no amount of drifting can bring an element's edge into view — the reasoning
+ * is under "The atmosphere" in `theme.css`, and it is the whole reason this
+ * scene reads as one continuous environment rather than as stacked panes.
+ * The only clip in the system is this element's, and it sits exactly on the
+ * viewport edge where a clip cannot be perceived.
  *
  * Layer 5 is skipped on reduced-motion or modest hardware, and the pointer
  * parallax only ever runs on a device with a real pointer. There is no WebGL
@@ -252,63 +261,24 @@ export function CosmicBackground({ active = false }: CosmicBackgroundProps) {
           'linear-gradient(168deg, var(--bg-0) 0%, var(--bg-1) 48%, var(--bg-2) 100%)',
       }}
     >
-      {/* Moonlight, high and slightly off-centre. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(38% 26% at 68% -4%, var(--moonlight) 0%, transparent 72%)',
-          transform:
-            'translate3d(calc(var(--px) * -10px), calc(var(--py) * -6px), 0)',
-          opacity: active ? 1 : 0.82,
-          transition: 'opacity 1.8s var(--ease-calm)',
-        }}
-      />
-
-      {/* Three slow light pools. */}
-      <div
-        className={still ? 'absolute inset-0' : 'animate-drift absolute inset-0'}
-        style={{
-          background:
-            'radial-gradient(58% 44% at 16% 14%, var(--aurora-a) 0%, transparent 70%)',
-          opacity: active ? 0.98 : 0.72,
-          transition: 'opacity 1.8s var(--ease-calm)',
-        }}
-      />
-      <div
-        className={still ? 'absolute inset-0' : 'animate-drift absolute inset-0'}
-        style={{
-          background:
-            'radial-gradient(54% 40% at 86% 30%, var(--aurora-b) 0%, transparent 72%)',
-          animationDelay: '-13s',
-          animationDuration: '54s',
-          opacity: active ? 0.94 : 0.64,
-          transition: 'opacity 1.8s var(--ease-calm)',
-        }}
-      />
-      <div
-        className={still ? 'absolute inset-0' : 'animate-drift absolute inset-0'}
-        style={{
-          background:
-            'radial-gradient(72% 48% at 48% 106%, var(--aurora-c) 0%, transparent 66%)',
-          animationDelay: '-28s',
-          animationDuration: '66s',
-          opacity: active ? 0.95 : 0.62,
-          transition: 'opacity 1.8s var(--ease-calm)',
-        }}
-      />
+      {/*
+        Four pools of light. Geometry, tint and breath all live in `theme.css`
+        under "The atmosphere" — the only thing decided here is how bright each
+        one burns, which is the one part that answers to the session.
+      */}
+      <Pool variant="moon" still={still} opacity={active ? 1 : 0.9} />
+      <Pool variant="a" still={still} opacity={active ? 0.98 : 0.8} />
+      <Pool variant="b" still={still} opacity={active ? 0.94 : 0.72} delay="-13s" duration="54s" />
+      <Pool variant="c" still={still} opacity={active ? 0.95 : 0.7} delay="-28s" duration="66s" />
 
       {/*
         Two organic curves: the suggestion of a garden horizon and a stem
         arcing across it. One static SVG, no filters, drawn once.
       */}
       <svg
-        className="absolute inset-x-0 bottom-0 h-[62%] w-full"
+        className="sky-contours"
         viewBox="0 0 1200 600"
         preserveAspectRatio="none"
-        style={{
-          transform: 'translate3d(calc(var(--px) * 8px), calc(var(--py) * 5px), 0)',
-        }}
       >
         <path
           d="M-40 470 C 220 380, 420 520, 660 430 S 1040 300, 1240 372"
@@ -337,6 +307,43 @@ export function CosmicBackground({ active = false }: CosmicBackgroundProps) {
         screen after someone turns reduced motion on.
       */}
       {!still && <canvas ref={canvasRef} className="absolute inset-0" />}
+    </div>
+  )
+}
+
+/**
+ * One pool of light.
+ *
+ * Two elements rather than one, and deliberately so: the outer holds the
+ * placement and the brightness the session asks for, the inner holds the
+ * breath. They would otherwise be fighting over `transform` and `opacity` —
+ * a CSS animation wins that fight outright, and the pool would stop answering
+ * to the player.
+ */
+function Pool({
+  variant,
+  opacity,
+  still,
+  delay,
+  duration,
+}: {
+  variant: 'moon' | 'a' | 'b' | 'c'
+  opacity: number
+  still: boolean
+  delay?: string
+  duration?: string
+}) {
+  return (
+    <div className={`sky-pool sky-pool--${variant}`} style={{ opacity }}>
+      <span
+        className={cx('sky-glow', !still && 'sky-glow--breathing')}
+        style={
+          {
+            '--swell-delay': delay,
+            '--swell-duration': duration,
+          } as CSSProperties
+        }
+      />
     </div>
   )
 }
