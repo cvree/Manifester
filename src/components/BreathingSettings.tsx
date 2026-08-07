@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   auditionBreathVoice,
   BREATH_VOICES,
@@ -23,6 +23,7 @@ import {
 } from '../lib/breathing'
 import { cx } from '../lib/cx'
 import { cue, hapticsSupported } from '../lib/feedback'
+import { revealSection } from '../lib/scroll'
 import { useBreathing } from '../lib/useBreathing'
 import type { Preferences } from '../state/PreferencesProvider'
 import {
@@ -46,6 +47,26 @@ const PHASES: Array<{ key: keyof BreathPattern; label: string }> = [
   { key: 'exhale', label: 'Breathe out' },
   { key: 'holdOut', label: 'Rest' },
 ]
+
+/** The three questions this panel asks, in the order it asks them. */
+type Step = 'pattern' | 'form' | 'sound'
+
+/**
+ * Where answering each question takes you. Sound is the last one that leads
+ * anywhere — after it the volume slider opens in place, and vibration is a
+ * single toggle already in view, so there is nothing left to walk to.
+ */
+const NEXT_STEP: Partial<Record<Step, Step>> = {
+  pattern: 'form',
+  form: 'sound',
+}
+
+/**
+ * Long enough that the tile you just pressed has visibly taken the selection,
+ * and that tapping between two options to compare them resets the wait instead
+ * of dragging you down the panel mid-comparison.
+ */
+const ADVANCE_DELAY = 420
 
 /**
  * Everything about the guide, in the order it matters: is it on, what shape
@@ -76,6 +97,38 @@ export function BreathingSettings({
 
   // Never leave a voice ringing behind a closed sheet.
   useEffect(() => () => stopAudition(), [])
+
+  /*
+   * Answering a question hands you the next one.
+   *
+   * Pick a pattern and the panel walks down to Form; pick a form and it walks
+   * down to Breath sound. The alternative is a long sheet where every answer
+   * leaves you scrolling to find what you were meant to decide next.
+   *
+   * The nonce is what makes the wait restartable: pressing a second tile while
+   * the first is still pending replaces the entry, the effect tears down its
+   * timer and starts a fresh one, so comparing two options never yanks the
+   * panel out from under you.
+   */
+  const sections = useRef<Partial<Record<Step, HTMLDivElement | null>>>({})
+  const [pending, setPending] = useState<{ step: Step; nonce: number } | null>(
+    null,
+  )
+
+  const advanceFrom = (step: Step) => {
+    const next = NEXT_STEP[step]
+    if (!next) return
+    setPending((current) => ({ step: next, nonce: (current?.nonce ?? 0) + 1 }))
+  }
+
+  useEffect(() => {
+    if (!pending) return
+    const id = window.setTimeout(
+      () => revealSection(sections.current[pending.step] ?? null),
+      ADVANCE_DELAY,
+    )
+    return () => window.clearTimeout(id)
+  }, [pending])
 
   const setPattern = (patch: Partial<BreathPattern>) =>
     onChange({ breathPattern: { ...pattern, ...patch } })
@@ -150,6 +203,7 @@ export function BreathingSettings({
                             onClick={() => {
                               setPattern(preset.pattern)
                               cue('select')
+                              advanceFrom('pattern')
                             }}
                             className={cx(
                               'interactive pressable flex min-h-[3.5rem] flex-col justify-center rounded-2xl border px-3.5 py-2.5 text-left',
@@ -225,7 +279,11 @@ export function BreathingSettings({
           </div>
 
           {/* ── Form ── */}
-          <div>
+          <div
+            ref={(node) => {
+              sections.current.form = node
+            }}
+          >
             <FieldLabel hint="Shown above">Form</FieldLabel>
             <div
               role="radiogroup"
@@ -242,6 +300,7 @@ export function BreathingSettings({
                   onSelect={() => {
                     onChange({ breathStyle: style.id })
                     cue('select')
+                    advanceFrom('form')
                   }}
                 />
               ))}
@@ -249,7 +308,11 @@ export function BreathingSettings({
           </div>
 
           {/* ── Sound ── */}
-          <div>
+          <div
+            ref={(node) => {
+              sections.current.sound = node
+            }}
+          >
             <FieldLabel hint="Follow it with your eyes closed">
               Breath sound
             </FieldLabel>
