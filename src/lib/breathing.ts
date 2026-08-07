@@ -19,11 +19,32 @@ export interface BreathPattern {
   holdOut: number
 }
 
+/** What a pattern is for. Presets are grouped under these on the picker. */
+export type BreathMood = 'settle' | 'balance' | 'focus' | 'sleep' | 'lift'
+
+export const MOOD_LABEL: Record<BreathMood, string> = {
+  settle: 'Settle',
+  balance: 'Balance',
+  focus: 'Focus',
+  sleep: 'Sleep',
+  lift: 'Lift',
+}
+
+/** The order moods appear in, calmest first. */
+export const MOOD_ORDER: BreathMood[] = [
+  'settle',
+  'balance',
+  'focus',
+  'sleep',
+  'lift',
+]
+
 export interface BreathPreset {
   id: string
   name: string
   /** One honest line about what it is for. */
   description: string
+  mood: BreathMood
   pattern: BreathPattern
 }
 
@@ -40,27 +61,139 @@ export const BREATH_PRESETS: BreathPreset[] = [
     id: 'calm',
     name: 'Calm',
     description: 'In for 4, out for 6. A longer out-breath settles you.',
+    mood: 'settle',
     pattern: DEFAULT_PATTERN,
+  },
+  {
+    id: 'sigh',
+    name: 'Let go',
+    description: 'In for 4, out for 8. The longest exhale here, for tension.',
+    mood: 'settle',
+    pattern: { inhale: 4, holdIn: 0, exhale: 8, holdOut: 0 },
   },
   {
     id: 'even',
     name: 'Even',
     description: 'In for 5, out for 5. Steady and easy to follow.',
+    mood: 'balance',
     pattern: { inhale: 5, holdIn: 0, exhale: 5, holdOut: 0 },
+  },
+  {
+    id: 'coherent',
+    name: 'Coherent',
+    description: 'In and out for 5.5 — about six breaths a minute.',
+    mood: 'balance',
+    pattern: { inhale: 5.5, holdIn: 0, exhale: 5.5, holdOut: 0 },
   },
   {
     id: 'box',
     name: 'Box',
     description: 'Four counts each: in, hold, out, hold.',
+    mood: 'focus',
     pattern: { inhale: 4, holdIn: 4, exhale: 4, holdOut: 4 },
+  },
+  {
+    id: 'triangle',
+    name: 'Triangle',
+    description: 'In for 4, hold 4, out for 6. Box, with a softer landing.',
+    mood: 'focus',
+    pattern: { inhale: 4, holdIn: 4, exhale: 6, holdOut: 0 },
   },
   {
     id: 'unwind',
     name: 'Unwind',
     description: 'In for 4, hold 7, out for 8. Slow and deep.',
+    mood: 'sleep',
     pattern: { inhale: 4, holdIn: 7, exhale: 8, holdOut: 0 },
   },
+  {
+    id: 'deep-rest',
+    name: 'Deep rest',
+    description: 'In for 6, out for 10. Very slow — best lying down.',
+    mood: 'sleep',
+    pattern: { inhale: 6, holdIn: 0, exhale: 10, holdOut: 0 },
+  },
+  {
+    id: 'awaken',
+    name: 'Awaken',
+    description: 'In for 6, out for 3. A longer in-breath brings you up.',
+    mood: 'lift',
+    pattern: { inhale: 6, holdIn: 0, exhale: 3, holdOut: 0 },
+  },
+  {
+    id: 'clear',
+    name: 'Clear',
+    description: 'In for 3, out for 3. Quick, bright and wakeful.',
+    mood: 'lift',
+    pattern: { inhale: 3, holdIn: 0, exhale: 3, holdOut: 0 },
+  },
 ]
+
+/* ── Visual styles ──────────────────────────────────────────── */
+
+/**
+ * How the guide is drawn.
+ *
+ * Every style reads the same two custom properties and so follows the same
+ * breath exactly; what changes is the form it takes. They exist because a
+ * shape you find beautiful is a shape you will keep watching, and watching is
+ * the whole mechanism — one person settles into a lotus opening, another into
+ * water, another wants a plain circle and nothing else.
+ */
+export type BreathStyleId =
+  | 'bloom'
+  | 'halo'
+  | 'ripple'
+  | 'aurora'
+  | 'constellation'
+  | 'tide'
+
+export interface BreathStyle {
+  id: BreathStyleId
+  name: string
+  description: string
+}
+
+export const BREATH_STYLES: BreathStyle[] = [
+  {
+    id: 'bloom',
+    name: 'Bloom',
+    description: 'Six petals opening from a seed of light.',
+  },
+  {
+    id: 'halo',
+    name: 'Halo',
+    description: 'One circle and one ring. Nothing else.',
+  },
+  {
+    id: 'ripple',
+    name: 'Ripple',
+    description: 'Rings travelling outward across still water.',
+  },
+  {
+    id: 'aurora',
+    name: 'Aurora',
+    description: 'Slow drifts of colour that gather and part.',
+  },
+  {
+    id: 'constellation',
+    name: 'Constellation',
+    description: 'Stars drawing apart and back into a point.',
+  },
+  {
+    id: 'tide',
+    name: 'Tide',
+    description: 'A water line rising and falling inside the circle.',
+  },
+]
+
+export const DEFAULT_STYLE: BreathStyleId = 'bloom'
+
+export function findStyle(id: string): BreathStyle {
+  return BREATH_STYLES.find((style) => style.id === id) ?? BREATH_STYLES[0]
+}
+
+/* ── Timing ─────────────────────────────────────────────────── */
 
 export const PHASE_LABEL: Record<BreathPhase, string> = {
   inhale: 'Breathe in',
@@ -69,10 +202,27 @@ export const PHASE_LABEL: Record<BreathPhase, string> = {
   holdOut: 'Rest',
 }
 
-export const PHASE_LIMITS = { min: 0, max: 20 }
+/**
+ * Half-second steps, because two of the presets people ask for by name —
+ * coherent breathing at 5.5 seconds a side — are not whole numbers, and a
+ * custom timing control that cannot reach the preset beside it is a control
+ * that quietly calls itself a liar.
+ */
+export const PHASE_LIMITS = { min: 0, max: 20, step: 0.5 }
+
+/** `5.5` → `"5.5"`, `6` → `"6"`. Trailing `.0` reads like a stopwatch. */
+export function formatSeconds(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
 
 export function cycleSeconds(pattern: BreathPattern): number {
   return pattern.inhale + pattern.holdIn + pattern.exhale + pattern.holdOut
+}
+
+/** Breaths per minute, for the pattern picker's readout. */
+export function breathsPerMinute(pattern: BreathPattern): number {
+  const total = cycleSeconds(pattern)
+  return total > 0 ? 60 / total : 0
 }
 
 /** A pattern with no time in it would divide by zero everywhere downstream. */
@@ -88,6 +238,18 @@ export function findPreset(pattern: BreathPattern): BreathPreset | undefined {
       preset.pattern.exhale === pattern.exhale &&
       preset.pattern.holdOut === pattern.holdOut,
   )
+}
+
+/** e.g. `"4 in · 7 hold · 8 out"` — the shape of a breath in one line. */
+export function describePattern(pattern: BreathPattern): string {
+  return [
+    `${formatSeconds(pattern.inhale)} in`,
+    pattern.holdIn > 0 ? `${formatSeconds(pattern.holdIn)} hold` : null,
+    `${formatSeconds(pattern.exhale)} out`,
+    pattern.holdOut > 0 ? `${formatSeconds(pattern.holdOut)} rest` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 export interface BreathState {
@@ -108,7 +270,7 @@ export interface BreathState {
 const ORDER: BreathPhase[] = ['inhale', 'holdIn', 'exhale', 'holdOut']
 
 /** Smooth acceleration and settle — the shape a real breath has. */
-function easeInOut(t: number): number {
+export function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
 }
 

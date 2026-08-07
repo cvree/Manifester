@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
 import { formatApproxDuration, estimateSpokenSeconds } from '../lib/format'
+import type { BreathStyleId } from '../lib/breathing'
 import { useReducedMotion } from '../lib/motion'
 import { affirmationLines } from '../lib/summaries'
 import type { BreathingRuntime } from '../lib/useBreathing'
@@ -25,6 +26,8 @@ interface RitualPreviewProps {
   text: string
   settings: LoopSettings
   breathing: BreathingRuntime
+  /** Which of the six forms the guide is drawn as. */
+  breathStyle: BreathStyleId
   voice: string
   sound: string
   /** The brainwave rhythm summary, or `null` when it is off. */
@@ -101,6 +104,7 @@ export function RitualPreview({
   text,
   settings,
   breathing,
+  breathStyle,
   voice,
   sound,
   rhythm,
@@ -156,7 +160,11 @@ export function RitualPreview({
         </h2>
 
         <div className="my-6">
-          <BreathingVisualizer runtime={breathing} size="md" />
+          <BreathingVisualizer
+            runtime={breathing}
+            style={breathStyle}
+            size="md"
+          />
         </div>
 
         {/* The affirmation excerpt, rotating slowly through the lines. */}

@@ -7,7 +7,15 @@
  * the setting rows have to agree word for word.
  */
 
-import { cycleSeconds, findPreset, type BreathPattern } from './breathing'
+import { findVoice, type BreathSound } from './breathAudio'
+import {
+  cycleSeconds,
+  findPreset,
+  findStyle,
+  formatSeconds,
+  type BreathPattern,
+  type BreathStyleId,
+} from './breathing'
 import {
   BRAINWAVE_LIST,
   formatHz,
@@ -62,11 +70,21 @@ export function brainwaveSummary(brainwave: BrainwaveSettings): string {
 export function breathingSummary(
   enabled: boolean,
   pattern: BreathPattern,
+  style?: BreathStyleId,
+  sound?: BreathSound,
 ): string {
   if (!enabled) return 'Off'
   const preset = findPreset(pattern)
-  const shape = `${pattern.inhale} in / ${pattern.exhale} out`
-  return preset ? `${preset.name} · ${shape}` : `Custom · ${cycleSeconds(pattern)}s`
+  const shape = `${formatSeconds(pattern.inhale)} in / ${formatSeconds(pattern.exhale)} out`
+  return [
+    preset ? `${preset.name} · ${shape}` : `Custom · ${formatSeconds(cycleSeconds(pattern))}s`,
+    style ? findStyle(style).name : null,
+    // Worth its own word in the summary: it is the part that works when your
+    // eyes are shut, and the part nobody expects a breathing guide to have.
+    sound && sound !== 'off' ? findVoice(sound)?.name : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 export function delaySummary(seconds: number): string {

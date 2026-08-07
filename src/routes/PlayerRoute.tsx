@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { BrainwavePanel } from '../components/BrainwavePanel'
-import { BreathingSettings } from '../components/BreathingSettings'
 import { BreathingVisualizer } from '../components/BreathingVisualizer'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
+import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
 import { EmptyState } from '../components/EmptyState'
 import {
   BreathIcon,
@@ -18,12 +17,11 @@ import {
   TuneIcon,
 } from '../components/Icons'
 import { SettingRow } from '../components/SettingRow'
-import { Sheet } from '../components/Sheet'
 import { Slider } from '../components/Slider'
-import { Toggle } from '../components/Toggle'
 import { MAX_MUSIC_VOLUME } from '../lib/audioBus'
 import { cx } from '../lib/cx'
-import { cue, hapticsSupported, primeFeedback } from '../lib/feedback'
+import { primeBreathAudio } from '../lib/breathAudio'
+import { cue, primeFeedback } from '../lib/feedback'
 import { countWords, formatClock } from '../lib/format'
 import { MAX_VOICE_VOLUME } from '../lib/speech'
 import {
@@ -56,12 +54,9 @@ export function PlayerRoute() {
     dismissNotice,
     setLiveVoiceVolume,
     setLiveMusicVolume,
-    setBrainwave,
   } = useSession()
-  const { preferences, update: updatePreferences } = usePreferences()
-  const [sheet, setSheet] = useState<'breathing' | 'brainwave' | 'feel' | null>(
-    null,
-  )
+  const { preferences } = usePreferences()
+  const [sheet, setSheet] = useState<PanelKey | null>(null)
 
   const hasText = countWords(draft.text) > 0
   const idle = session.status === 'idle'
@@ -74,7 +69,8 @@ export function PlayerRoute() {
   const breathing = useBreathing({
     pattern: preferences.breathPattern,
     active: preferences.breathingEnabled && playing,
-    soundCues: preferences.breathSoundCues,
+    sound: preferences.breathSound,
+    soundVolume: preferences.breathSoundVolume,
     hapticCues: preferences.breathHapticCues,
   })
 
@@ -153,6 +149,7 @@ export function PlayerRoute() {
     } else {
       prime()
       primeFeedback()
+      primeBreathAudio()
       cue('start')
       start()
     }
@@ -220,6 +217,7 @@ export function PlayerRoute() {
             <div className="relative my-8 flex items-center justify-center">
               <BreathingVisualizer
                 runtime={breathing}
+                style={preferences.breathStyle}
                 size="lg"
                 showPhase={preferences.breathingEnabled && playing}
                 awaken={awaken}
@@ -377,6 +375,8 @@ export function PlayerRoute() {
               summary={breathingSummary(
                 preferences.breathingEnabled,
                 preferences.breathPattern,
+                preferences.breathStyle,
+                preferences.breathSound,
               )}
               onClick={() => {
                 cue('tap')
@@ -403,59 +403,7 @@ export function PlayerRoute() {
         </div>
       </div>
 
-      <Sheet
-        open={sheet === 'breathing'}
-        onClose={() => setSheet(null)}
-        title="Breathing"
-        description="The guide that expands and settles while you listen."
-      >
-        <BreathingSettings preferences={preferences} onChange={updatePreferences} />
-      </Sheet>
-
-      <Sheet
-        open={sheet === 'brainwave'}
-        onClose={() => setSheet(null)}
-        title="Brainwave rhythm"
-        description="Changes here take effect straight away, without restarting."
-      >
-        <BrainwavePanel
-          settings={draft.settings.brainwave}
-          onChange={setBrainwave}
-        />
-      </Sheet>
-
-      <Sheet
-        open={sheet === 'feel'}
-        onClose={() => setSheet(null)}
-        title="Haptics and interface sounds"
-        description="How the app answers when you touch it."
-      >
-        <div className="space-y-5">
-          <Toggle
-            label="Interface sounds"
-            description="A soft tone when you start, pause, save or finish something."
-            checked={preferences.uiSounds}
-            onChange={(uiSounds) => {
-              updatePreferences({ uiSounds })
-              if (uiSounds) cue('tap')
-            }}
-          />
-          <Toggle
-            label="Haptics"
-            description={
-              hapticsSupported()
-                ? 'A brief buzz on the main controls. Sliders never vibrate.'
-                : 'Not available in this browser. iPhone does not let web apps vibrate.'
-            }
-            checked={preferences.uiHaptics && hapticsSupported()}
-            disabled={!hapticsSupported()}
-            onChange={(uiHaptics) => {
-              updatePreferences({ uiHaptics })
-              if (uiHaptics) cue('tap')
-            }}
-          />
-        </div>
-      </Sheet>
+      <SettingsSheets open={sheet} onOpenChange={setSheet} />
     </>
   )
 }

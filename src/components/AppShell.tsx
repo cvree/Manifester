@@ -18,15 +18,18 @@ import {
   PlayIcon,
   SparkIcon,
   SunIcon,
-  WaveIcon,
 } from './Icons'
 import { InstallPrompt } from './InstallPrompt'
 
+/**
+ * Three tabs, in the order the app is used: write it, play it, keep it.
+ * Saved loops and sounds were two separate destinations answering the same
+ * question, and they share one library now.
+ */
 const TABS = [
   { to: '/create', label: 'Create', icon: BloomIcon },
   { to: '/player', label: 'Player', icon: PlayIcon },
-  { to: '/saved', label: 'Saved', icon: LeafIcon },
-  { to: '/sounds', label: 'Sounds', icon: WaveIcon },
+  { to: '/library', label: 'Library', icon: LeafIcon },
 ]
 
 export function AppShell() {

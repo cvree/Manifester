@@ -21,6 +21,7 @@ import {
 import { RitualPreview, type RitualSetting } from '../components/RitualPreview'
 import { TextArea, TextField } from '../components/TextArea'
 import { TimerSettings } from '../components/TimerSettings'
+import { primeBreathAudio } from '../lib/breathAudio'
 import { recordEngagement } from '../lib/engagement'
 import { cue, primeFeedback } from '../lib/feedback'
 import { countWords } from '../lib/format'
@@ -139,7 +140,8 @@ export function CreateRoute() {
   const breathing = useBreathing({
     pattern: preferences.breathPattern,
     active: preferences.breathingEnabled,
-    soundCues: false,
+    sound: 'off',
+    soundVolume: 0,
     hapticCues: false,
   })
 
@@ -189,6 +191,7 @@ export function CreateRoute() {
     // let the button animate. Safari will not unlock it a beat later.
     prime()
     primeFeedback()
+    primeBreathAudio()
     cue('start')
     setStarting(true)
 
@@ -535,6 +538,7 @@ export function CreateRoute() {
             text={draft.text}
             settings={draft.settings}
             breathing={breathing}
+            breathStyle={preferences.breathStyle}
             voice={voiceSummary(draft.settings, resolvedDeviceVoice)}
             sound={soundSummary(draft.settings, allTracks)}
             rhythm={

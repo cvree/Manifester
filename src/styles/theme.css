@@ -629,10 +629,17 @@
 /* ── Breathing visualiser ───────────────────────────────────── */
 
 /*
- * Every layer is driven by two custom properties the breathing hook writes
- * each frame: `--e` (0 → 1 expansion) and `--p` (0 → 1 through the current
- * phase). Only transform, opacity and one stroke-dashoffset change, so the
- * whole thing composites on the GPU and never touches layout or React.
+ * Six forms, one clock.
+ *
+ * Every layer of every style is driven by the same two custom properties the
+ * breathing hook writes each frame: `--e` (0 → 1 expansion) and `--p` (0 → 1
+ * through the current phase). Only transform, opacity and one stroke-dashoffset
+ * change, so the whole thing composites on the GPU and never touches layout
+ * or React — and adding a form here costs no JavaScript at all.
+ *
+ * Anything a style animates on its own — a travelling ripple, a drifting
+ * veil, a turning wave — lives on a *child* element, so its animation and the
+ * breath's own transform never fight over the same property.
  */
 .breath {
   --e: 0;
@@ -651,8 +658,45 @@
   will-change: transform, opacity;
 }
 
-/* 1 — moonlit halo, the outermost bloom of light. */
+/* The phase word sits above every layer, whatever the style. */
+.breath-caption {
+  z-index: 4;
+}
+
 /*
+ * The style picker's thumbnails. Same markup, a fraction of the size — only
+ * the handful of layers measured in pixels rather than in `--size` need
+ * bringing back into proportion.
+ */
+.breath--thumb {
+  flex: none;
+}
+
+.breath--thumb > * {
+  will-change: auto;
+}
+
+.breath--thumb .breath-star__dot,
+.breath--thumb .breath-seed {
+  width: 2px;
+  height: 2px;
+  box-shadow: 0 0 4px 1px color-mix(in oklab, var(--rose) 45%, transparent);
+}
+
+.breath--thumb .breath-star--bright .breath-star__dot {
+  width: 3px;
+  height: 3px;
+}
+
+.breath--thumb .breath-ripple__ring {
+  border-width: 1px;
+}
+
+/* ── Shared layers ──────────────────────────────────────────── */
+
+/*
+ * The moonlit halo — the outermost bloom of light.
+ *
  * Sized under 100% and capped at scale 1, so the outermost layer plus its
  * blur still land inside the visualiser's own box. Anything that escapes it
  * shows up as stray overflow in whatever panel the orb is sitting in.
@@ -672,7 +716,79 @@
   filter: blur(2px);
 }
 
-/* 2 — six petals opening from a seed. The signature form. */
+/* Broader and softer, for the styles with a solid shape at the centre. */
+.breath-halo--wide {
+  width: 100%;
+  height: 100%;
+  filter: blur(6px);
+  transform: scale(calc(0.6 + var(--e) * 0.4));
+}
+
+.breath-ring {
+  border-radius: 999px;
+  border: 1px solid var(--rose);
+}
+
+.breath-ring--outer {
+  width: calc(var(--size) * 0.84);
+  height: calc(var(--size) * 0.84);
+  transform: scale(calc(0.66 + var(--e) * 0.34));
+  opacity: calc(0.16 + var(--e) * 0.34);
+}
+
+.breath-ring--inner {
+  width: calc(var(--size) * 0.63);
+  height: calc(var(--size) * 0.63);
+  border-color: var(--gold);
+  transform: scale(calc(0.72 + var(--e) * 0.28));
+  opacity: calc(0.2 + var(--e) * 0.4);
+}
+
+/* The one ring the quieter styles wear. */
+.breath-ring--single {
+  width: calc(var(--size) * 0.88);
+  height: calc(var(--size) * 0.88);
+  border-color: color-mix(in oklab, var(--rose) 72%, transparent);
+  transform: scale(calc(0.62 + var(--e) * 0.38));
+  opacity: calc(0.2 + var(--e) * 0.45);
+}
+
+/* The core, lit from within and slightly above. */
+.breath-core {
+  width: calc(var(--size) * 0.4);
+  height: calc(var(--size) * 0.4);
+  border-radius: 999px;
+  background:
+    radial-gradient(
+      circle at 40% 32%,
+      color-mix(in oklab, var(--moonlight) 95%, transparent) 0%,
+      transparent 44%
+    ),
+    radial-gradient(
+      circle at 50% 56%,
+      color-mix(in oklab, var(--rose) 74%, transparent) 0%,
+      color-mix(in oklab, var(--rose) 34%, transparent) 56%,
+      color-mix(in oklab, var(--rose) 8%, transparent) 78%,
+      transparent 92%
+    );
+  box-shadow:
+    inset 0 1px 3px color-mix(in oklab, var(--moonlight) 70%, transparent),
+    inset 0 -8px 20px -10px color-mix(in oklab, var(--rose-deep) 45%, transparent),
+    0 0 40px -8px var(--glow);
+  transform: scale(calc(0.6 + var(--e) * 0.4));
+  opacity: calc(0.65 + var(--e) * 0.35);
+}
+
+/* Under the aurora it is a suggestion of a centre, not the subject. */
+.breath-core--faint {
+  width: calc(var(--size) * 0.3);
+  height: calc(var(--size) * 0.3);
+  opacity: calc(0.24 + var(--e) * 0.4);
+  box-shadow: 0 0 34px -10px var(--glow);
+}
+
+/* ── 1 · Bloom — six petals opening from a seed ─────────────── */
+
 .breath-petal {
   /*
    * Narrow enough that six of them read as petals rather than merging into
@@ -712,28 +828,7 @@
   mix-blend-mode: screen;
 }
 
-/* 3 — the two guide rings. */
-.breath-ring {
-  border-radius: 999px;
-  border: 1px solid var(--rose);
-}
-
-.breath-ring--outer {
-  width: calc(var(--size) * 0.84);
-  height: calc(var(--size) * 0.84);
-  transform: scale(calc(0.66 + var(--e) * 0.34));
-  opacity: calc(0.16 + var(--e) * 0.34);
-}
-
-.breath-ring--inner {
-  width: calc(var(--size) * 0.63);
-  height: calc(var(--size) * 0.63);
-  border-color: var(--gold);
-  transform: scale(calc(0.72 + var(--e) * 0.28));
-  opacity: calc(0.2 + var(--e) * 0.4);
-}
-
-/* 4 — seed lights riding outward, each on its own spoke. */
+/* Seed lights riding outward, each on its own spoke. */
 .breath-seed {
   width: 4px;
   height: 4px;
@@ -746,37 +841,302 @@
   box-shadow: 0 0 8px 1px color-mix(in oklab, var(--sage) 45%, transparent);
 }
 
-/* 5 — the core, lit from within and slightly above. */
-.breath-core {
-  width: calc(var(--size) * 0.4);
-  height: calc(var(--size) * 0.4);
+/* ── 2 · Halo — one disc, one ring, nothing else ────────────── */
+
+.breath-disc {
+  width: calc(var(--size) * 0.5);
+  height: calc(var(--size) * 0.5);
   border-radius: 999px;
   background:
     radial-gradient(
-      circle at 40% 32%,
-      color-mix(in oklab, var(--moonlight) 95%, transparent) 0%,
-      transparent 44%
+      circle at 38% 30%,
+      color-mix(in oklab, var(--moonlight) 90%, transparent) 0%,
+      transparent 46%
     ),
     radial-gradient(
-      circle at 50% 56%,
-      color-mix(in oklab, var(--rose) 74%, transparent) 0%,
-      color-mix(in oklab, var(--rose) 34%, transparent) 56%,
-      color-mix(in oklab, var(--rose) 8%, transparent) 78%,
-      transparent 92%
+      circle at 50% 58%,
+      color-mix(in oklab, var(--rose) 80%, transparent) 0%,
+      color-mix(in oklab, var(--rose) 30%, transparent) 68%,
+      transparent 94%
     );
-  box-shadow:
-    inset 0 1px 3px color-mix(in oklab, var(--moonlight) 70%, transparent),
-    inset 0 -8px 20px -10px color-mix(in oklab, var(--rose-deep) 45%, transparent),
-    0 0 40px -8px var(--glow);
-  transform: scale(calc(0.6 + var(--e) * 0.4));
-  opacity: calc(0.65 + var(--e) * 0.35);
+  box-shadow: 0 0 56px -12px var(--glow);
+  transform: scale(calc(0.46 + var(--e) * 0.54));
+  opacity: calc(0.7 + var(--e) * 0.3);
 }
 
-/* 6 — the phase progress ring, drawn once and offset per frame. */
+.breath-disc--small {
+  width: calc(var(--size) * 0.3);
+  height: calc(var(--size) * 0.3);
+  transform: scale(calc(0.6 + var(--e) * 0.4));
+}
+
+/* ── 3 · Ripple — rings travelling across still water ───────── */
+
+/*
+ * The rings never stop travelling; the breath decides how far they reach and
+ * how brightly they show. At the bottom of an out-breath the water is almost
+ * flat, and it surges as you fill.
+ */
+.breath-ripple {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  transform: scale(calc(0.5 + var(--e) * 0.5));
+  opacity: calc(0.3 + var(--e) * 0.7);
+}
+
+.breath-ripple__ring {
+  width: 92%;
+  height: 92%;
+  border-radius: 999px;
+  border: 2px solid var(--rose);
+  animation: breath-ripple-out 5.6s linear infinite;
+  animation-delay: calc(var(--i) * -1.4s);
+}
+
+.breath-ripple:nth-child(3) .breath-ripple__ring {
+  border-color: var(--gold);
+}
+
+.breath-ripple:nth-child(5) .breath-ripple__ring {
+  border-color: var(--sage);
+}
+
+@keyframes breath-ripple-out {
+  0% {
+    transform: scale(0.16);
+    opacity: 0;
+  }
+  14% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* ── 4 · Aurora — slow drifts of colour ─────────────────────── */
+
+/*
+ * Three veils on three orbits at three speeds. They gather into one warm
+ * light at the top of the breath and pull apart as it leaves — the only style
+ * whose *colour* changes with the breath rather than its size alone.
+ */
+.breath-aurora {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  animation: breath-orbit calc(24s + var(--i) * 8s) linear infinite;
+}
+
+.breath-aurora:nth-child(2) {
+  animation-direction: reverse;
+}
+
+/*
+ * Kept deliberately small and well separated. Three broad veils merge into one
+ * flat wash long before they reach the rim — the reason to look at this style
+ * is watching three colours travel past each other, and a single even glow is
+ * the failure state, not the effect.
+ */
+.breath-aurora__veil {
+  width: 44%;
+  height: 44%;
+  border-radius: 52% 48% 56% 44% / 46% 54% 46% 54%;
+  filter: blur(12px);
+  background: var(--rose);
+  transform: translate(-23%, -16%) scale(calc(0.46 + var(--e) * 0.66));
+  opacity: calc(0.2 + var(--e) * 0.55);
+}
+
+.breath-aurora:nth-child(2) .breath-aurora__veil {
+  background: var(--sage);
+  transform: translate(24%, 12%) scale(calc(0.48 + var(--e) * 0.62));
+}
+
+.breath-aurora:nth-child(3) .breath-aurora__veil {
+  background: var(--gold);
+  transform: translate(-3%, 25%) scale(calc(0.44 + var(--e) * 0.64));
+}
+
+.dark .breath-aurora__veil {
+  mix-blend-mode: screen;
+}
+
+/*
+ * Screen blending lifts the veils on the dark ground; on cream there is
+ * nothing to lift them and the same alpha lands as three heavy stains, so
+ * they are drawn lighter there.
+ */
+html:not(.dark) .breath-aurora__veil {
+  opacity: calc(0.13 + var(--e) * 0.38);
+}
+
+@keyframes breath-orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── 5 · Constellation — stars drawing apart and back ───────── */
+
+.breath-star {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  transform: rotate(var(--angle));
+  opacity: calc(0.2 + var(--e) * 0.8);
+}
+
+.breath-star__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--moonlight);
+  background: color-mix(in oklab, var(--rose) 70%, white);
+  box-shadow: 0 0 10px 2px color-mix(in oklab, var(--rose) 50%, transparent);
+  /*
+   * Out along its own spoke — the parent's rotation is what aims it. It stops
+   * short of the progress ring at 0.465: a star sitting on the ring reads as
+   * a bead threaded onto it rather than as a star.
+   */
+  transform: translateY(calc(var(--size) * -0.07 - var(--e) * var(--size) * 0.31));
+  animation: breath-twinkle 3.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.29s);
+}
+
+.breath-star--bright .breath-star__dot {
+  width: 6px;
+  height: 6px;
+  background: color-mix(in oklab, var(--gold) 78%, white);
+  box-shadow: 0 0 14px 3px color-mix(in oklab, var(--gold) 55%, transparent);
+}
+
+@keyframes breath-twinkle {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* The point they all came from, brightest when they are closest to it. */
+.breath-spark {
+  width: calc(var(--size) * 0.2);
+  height: calc(var(--size) * 0.2);
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--moonlight) 92%, transparent) 0%,
+    color-mix(in oklab, var(--rose) 55%, transparent) 42%,
+    transparent 72%
+  );
+  box-shadow: 0 0 34px -6px var(--glow);
+  transform: scale(calc(1.2 - var(--e) * 0.5));
+  opacity: calc(0.9 - var(--e) * 0.32);
+}
+
+/* ── 6 · Tide — a circle filling with water ─────────────────── */
+
+/*
+ * The most literal of the six: the water level *is* your lungs. It needs no
+ * explaining and reads correctly from across a room, which is why it is here
+ * alongside five more abstract forms.
+ */
+.breath-vessel {
+  position: relative;
+  width: calc(var(--size) * 0.8);
+  height: calc(var(--size) * 0.8);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--rose) 40%, transparent);
+  /* The sunken control colour, so the empty part of the bowl is theme-aware. */
+  background: var(--control-sunken);
+}
+
+.breath-water {
+  position: absolute;
+  inset: 0;
+  /* Empty at the bottom of the breath, brim-full at the top of it. */
+  transform: translateY(calc((1 - var(--e)) * 96%));
+}
+
+/*
+ * Each crest is a disc far wider than the vessel, sitting just above the
+ * water line. Because its corner radii are deliberately unequal, turning it
+ * makes the surface swell and dip — a moving waterline out of one element and
+ * one rotation, with nothing measuring anything.
+ */
+.breath-water__crest {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 210%;
+  aspect-ratio: 1 / 1;
+  border-radius: 43% 47% 45% 49%;
+  /*
+   * The border is the waterline. Only the crest's top arc is ever inside the
+   * vessel — every other edge is clipped away — so one plain border draws a
+   * crisp, curving surface that a gradient alone washed out into grey.
+   */
+  border: 2px solid color-mix(in oklab, var(--rose) 88%, white);
+  /*
+   * Rose the whole way down rather than falling into twilight. The navy read
+   * as depth on the dark ground and as mud on the cream one; two shades of
+   * the lead colour give the same sense of depth in both, because both shades
+   * already flip with the theme.
+   */
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--rose) 90%, transparent) 0%,
+    color-mix(in oklab, var(--rose) 60%, transparent) 7%,
+    color-mix(in oklab, var(--rose-deep) 44%, transparent) 26%,
+    color-mix(in oklab, var(--rose-deep) 28%, transparent) 100%
+  );
+  opacity: 0.9;
+  animation: breath-crest 12s linear infinite;
+}
+
+.breath-water__crest--slow {
+  width: 244%;
+  border-radius: 47% 43% 49% 45%;
+  border-color: color-mix(in oklab, var(--gold) 70%, transparent);
+  border-width: 1px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--gold) 54%, transparent) 0%,
+    transparent 58%
+  );
+  opacity: 0.34;
+  animation-duration: 17s;
+  animation-direction: reverse;
+}
+
+@keyframes breath-crest {
+  from {
+    transform: translate(-50%, -3%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -3%) rotate(360deg);
+  }
+}
+
+/* ── The phase progress ring, drawn once and offset per frame ── */
+
 .breath-progress {
   width: calc(var(--size) * 0.93);
   height: calc(var(--size) * 0.93);
   transform: rotate(-90deg);
+  z-index: 3;
 }
 
 .breath-progress__track {
@@ -838,15 +1198,20 @@
 
 /*
  * With reduced motion the guide holds a comfortable half-open pose and the
- * words plus the countdown do all the guiding.
+ * words, the countdown and the breath's own voice do all the guiding. Every
+ * self-running animation inside the orb stops too — a ripple that keeps
+ * travelling is exactly the thing someone asking for less motion is asking to
+ * be spared.
  */
 @media (prefers-reduced-motion: reduce) {
   .breath {
     --e: 0.55;
   }
 
-  .breath > * {
+  .breath > *,
+  .breath > * > * {
     will-change: auto;
+    animation: none !important;
   }
 
   .breath--awaken {

@@ -15,14 +15,28 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { DEFAULT_PATTERN, type BreathPattern } from '../lib/breathing'
+import {
+  DEFAULT_BREATH_VOLUME,
+  MAX_BREATH_VOLUME,
+  type BreathSound,
+} from '../lib/breathAudio'
+import {
+  DEFAULT_PATTERN,
+  DEFAULT_STYLE,
+  type BreathPattern,
+  type BreathStyleId,
+} from '../lib/breathing'
 import { setHapticsEnabled, setSoundEnabled } from '../lib/feedback'
 import { readLocal, writeLocal } from '../lib/storage'
 
 export interface Preferences {
   breathingEnabled: boolean
   breathPattern: BreathPattern
-  breathSoundCues: boolean
+  /** Which of the six forms the guide is drawn as. */
+  breathStyle: BreathStyleId
+  /** The breath's own voice, or `'off'`. */
+  breathSound: BreathSound
+  breathSoundVolume: number
   breathHapticCues: boolean
   /** Interface taps and confirmations. */
   uiSounds: boolean
@@ -38,12 +52,19 @@ export interface Preferences {
 }
 
 const DEFAULTS: Preferences = {
-  // The guide is now the visual centre of both the preview and the player,
-  // so it is on by default. Its cues stay off: nothing should make a sound
-  // or vibrate until it has been asked to.
+  // The guide is the visual centre of both the preview and the player, so it
+  // is on by default.
   breathingEnabled: true,
   breathPattern: DEFAULT_PATTERN,
-  breathSoundCues: false,
+  breathStyle: DEFAULT_STYLE,
+  /*
+   * A chime rather than one of the continuous voices. The guide is no use to
+   * anyone with their eyes shut unless it makes a sound, so silence is the
+   * wrong default — but a bed of noise arriving unasked would be startling,
+   * and a bell that rings twice a breath will not be mistaken for a fault.
+   */
+  breathSound: 'chime',
+  breathSoundVolume: DEFAULT_BREATH_VOLUME,
   breathHapticCues: true,
   uiSounds: true,
   uiHaptics: true,
@@ -59,16 +80,37 @@ interface PreferencesContextValue {
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null)
 
+/** What was stored before the breath had voices and forms of its own. */
+interface LegacyPreferences {
+  breathSoundCues?: boolean
+}
+
 function load(): Preferences {
   const raw = readLocal(KEY)
   if (!raw) return DEFAULTS
   try {
-    const parsed = JSON.parse(raw) as Partial<Preferences>
-    return {
+    const parsed = JSON.parse(raw) as Partial<Preferences> & LegacyPreferences
+    const merged: Preferences = {
       ...DEFAULTS,
       ...parsed,
       breathPattern: { ...DEFAULTS.breathPattern, ...parsed.breathPattern },
     }
+
+    /*
+     * The old setting was a single on/off for "a soft tone at each change of
+     * phase", which is exactly what the chime is. Someone who had turned it
+     * off had made a decision, and upgrading the app is not a reason to
+     * overrule it.
+     */
+    if (parsed.breathSound == null && typeof parsed.breathSoundCues === 'boolean') {
+      merged.breathSound = parsed.breathSoundCues ? 'chime' : 'off'
+    }
+
+    merged.breathSoundVolume = Math.min(
+      MAX_BREATH_VOLUME,
+      Math.max(0, merged.breathSoundVolume),
+    )
+    return merged
   } catch {
     return DEFAULTS
   }
@@ -79,7 +121,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   // Keep the feedback module in step; it is called from non-React code.
   useEffect(() => {
-    setSoundEnabled(preferences.uiSounds || preferences.breathSoundCues)
+    setSoundEnabled(preferences.uiSounds)
     setHapticsEnabled(preferences.uiHaptics || preferences.breathHapticCues)
     writeLocal(KEY, JSON.stringify(preferences))
   }, [preferences])

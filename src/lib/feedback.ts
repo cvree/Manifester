@@ -125,6 +125,25 @@ function context(): AudioContext | null {
 }
 
 /**
+ * Vibrate a cue's pattern without making a sound.
+ *
+ * The breathing guide needs exactly this: its sound is a synthesised breath
+ * voice with its own volume and its own choice of instrument (see
+ * `breathAudio`), so firing the interface tone alongside it would put two
+ * unrelated sounds on the same beat.
+ */
+export function haptic(name: Cue): void {
+  const shape = CUES[name]
+  if (!shape) return
+  if (!hapticsEnabled || shape.vibrate == null || !mayVibrate()) return
+  try {
+    navigator.vibrate(shape.vibrate)
+  } catch {
+    /* Some browsers throw when the page is not visible. */
+  }
+}
+
+/**
  * Play a cue. Safe to call from anywhere — it does nothing at all when the
  * user has turned cues off, and never throws.
  */
@@ -132,13 +151,7 @@ export function cue(name: Cue): void {
   const shape = CUES[name]
   if (!shape) return
 
-  if (hapticsEnabled && shape.vibrate != null && mayVibrate()) {
-    try {
-      navigator.vibrate(shape.vibrate)
-    } catch {
-      /* Some browsers throw when the page is not visible. */
-    }
-  }
+  haptic(name)
 
   if (!soundEnabled) return
 

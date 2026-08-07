@@ -48,7 +48,7 @@ const RAIN_HINTS: Record<RainCharacter, string> = {
   full: 'Denser and brighter, with more warmth underneath.',
 }
 
-export function SoundsRoute() {
+export function SoundsSection() {
   const {
     builtinTracks,
     customTracks,
@@ -257,15 +257,7 @@ export function SoundsRoute() {
     previewId === 'rain-window'
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 lg:grid lg:max-w-none lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start lg:gap-8 lg:space-y-0">
-      <header data-rise className="pt-2 lg:col-span-2">
-        <h1 className="type-display">Sounds</h1>
-        <p className="type-body mt-3">
-          Five ambiences and five rhythms come built in, all generated on this
-          device. You can also bring your own audio — it stays here too.
-        </p>
-      </header>
-
+    <div className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start lg:gap-8 lg:space-y-0">
       <div className="space-y-6 lg:col-start-1">
         <Card
           data-rise

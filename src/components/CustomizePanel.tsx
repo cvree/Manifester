@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { setStoredCredentials, useCredentials } from '../lib/ai/useCredentials'
 import { cue, hapticsSupported } from '../lib/feedback'
 import {
@@ -62,7 +63,7 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
   },
   breathing: {
     title: 'Breathing',
-    description: 'The guide that expands and settles while you listen.',
+    description: 'The guide you follow while you listen — how it moves, and how it sounds.',
   },
   delay: {
     title: 'Delay between loops',
@@ -86,24 +87,20 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
   },
 }
 
-/**
- * Everything that used to be a long vertical settings form.
- *
- * Each row states its own value, so the whole of the advanced configuration
- * is legible at a glance; opening one puts it in a sheet — rising from the
- * bottom on a phone, centred on a desktop — instead of pushing the page
- * further down.
- */
-interface CustomizePanelProps {
-  /**
-   * Which sheet is open, owned by Create. The ritual preview's summary tiles
-   * open these same sheets, so the state cannot live in here.
-   */
+interface SheetsProps {
   open: PanelKey | null
   onOpenChange: (key: PanelKey | null) => void
 }
 
-export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
+/**
+ * Every settings sheet in the app, in one place.
+ *
+ * Create and the Player both open sheets, and each used to carry its own copy
+ * of the ones it needed — which is how the same breathing panel ended up with
+ * two descriptions and the haptics panel with two. There is one of each now,
+ * and a screen only has to say which key is open.
+ */
+export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
   const {
     draft,
     updateSettings,
@@ -119,92 +116,11 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
   const credentials = useCredentials()
 
   const { settings } = draft
-
-  const openPanel = (key: PanelKey) => {
-    cue('tap')
-    onOpenChange(key)
-  }
+  const close = () => onOpenChange(null)
 
   return (
     <>
-      <div className="surface-panel overflow-hidden">
-        <div className="border-b border-[var(--quiet-border)] px-4 py-4 sm:px-5">
-          <h2 className="type-subheading">Customize your ritual</h2>
-          <p className="type-meta mt-0.5">
-            Everything here is optional. The defaults already work.
-          </p>
-        </div>
-
-        <SettingRow
-          icon={<VoiceIcon />}
-          title="Voice"
-          summary={voiceSummary(settings, resolvedDeviceVoice)}
-          onClick={() => openPanel('voice')}
-          accent
-        />
-        <SettingRow
-          icon={<WaveIcon />}
-          title="Background sound"
-          summary={soundSummary(settings, allTracks)}
-          onClick={() => openPanel('sound')}
-          accent={settings.sound.mode !== 'off'}
-        />
-        <SettingRow
-          icon={<PulseIcon />}
-          title="Brainwave rhythm"
-          summary={brainwaveSummary(settings.brainwave)}
-          onClick={() => openPanel('brainwave')}
-          accent={settings.brainwave.enabled}
-        />
-        <SettingRow
-          icon={<BreathIcon />}
-          title="Breathing"
-          summary={breathingSummary(
-            preferences.breathingEnabled,
-            preferences.breathPattern,
-          )}
-          onClick={() => openPanel('breathing')}
-          accent={preferences.breathingEnabled}
-        />
-        <SettingRow
-          icon={<PauseIcon />}
-          title="Delay between loops"
-          summary={delaySummary(settings.repeatPauseSeconds)}
-          onClick={() => openPanel('delay')}
-        />
-        <SettingRow
-          icon={<MicIcon />}
-          title="Voice recording"
-          summary={recordingSummary(settings.recordingId)}
-          onClick={() => openPanel('recording')}
-          accent={settings.recordingId != null}
-        />
-        <SettingRow
-          icon={<DownloadIcon />}
-          title="Download audio"
-          summary={exportSummary(settings, settings.recordingId != null)}
-          onClick={() => openPanel('export')}
-        />
-        <SettingRow
-          icon={<SparkIcon />}
-          title="AI writing help"
-          summary={aiSummary(credentials, preferences.aiEnabled)}
-          onClick={() => openPanel('ai')}
-          accent={credentials != null && preferences.aiEnabled}
-        />
-        <SettingRow
-          icon={<TuneIcon />}
-          title="Haptics and interface sounds"
-          summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
-          onClick={() => openPanel('feel')}
-        />
-      </div>
-
-      <Sheet
-        open={open === 'voice'}
-        onClose={() => onOpenChange(null)}
-        {...TITLES.voice}
-      >
+      <Sheet open={open === 'voice'} onClose={close} {...TITLES.voice}>
         <VoiceSettings
           voices={voices}
           voicesReady={voicesReady}
@@ -216,11 +132,7 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
         />
       </Sheet>
 
-      <Sheet
-        open={open === 'sound'}
-        onClose={() => onOpenChange(null)}
-        {...TITLES.sound}
-      >
+      <Sheet open={open === 'sound'} onClose={close} {...TITLES.sound}>
         <SoundSettings
           settings={settings}
           tracks={allTracks}
@@ -228,52 +140,32 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
         />
       </Sheet>
 
-      <Sheet
-        open={open === 'brainwave'}
-        onClose={() => onOpenChange(null)}
-        {...TITLES.brainwave}
-      >
+      <Sheet open={open === 'brainwave'} onClose={close} {...TITLES.brainwave}>
         <BrainwavePanel settings={settings.brainwave} onChange={setBrainwave} />
       </Sheet>
 
-      <Sheet
-        open={open === 'breathing'}
-        onClose={() => onOpenChange(null)}
-        {...TITLES.breathing}
-      >
+      <Sheet open={open === 'breathing'} onClose={close} {...TITLES.breathing}>
         <BreathingSettings
           preferences={preferences}
           onChange={updatePreferences}
         />
       </Sheet>
 
-      <Sheet
-        open={open === 'delay'}
-        onClose={() => onOpenChange(null)}
-        {...TITLES.delay}
-      >
+      <Sheet open={open === 'delay'} onClose={close} {...TITLES.delay}>
         <DelaySettings
           seconds={settings.repeatPauseSeconds}
           onChange={(repeatPauseSeconds) => updateSettings({ repeatPauseSeconds })}
         />
       </Sheet>
 
-      <Sheet
-        open={open === 'recording'}
-        onClose={() => onOpenChange(null)}
-        {...TITLES.recording}
-      >
+      <Sheet open={open === 'recording'} onClose={close} {...TITLES.recording}>
         <VoiceRecorderPanel
           recordingId={settings.recordingId}
           onChange={(recordingId) => updateSettings({ recordingId })}
         />
       </Sheet>
 
-      <Sheet
-        open={open === 'export'}
-        onClose={() => onOpenChange(null)}
-        {...TITLES.export}
-      >
+      <Sheet open={open === 'export'} onClose={close} {...TITLES.export}>
         <ExportPanel
           settings={settings}
           title={draft.title}
@@ -283,7 +175,7 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
         />
       </Sheet>
 
-      <Sheet open={open === 'ai'} onClose={() => onOpenChange(null)} {...TITLES.ai}>
+      <Sheet open={open === 'ai'} onClose={close} {...TITLES.ai}>
         <AiSetupPanel
           credentials={credentials}
           onChange={setStoredCredentials}
@@ -292,7 +184,7 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
         />
       </Sheet>
 
-      <Sheet open={open === 'feel'} onClose={() => onOpenChange(null)} {...TITLES.feel}>
+      <Sheet open={open === 'feel'} onClose={close} {...TITLES.feel}>
         <div className="space-y-5">
           <Toggle
             label="Interface sounds"
@@ -320,5 +212,139 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
         </div>
       </Sheet>
     </>
+  )
+}
+
+/**
+ * Everything that used to be a long vertical settings form.
+ *
+ * Each row states its own value, so the whole of the advanced configuration is
+ * legible at a glance; opening one puts it in a sheet — rising from the bottom
+ * on a phone, centred on a desktop — instead of pushing the page further down.
+ *
+ * The nine rows are grouped into three named runs, because nine identical rows
+ * in a column is a list you read from the top every time rather than a place
+ * you know your way around.
+ */
+interface CustomizePanelProps {
+  /**
+   * Which sheet is open, owned by Create. The ritual preview's summary tiles
+   * open these same sheets, so the state cannot live in here.
+   */
+  open: PanelKey | null
+  onOpenChange: (key: PanelKey | null) => void
+}
+
+export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
+  const { draft, resolvedDeviceVoice } = useSession()
+  const { allTracks } = useLibrary()
+  const { preferences } = usePreferences()
+  const credentials = useCredentials()
+
+  const { settings } = draft
+
+  const openPanel = (key: PanelKey) => {
+    cue('tap')
+    onOpenChange(key)
+  }
+
+  return (
+    <>
+      <div className="surface-panel overflow-hidden">
+        <div className="border-b border-[var(--quiet-border)] px-4 py-4 sm:px-5">
+          <h2 className="type-subheading">Customize your ritual</h2>
+          <p className="type-meta mt-0.5">
+            Everything here is optional. The defaults already work.
+          </p>
+        </div>
+
+        <Group label="What you hear">
+          <SettingRow
+            icon={<VoiceIcon />}
+            title="Voice"
+            summary={voiceSummary(settings, resolvedDeviceVoice)}
+            onClick={() => openPanel('voice')}
+            accent
+          />
+          <SettingRow
+            icon={<WaveIcon />}
+            title="Background sound"
+            summary={soundSummary(settings, allTracks)}
+            onClick={() => openPanel('sound')}
+            accent={settings.sound.mode !== 'off'}
+          />
+          <SettingRow
+            icon={<PauseIcon />}
+            title="Delay between loops"
+            summary={delaySummary(settings.repeatPauseSeconds)}
+            onClick={() => openPanel('delay')}
+          />
+        </Group>
+
+        <Group label="What guides you">
+          <SettingRow
+            icon={<BreathIcon />}
+            title="Breathing"
+            summary={breathingSummary(
+              preferences.breathingEnabled,
+              preferences.breathPattern,
+              preferences.breathStyle,
+              preferences.breathSound,
+            )}
+            onClick={() => openPanel('breathing')}
+            accent={preferences.breathingEnabled}
+          />
+          <SettingRow
+            icon={<PulseIcon />}
+            title="Brainwave rhythm"
+            summary={brainwaveSummary(settings.brainwave)}
+            onClick={() => openPanel('brainwave')}
+            accent={settings.brainwave.enabled}
+          />
+        </Group>
+
+        <Group label="Now and then">
+          <SettingRow
+            icon={<MicIcon />}
+            title="Voice recording"
+            summary={recordingSummary(settings.recordingId)}
+            onClick={() => openPanel('recording')}
+            accent={settings.recordingId != null}
+          />
+          <SettingRow
+            icon={<DownloadIcon />}
+            title="Download audio"
+            summary={exportSummary(settings, settings.recordingId != null)}
+            onClick={() => openPanel('export')}
+          />
+          <SettingRow
+            icon={<SparkIcon />}
+            title="AI writing help"
+            summary={aiSummary(credentials, preferences.aiEnabled)}
+            onClick={() => openPanel('ai')}
+            accent={credentials != null && preferences.aiEnabled}
+          />
+          <SettingRow
+            icon={<TuneIcon />}
+            title="Haptics and interface sounds"
+            summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
+            onClick={() => openPanel('feel')}
+          />
+        </Group>
+      </div>
+
+      <SettingsSheets open={open} onOpenChange={onOpenChange} />
+    </>
+  )
+}
+
+function Group({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section aria-label={label}>
+      <h3 className="type-meta bg-[var(--quiet)] px-4 py-2 font-semibold tracking-[0.08em] uppercase sm:px-5">
+        {label}
+      </h3>
+      {children}
+    </section>
   )
 }

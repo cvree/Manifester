@@ -8,7 +8,7 @@ import type { SavedLoop } from '../lib/types'
 import { useLibrary } from '../state/LibraryProvider'
 import { useSession } from '../state/SessionProvider'
 
-export function SavedRoute() {
+export function LoopsSection() {
   const navigate = useNavigate()
   const { loops, ready, removeLoop, duplicateLoop, touchLoop } = useLibrary()
   const { loadIntoDraft, start } = useSession()
@@ -26,14 +26,7 @@ export function SavedRoute() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 md:max-w-5xl">
-      <header data-rise className="pt-2">
-        <h1 className="type-display">Saved loops</h1>
-        <p className="type-body mt-3">
-          Your rituals, kept on this device. Tap one to hear it again.
-        </p>
-      </header>
-
+    <div className="space-y-6">
       {!ready ? (
         <Card data-rise level="panel">
           <p

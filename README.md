@@ -113,12 +113,10 @@ app.
   desk. On a phone the navigation slides away while a session runs, and a strip
   at the bottom edge brings it straight back.
 - One large play/pause control, with a smaller *End session* below it.
-- A **breathing guide**: a seed of light opening into six petals inside a
-  moonlit halo, with a thin ring reporting progress through the phase, the phase
-  name and a countdown in the centre.
-  Default 4 seconds in, 6 seconds out — presets for Calm, Even, Box and Unwind,
-  plus custom timing for every phase. Optional soft tone and vibration cues at
-  each change of phase. It pauses and resumes with the session.
+- A **breathing guide** in one of six forms, with a thin ring reporting progress
+  through the phase, the phase name and a countdown in the centre. Ten patterns,
+  five breath voices, and custom timing for every phase — it has a section of
+  its own below. It pauses and resumes with the session.
 - **Delay between loops**, 0–60 seconds, counted down on screen (*"Next loop in
   6s"*) and frozen exactly where it was if you pause.
 - Time remaining, or elapsed time when there is no timer.
@@ -139,7 +137,22 @@ app.
 - Everything is rendered on your device in a Web Worker, so the app stays
   usable while it works, and nothing is ever uploaded.
 
-**Sounds**
+**Library**
+
+Saved loops and sounds share one tab, because they answer the same question —
+*what have I got?* A segmented control switches between the two halves, and
+which half you are on lives in the URL, so a link to your sounds is still a
+link to your sounds.
+
+*Loops*
+
+- Every saved loop keeps its text, title, voice, speed, pitch, volumes, timer,
+  sound selection, rain character, brainwave rhythm, playlist, repeat mode, and
+  dates. A loop saved before a setting existed loads with it turned off rather
+  than failing.
+- Play, edit, duplicate, or delete.
+
+*Sounds*
 
 - Five built-in ambiences, all generated live: **Moon Garden**, **Soft
   Horizon**, **Rain on Window**, **Ocean Tide** and **Fireplace Glow**. Each has
@@ -152,14 +165,6 @@ app.
 - Import your own audio (MP3, M4A, WAV, OGG, FLAC — up to 40 MB each).
 - Rename, preview, and delete imported sounds.
 - Build an ordered playlist, reorder it, and choose repeat-one or repeat-all.
-
-**Saved**
-
-- Every saved loop keeps its text, title, voice, speed, pitch, volumes, timer,
-  sound selection, rain character, brainwave rhythm, playlist, repeat mode, and
-  dates. A loop saved before a setting existed loads with it turned off rather
-  than failing.
-- Play, edit, duplicate, or delete.
 
 **Everywhere**
 
@@ -175,10 +180,93 @@ app.
   appears once as a small card, and remembers being dismissed. The full
   instructions live on the About screen.
 - Original procedural interface sounds and haptics — a tap, a selection tick, a
-  rising start tone, a settling pause tone, a save sparkle, a completion chime,
-  breathing cues and a quiet error tone. All off until you turn them on, and
-  sliders never vibrate.
+  rising start tone, a settling pause tone, a save sparkle, a completion chime
+  and a quiet error tone — separate from the breath's own voice, which has its
+  own instrument and its own level. Sliders never vibrate.
 - Works offline after the first visit.
+
+---
+
+## The breathing guide
+
+The guide is the part of Manifester you actually *do*, rather than listen to, so
+it gets three kinds of choice: how the breath is shaped, what it looks like, and
+what it sounds like. All of it lives under **Breathing**, on both Create and the
+Player, and it is a preference rather than a loop setting — you should not have
+to re-pick your breathing pattern for every set of words.
+
+### Ten patterns, grouped by what they are for
+
+| | |
+| --- | --- |
+| **Settle** | Calm (4–6) · Let go (4–8) |
+| **Balance** | Even (5–5) · Coherent (5.5–5.5, about six breaths a minute) |
+| **Focus** | Box (4–4–4–4) · Triangle (4–4–6) |
+| **Sleep** | Unwind (4–7–8) · Deep rest (6–10) |
+| **Lift** | Awaken (6–3) · Clear (3–3) |
+
+Custom timing sets each of the four phases independently, in half-second steps —
+half a second rather than whole seconds because coherent breathing is 5.5 a
+side, and a custom control that cannot reach the preset next to it is a control
+that quietly calls itself a liar. Set a phase to zero to skip it.
+
+### Six forms
+
+| Form | What it is |
+| --- | --- |
+| **Bloom** | Six petals opening from a seed of light |
+| **Halo** | One circle and one ring. Nothing else |
+| **Ripple** | Rings travelling outward across still water |
+| **Aurora** | Slow drifts of colour that gather and part |
+| **Constellation** | Stars drawing apart and back into a point |
+| **Tide** | A water line rising and falling inside the circle |
+
+The picker shows six live thumbnails rather than six adjectives — each is the
+real component at a smaller size, so whatever a form does on its own is a thing
+you can watch before you choose it.
+
+### Five voices — the guide with your eyes shut
+
+A visual orb is useless the moment someone closes their eyes, which is exactly
+when a breathing exercise starts working. So the sound has to carry the whole
+shape of the breath on its own: *rising* to breathe in, *falling* to let go,
+*still* through a hold.
+
+Two families do that differently. The **continuous** voices sound through the
+whole phase, so at any moment you know not merely that the breath turned but
+where in it you are:
+
+- **Ocean** — a wave gathering as you breathe in and drawing back as you let go
+- **Hush** — a soft breath alongside yours, brighter going in than coming out
+- **Drone** — a warm tone that climbs a fifth on the way in and falls on the way out
+
+The **struck** voices sound once at each turn and then get out of the way, for
+people who find a continuous sound intrusive:
+
+- **Chime** — two clear notes, up to breathe in, down to let go
+- **Singing bowl** — one struck bowl, with the inharmonic partials that give it
+  its shimmer, ringing out into the quiet
+
+Every one is synthesised at the moment it plays; there are no audio files here
+either. They run on their own `AudioContext`, separate from the session mix, so
+a breath cue can never be caught by a session fade, ducked by the ambience, or
+suspended along with the music — and the level is its own slider, independent of
+the loop's voice and sound. Auditioning a voice in the settings sheet runs on a
+second player, so pressing *hear it* mid-session never disturbs the breath you
+are actually following.
+
+Sound is scheduled a phase at a time rather than nudged each frame: the whole
+length of the phase is handed to the audio clock the moment it begins. The Web
+Audio clock is sample-accurate and the animation clock is not, so this is what
+keeps the sound exactly in step even while the main thread is busy laying out a
+settings sheet. [`breathAudio.test.ts`](src/lib/breathAudio.test.ts) renders
+every voice offline and measures it — that the in-breath really does rise, that
+the out-breath really does fall, that a struck voice really does clear out
+before the next turn — because "some audio came out" would pass just as happily
+on a voice that played the same flat hiss both ways.
+
+Vibration is offered separately, where the device supports it. iPhone does not
+let web apps vibrate, and the app says so rather than showing a dead switch.
 
 ---
 
@@ -463,8 +551,8 @@ better engineering answer.
 **Vite + React Router instead of the Remix / React Router framework.**
 The React Router framework mode expects a server (or a prerender step with real
 routes). GitHub Pages serves static files with no rewrite rules, so a path like
-`/Manifester/saved` would 404 on refresh or on a shared link. Vite's static build
-plus `HashRouter` sidesteps that entirely: `#/saved` always resolves to the one
+`/Manifester/library` would 404 on refresh or on a shared link. Vite's static build
+plus `HashRouter` sidesteps that entirely: `#/library` always resolves to the one
 real document, deep links survive a reload, and the service worker only ever has
 one HTML file to cache. A `404.html` fallback is included as a belt-and-braces
 redirect for any stray path.
@@ -487,12 +575,13 @@ one modal surface in the app — a bottom sheet on a phone, a centred dialog fro
 about sixty lines. A headless UI package would be ~15 kB for behaviour we need
 exactly one variant of.
 
-**No animation library for the breathing guide.** Every layer of the visualiser
-is driven by two CSS custom properties (`--e` for expansion, `--p` for phase
-progress) that [`useBreathing`](src/lib/useBreathing.ts) writes straight onto the
-element each frame. React re-renders once a second, for the countdown, and never
-for the animation itself — so the browser only ever composites transforms,
-opacity and one dash offset.
+**No animation library for the breathing guide.** Every layer of all six forms
+is driven by the same two CSS custom properties (`--e` for expansion, `--p` for
+phase progress) that [`useBreathing`](src/lib/useBreathing.ts) writes straight
+onto the element each frame. React re-renders once a second, for the countdown,
+and never for the animation itself — so the browser only ever composites
+transforms, opacity and one dash offset, and adding a seventh form would cost
+no JavaScript at all.
 
 **No React Bits or Skiper UI packages.** Both were used as *reference* for the
 kind of polish worth aiming at. The two effects that survived — a shimmer sweep
@@ -594,16 +683,17 @@ the result.
 src/
   components/     design system + composed UI
     Sheet.tsx             the one modal surface: bottom sheet / centred dialog
-    BreathingVisualizer   the orb, petals, phase ring and halo
+    BreathingVisualizer   all six guide forms, plus the phase ring
     RitualPreview.tsx     the live picture of the finished ritual
     CustomizePanel.tsx    the advanced settings, as summarised rows + sheets
     SettingRow.tsx        one row of that list, stating its own value
-  routes/         Create, Player, Saved, Sounds, About
+  routes/         Create, Player, Library (loops + sounds), About
   state/          Theme, Library (IndexedDB), Session (playback engines)
   lib/
     speech.ts       chunking, voice loading, the looping speaker
     voiceRanking.ts scores device voices and picks the best of each style
-    breathing.ts    pure breath-phase maths
+    breathing.ts    pure breath-phase maths, patterns and forms
+    breathAudio.ts  the breath's own synthesised voices
     useBreathing.ts drives the orb from the wall clock
     feedback.ts     haptics and generated interface tones
     recorder.ts     microphone capture for exports
