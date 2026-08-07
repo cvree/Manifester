@@ -22,6 +22,16 @@ export interface Credentials {
    * Absent means never asked, which means never send anything.
    */
   agreedAt: number
+  /**
+   * The model that answered when the key was last checked.
+   *
+   * Two jobs: it is what the connected screen shows, so nobody has to guess
+   * what they are actually talking to, and it is where the next request
+   * starts, so the usual case is one call rather than a walk down the list.
+   */
+  model?: string
+  /** When a real request last came back from the provider. */
+  verifiedAt?: number
 }
 
 const KEY = 'aiCredentials'
@@ -44,9 +54,16 @@ export async function forgetCredentials(): Promise<void> {
   await writeKv(KEY, null)
 }
 
-/** `sk-ant-api03-abcd…wxyz` — enough to recognise, not enough to use. */
+/**
+ * `AQ.Ab8•••••••••3f7a` — enough to recognise, not enough to use.
+ *
+ * The head is short on purpose. Six characters is plenty to tell your two keys
+ * apart and to see which company issued it, and every character beyond that is
+ * a character somebody has handed to whoever is looking over their shoulder.
+ * Short keys are hidden outright rather than mostly-shown.
+ */
 export function maskKey(key: string): string {
   const trimmed = key.trim()
-  if (trimmed.length <= 12) return '•'.repeat(trimmed.length)
-  return `${trimmed.slice(0, 8)}…${trimmed.slice(-4)}`
+  if (trimmed.length < 16) return '•'.repeat(Math.max(trimmed.length, 8))
+  return `${trimmed.slice(0, 6)}${'•'.repeat(8)}${trimmed.slice(-4)}`
 }

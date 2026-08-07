@@ -73,6 +73,29 @@ app.
   built-in list — so pressing *Add* repeatedly keeps producing new material
   instead of running dry. It falls back to the offline engine whenever the
   network or the key gives out. See [Privacy](#privacy).
+- **A key is checked by using it, never by looking at it.** *Connect* spends one
+  very short real request, and the word "connected" means that request came
+  back. Nothing is stored until it does. This matters more than it sounds:
+  Manifester used to insist a Google key began with `AIza`, and when Google
+  moved AI Studio onto [auth keys](https://ai.google.dev/gemini-api/docs/api-key)
+  beginning with `AQ.`, every new key in the world was refused before a request
+  was ever made. Both formats work now, so will the next one, and the prefix is
+  used for at most a friendly note beside the box.
+- **The failure tells you what to do about it.** A refused key, a key that is
+  not allowed to use the API, a project with the API switched off, a key locked
+  to other websites, a spent daily allowance, a model this account cannot have,
+  a blocked network, a timeout and a Google outage are nine different sentences,
+  not one shrug. Where Manifester can name the fix, it names it. On Gemini it
+  also walks down its list of current Flash models rather than blaming a key for
+  a model it simply cannot reach today, and the connected screen says which
+  model actually answered.
+- **Nothing you wrote is ever at risk.** The draft is not touched until a reply
+  has come back *and* passed validation; a reply that is malformed, empty, the
+  wrong shape, or carrying a promise about health or money is dropped rather
+  than spoken. Requests give up after thirty seconds, there is a *Stop* button
+  the whole time one is in flight, and if you carry on typing while it thinks,
+  the newer words win. *Undo* covers every AI edit exactly as it covers the
+  offline ones.
 - **The AI is opt-in, and switching it off is a single control.** The same panel
   — a master switch plus the full step-by-step — appears in two places: under
   *Customize → AI writing help* on Create, and on the **About** page, which is
@@ -509,12 +532,20 @@ better engineering answer.
   up. Nothing else does — not typing, not saving, not playing a session. The
   key is stored in this browser's IndexedDB, is never bundled into the app, and
   is sent only to the company it belongs to.
+- **The key is never shown, logged or exported whole.** Every screen shows it
+  masked (`AQ.Ab8••••••••YwZr`), the paste box is a password field, error
+  messages quote the provider rather than the credential, and nothing writes it
+  to the console. *Disconnect* removes it from the device for good.
+- **Requests carry `store: false`**, so the interaction is not kept on Google's
+  side for later retrieval, and Manifester never asks for one back.
 - **Choose the provider with your eyes open.** Anthropic does not train on API
   content and no human reads it. Google's Gemini *free* tier is different: its
   [API terms](https://ai.google.dev/gemini-api/terms) say unpaid-tier content is
   used to improve Google products and that human reviewers may read it. For a
   page of private affirmations that is a real cost, so the setup screen says so
-  in a warning box rather than a footnote. Paying for Gemini turns it off.
+  in a warning box rather than a footnote. Paying for Gemini turns it off — as
+  does being in the UK, Switzerland or the EEA, where Google applies the paid
+  terms to the free tier too.
 - **ChatGPT is not offered, and cannot be.** `api.openai.com` sends no
   `Access-Control-Allow-Origin` header, so a browser blocks the request before
   it leaves — verified from the same page where Anthropic and Google both
@@ -676,6 +707,20 @@ the result.
 - **Compatibility.** A loop record written by the previous version — no
   `brainwave` key, no `rainCharacter` — loads with the feature off and everything
   else intact. A tampered `targetHz` is rebuilt from its preset.
+- **The AI connection**, against a stand-in for `@google/genai`, because the
+  interesting behaviour is the decisions and not the network. A modern `AQ.`
+  auth key and an older `AIza` key both reach the wire; so does a shape nobody
+  has seen before, and no message anywhere tells a person their key has to
+  start with anything. Then the failures, one at a time: 400 with
+  `API_KEY_INVALID`, 401, 403 for permission, 403 for a disabled API, 403 for a
+  website restriction, 429, 404, a request field an older model does not know,
+  a blocked `fetch`, a timeout, a deliberate Stop, an empty reply, a malformed
+  reply, and a reply held back by a safety filter — each asserted to produce its
+  own kind, its own sentence, and its own decision about whether to try the next
+  model, hand over to the offline helper, or stop dead. Plus: the draft is never
+  touched by a failure, the key round-trips through storage and is genuinely
+  gone after a disconnect, and a line promising a cure or a windfall is dropped
+  before it can be spoken.
 
 ### Project layout
 
@@ -708,6 +753,13 @@ src/
     motion.ts       reduced motion, low-power, breakpoint and platform detection
     summaries.ts    the one-line summary of every advanced setting
     engagement.ts   when the install suggestion has been earned
+    wordcraft.ts    the offline writing helper: rewrite rules, no model
+    ai/
+      providers.ts    Claude and Gemini: key handling, models, the calls
+      errors.ts       failure kinds, recovery wording, timeout vs cancel
+      enhance.ts      the two prompts, output validation, offline fallback
+      credentials.ts  the key on this device, and how it is masked
+      useCredentials.ts  one nullable value, shared by two screens
   workers/
     encode.worker.ts  mixes the timeline and encodes MP3/WAV
   styles/

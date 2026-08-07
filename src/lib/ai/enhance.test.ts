@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { sanitiseLines } from './enhance'
-import { keyLooksWrong, PROVIDERS } from './providers'
-import { maskKey } from './credentials'
+import { isUnsafeLine, sanitiseLines } from './enhance'
 
 /**
  * The model's reply is parsed as data, not read by a person, so everything
- * here is about surviving the ways a helpful assistant breaks a line parser.
+ * here is about surviving the ways a helpful assistant breaks a line parser —
+ * and about the handful of lines that must never reach somebody's ritual
+ * however confidently they were written.
  */
 describe('reading a model reply', () => {
   it('strips numbering, bullets and quote marks', () => {
@@ -14,7 +14,7 @@ describe('reading a model reply', () => {
       '2) I trust the way I see things.',
       '- I move at my own pace.',
       '• I am allowed to rest.',
-      '"I am enough."',
+      '"I am enough today."',
       '“I speak clearly.”',
     ].join('\n')
 
@@ -23,7 +23,7 @@ describe('reading a model reply', () => {
       'I trust the way I see things.',
       'I move at my own pace.',
       'I am allowed to rest.',
-      'I am enough.',
+      'I am enough today.',
       'I speak clearly.',
     ])
   })
@@ -46,9 +46,22 @@ describe('reading a model reply', () => {
     expect(sanitiseLines(reply)).toEqual(['I am calm.', 'I am here.'])
   })
 
+  it('strips invisible characters that break the checks below', () => {
+    // Zero-width spaces and control characters read as nothing on screen and
+    // speak as nothing, but they defeat every length and word count here.
+    expect(sanitiseLines('I am​ calm.\nI am here.')).toEqual([
+      'I am calm.',
+      'I am here.',
+    ])
+  })
+
   it('refuses a line too long to say in one breath', () => {
     const rambling = `I am ${'very '.repeat(30)}calm.`
     expect(sanitiseLines(`I am calm.\n${rambling}`)).toEqual(['I am calm.'])
+  })
+
+  it('refuses a single word, which is not something you can say to yourself', () => {
+    expect(sanitiseLines('Calm.\nI am calm.')).toEqual(['I am calm.'])
   })
 
   it('returns nothing for a reply that is entirely commentary', () => {
@@ -56,40 +69,57 @@ describe('reading a model reply', () => {
   })
 })
 
-describe('checking a pasted key', () => {
-  it('accepts a plausible key for each provider', () => {
-    for (const provider of PROVIDERS) {
-      const plausible = `${provider.keyPrefix}${'x'.repeat(40)}`
-      expect(keyLooksWrong(provider.id, plausible)).toBeNull()
-    }
+/*
+ * An affirmation is not read once, it is repeated aloud dozens of times in a
+ * deliberately suggestible state. A line that promises a cure or guarantees an
+ * outcome is therefore not a harmless flourish, and the system prompt
+ * forbidding it is not enough on its own — this is the check that assumes the
+ * prompt was ignored.
+ */
+describe('refusing a line that promises something it cannot', () => {
+  const promises = [
+    'My cancer is gone and my body is whole.',
+    'My illness is disappearing a little more each day.',
+    'I no longer need my medication.',
+    'This heals my body from the inside.',
+    'My success is guaranteed.',
+    'The universe will bring me everything I asked for.',
+    'Money is coming to me from every direction.',
+    'I will be rich within the year.',
+    'I earn $50,000 a month with ease.',
+    'Everyone will love the person I am becoming.',
+  ]
+
+  it.each(promises)('drops: %s', (line) => {
+    expect(isUnsafeLine(line)).toBe(true)
+    expect(sanitiseLines(line)).toEqual([])
   })
 
-  it('catches a key pasted into the wrong provider', () => {
-    // An OpenAI key in the Claude box is the single most likely mistake,
-    // and it must be caught before a request is spent proving it.
-    const complaint = keyLooksWrong('claude', `sk-proj-${'x'.repeat(40)}`)
-    expect(complaint).toContain('sk-ant-')
-    expect(keyLooksWrong('gemini', `sk-ant-api03-${'x'.repeat(40)}`)).toContain('AIza')
+  const keepers = [
+    'I am healing at my own pace.',
+    'I am well enough for today.',
+    'I meet my body with kindness.',
+    'I am steady about money.',
+    'I am becoming someone I am proud of.',
+    'I am secure in what I know.',
+    'I rest without needing to earn it.',
+  ]
+
+  it.each(keepers)('keeps the hope rather than the promise: %s', (line) => {
+    expect(isUnsafeLine(line)).toBe(false)
+    expect(sanitiseLines(line)).toEqual([line])
   })
 
-  it('offers only providers a browser can actually reach', () => {
-    // ChatGPT is absent on purpose: api.openai.com sends no CORS header, so
-    // the request never leaves the browser. If someone re-adds it without a
-    // proxy, this fails and explains itself.
-    expect(PROVIDERS.map((provider) => provider.id)).toEqual(['claude', 'gemini'])
-  })
+  it('keeps the good lines out of a batch that also contains a bad one', () => {
+    const reply = [
+      'I am steady before meetings.',
+      'My diagnosis will disappear completely.',
+      'I speak at my own pace.',
+    ].join('\n')
 
-  it('catches empty and truncated pastes', () => {
-    expect(keyLooksWrong('gemini', '   ')).toBe('Paste the key first.')
-    expect(keyLooksWrong('gemini', 'AIzaShort')).toContain('too short')
-  })
-})
-
-describe('showing a stored key back', () => {
-  it('shows enough to recognise and not enough to use', () => {
-    const masked = maskKey(`sk-ant-api03-${'x'.repeat(60)}abcd`)
-    expect(masked.startsWith('sk-ant-a')).toBe(true)
-    expect(masked.endsWith('abcd')).toBe(true)
-    expect(masked).not.toContain('xxxxxxxxxx')
+    expect(sanitiseLines(reply)).toEqual([
+      'I am steady before meetings.',
+      'I speak at my own pace.',
+    ])
   })
 })

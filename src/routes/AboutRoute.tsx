@@ -88,9 +88,19 @@ export function AboutRoute() {
           does with it before you choose.
         </p>
         <p className="type-body mt-3">
-          If the connection fails, the key expires, or the account runs out of
-          credit, the built-in version quietly takes over so the button always
-          does something.
+          Paste the key, press Connect, and Manifester spends one very short
+          request finding out whether it really works — nothing is saved until
+          that comes back. Key formats change; Google’s newer ones look nothing
+          like its older ones. Manifester never decides from the look of a key,
+          only from the answer.
+        </p>
+        <p className="type-body mt-3">
+          If the connection fails, the key expires, the daily allowance runs
+          out, or the account runs out of credit, the built-in version quietly
+          takes over so the button always does something — and your words are
+          never replaced until a reply has come back and been checked. There is
+          a Stop button while it is thinking, and it gives up on its own after
+          thirty seconds rather than leaving you waiting.
         </p>
         <p className="type-body mt-3">
           You can set all of this up, or switch it off entirely, in the next

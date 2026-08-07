@@ -35,7 +35,8 @@ import {
   timerSummary,
   voiceSummary,
 } from '../lib/summaries'
-import { aiAddToWords, aiImproveWords, withTimeout } from '../lib/ai/enhance'
+import { aiAddToWords, aiImproveWords, helpWithFallback } from '../lib/ai/enhance'
+import { withTimeout } from '../lib/ai/errors'
 import type { Credentials } from '../lib/ai/credentials'
 import { findProvider } from '../lib/ai/providers'
 import { useCredentials } from '../lib/ai/useCredentials'
@@ -122,6 +123,23 @@ export function CreateRoute() {
   const [panel, setPanel] = useState<PanelKey | null>(null)
   const timerRef = useRef<HTMLDivElement>(null)
   const storedCredentials = useCredentials()
+
+  /*
+   * The draft as it is *now*, readable from inside a request that started up
+   * to thirty seconds ago. Without this the helper would finish, apply a
+   * result computed from an older draft, and silently throw away everything
+   * typed while it was thinking — the one outcome this feature must never
+   * produce.
+   */
+  const draftTextRef = useRef(draft.text)
+  draftTextRef.current = draft.text
+
+  /** Cancels the request in flight, for the Stop button and for unmount. */
+  const abortHelper = useRef<(() => void) | null>(null)
+  /** A second guard behind the disabled button, for a double tap on a slow phone. */
+  const helperInFlight = useRef(false)
+
+  useEffect(() => () => abortHelper.current?.(), [])
 
   /*
    * The master switch outranks a stored key. Everything downstream — which
@@ -250,13 +268,13 @@ export function CreateRoute() {
     async (
       kind: 'add' | 'improve',
       online: (credentials: Credentials, signal: AbortSignal) => Promise<WordcraftResult>,
-      offline: () => WordcraftResult,
+      offline: (text: string) => WordcraftResult,
     ) => {
-      if (busy) return
-      const before = draft.text
+      if (busy || helperInFlight.current) return
+      const before = draftTextRef.current
 
       if (!credentials) {
-        const result = offline()
+        const result = offline(before)
         // Say what just happened and what the alternative is — but only to
         // someone who has not already switched AI off.
         applyResult(
@@ -272,23 +290,49 @@ export function CreateRoute() {
         return
       }
 
+      helperInFlight.current = true
       setBusy(kind)
-      const { signal, done } = withTimeout()
+      const { signal, cancel, done } = withTimeout()
+      abortHelper.current = cancel
+
       try {
-        applyResult(before, await online(credentials, signal))
-      } catch (error) {
-        const why = error instanceof Error ? error.message : String(error)
-        const fallback = offline()
-        applyResult(before, {
-          ...fallback,
-          note: `${why} Used the built-in helper instead.`,
-        })
+        const outcome = await helpWithFallback(
+          () => online(credentials, signal),
+          () => offline(before),
+          credentials.provider,
+        )
+
+        // Somebody pressed Stop. The only correct thing to do is nothing.
+        if (!outcome.result) {
+          setHelper({ note: outcome.failure?.message ?? 'Stopped.', before: null, after: before })
+          return
+        }
+
+        /*
+         * They kept typing while this was being written. The suggestion was
+         * built from words that are no longer on screen, so applying it would
+         * overwrite live text with a stale rewrite. Say so, and leave the
+         * newer words alone — the whole result is still one press away.
+         */
+        if (draftTextRef.current !== before) {
+          setHelper({
+            note: 'You carried on writing while that came back, so nothing was replaced. Press again to work from what is there now.',
+            before: null,
+            after: draftTextRef.current,
+          })
+          cue('tap')
+          return
+        }
+
+        applyResult(before, outcome.result)
       } finally {
         done()
+        abortHelper.current = null
+        helperInFlight.current = false
         setBusy(null)
       }
     },
-    [applyResult, busy, credentials, draft.text, preferences.aiEnabled],
+    [applyResult, busy, credentials, preferences.aiEnabled],
   )
 
   // Only while the draft is still exactly what the helper left behind —
@@ -441,8 +485,8 @@ export function CreateRoute() {
                     void runHelper(
                       'add',
                       (creds, signal) =>
-                        aiAddToWords(draft.text, draft.title, creds, signal),
-                      () => addToWords(draft.text, draft.title),
+                        aiAddToWords(draftTextRef.current, draft.title, creds, signal),
+                      (text) => addToWords(text, draft.title),
                     )
                   }
                   leading={<PlusIcon className="text-[0.95rem]" />}
@@ -457,8 +501,8 @@ export function CreateRoute() {
                   onClick={() =>
                     void runHelper(
                       'improve',
-                      (creds, signal) => aiImproveWords(draft.text, creds, signal),
-                      () => improveWords(draft.text),
+                      (creds, signal) => aiImproveWords(draftTextRef.current, creds, signal),
+                      (text) => improveWords(text),
                     )
                   }
                   leading={<SparkIcon className="text-[0.95rem]" />}
@@ -469,9 +513,30 @@ export function CreateRoute() {
               {/* Undo belongs beside the sentence describing what to undo. */}
               <div className="mt-2.5 flex items-start justify-between gap-3">
                 <p className="type-meta" aria-live="polite">
-                  {helper?.note ?? helperHint(credentials, preferences.aiEnabled)}
+                  {busy && credentials
+                    ? `Asking ${findProvider(credentials.provider).name}… your words stay exactly as they are until it answers.`
+                    : (helper?.note ?? helperHint(credentials, preferences.aiEnabled))}
                 </p>
-                {canUndo && (
+                {/*
+                  Stop is offered the whole time a provider is being waited on.
+                  A thirty-second deadline stops the interface hanging for
+                  ever, but thirty seconds is still a long time to sit in front
+                  of a button that will not answer, so there is a way out of it.
+                */}
+                {busy && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="-mt-1.5 shrink-0"
+                    onClick={() => {
+                      cue('tap')
+                      abortHelper.current?.()
+                    }}
+                  >
+                    Stop
+                  </Button>
+                )}
+                {canUndo && !busy && (
                   <Button
                     size="sm"
                     variant="ghost"

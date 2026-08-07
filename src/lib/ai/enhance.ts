@@ -12,17 +12,19 @@
  * repeat any of it — so the fourth press is as fresh as the first, and each
  * batch is built on the words that were there a moment ago rather than on a
  * theme guessed from keywords.
+ *
+ * One rule runs through all of it: the draft is not touched until a reply has
+ * come back *and* survived `sanitiseLines`. A failure at any point leaves the
+ * text exactly as it was.
  */
 
 import { affirmationLines } from '../summaries'
 import type { WordcraftResult } from '../wordcraft'
 import type { Credentials } from './credentials'
-import { askProvider, findProvider } from './providers'
+import { AiFailure, classifyFailure } from './errors'
+import { askProvider, findProvider, providerLabel } from './providers'
 
 const ADDED_LINES = 3
-
-/** Long enough for a slow phone on hotel wifi, short enough to not feel stuck. */
-const TIMEOUT_MS = 30_000
 
 /**
  * Strip everything a model adds when it is being helpful.
@@ -37,6 +39,10 @@ export function sanitiseLines(raw: string): string[] {
     .split('\n')
     .map((line) =>
       line
+        // Control characters and zero-width joiners a model occasionally
+        // emits. They are invisible on screen and audible as nothing, but
+        // they break the line-length checks below and the speech engine.
+        .replace(/[\u0000-\u0008\u000b-\u001f\u007f\u200b-\u200f\u2028\u2029\ufeff]/g, '')
         .trim()
         // "1. ", "1) ", "- ", "* ", "• "
         .replace(/^\s*(?:\d+[.)]|[-*•—])\s+/, '')
@@ -68,10 +74,55 @@ export function sanitiseLines(raw: string): string[] {
       if (/\b(let me know|hope (this|these|that) help|feel free)\b/i.test(line)) return false
       // Markdown fences and separators.
       if (/^[`#>\-=_]+$/.test(line)) return false
+      // A single word is not a line somebody can say to themselves.
+      if (line.split(/\s+/).length < 2) return false
       // Far too long to speak in one breath — the model has written prose.
       if (line.split(/\s+/).length > 24) return false
+      if (line.length > 240) return false
+      if (isUnsafeLine(line)) return false
       return true
     })
+}
+
+/*
+ * The lines that must never reach somebody's ritual, whatever the model
+ * thought it was doing.
+ *
+ * This is not squeamishness. An affirmation is repeated aloud, in a
+ * suggestible state, dozens of times a session — so a line that promises a
+ * cure, or guarantees an outcome the world controls, is not a harmless
+ * flourish. It is a false statement being rehearsed until it feels true, and
+ * the two places that does real damage are health and money.
+ *
+ * The system prompt already forbids all of this. This is the check that
+ * assumes the prompt was ignored, because sooner or later it will be, and the
+ * cost of dropping one good line is a great deal lower than the cost of
+ * speaking one bad one. "I am healing" and "I am well" are deliberately still
+ * allowed: the target is the promise, not the hope.
+ */
+const UNSAFE_PATTERNS: RegExp[] = [
+  // Medicine: curing, diagnosis, and stopping treatment.
+  /\b(cure[sd]?|curing|remission|malignan|tumou?r|cancer|diabetes|infection)\b/i,
+  /\b(my|the)\s+(illness|disease|diagnosis|condition|symptoms?|pain)\b[^.]*\b(gone|vanish\w*|disappear\w*|heal(ed|ing)|cured|lift(ing|ed)|shrink\w*|fad(es?|ing))\b/i,
+  /\b(no longer need|stop taking|off)\s+(my\s+)?(medication|medicine|pills|treatment|insulin|chemo)/i,
+  /\b(doctors?|medicine|surgery|treatment)\b[^.]*\b(unnecessary|not needed|wrong)\b/i,
+  /\bheals?\b[^.]*\b(my|the)\s+(body|cells|blood|organs?)\b/i,
+  // Guarantees about a world nobody controls.
+  /\b(guarantee[sd]?|guaranteed|certain to|bound to|destined to|will definitely|always works|never fails)\b/i,
+  /\b(the universe|god|fate)\b[^.]*\b(will|gives me|brings me|delivers|owes)\b/i,
+  // Money arriving, which is the manifestation claim people are actually sold.
+  /\b(money|wealth|cash|riches|abundance|fortune)\b[^.]*\b(is coming|will come|flows to me|arrives|pours in|is on its way)\b/i,
+  /\bi will be (rich|wealthy|a millionaire|debt[- ]free)\b/i,
+  // A figure in an affirmation is a target, and a target said aloud as a
+  // present-tense fact is a promise about money.
+  /[$£€]\s?\d/,
+  /\b\d[\d,.]*\s*(k|m|million|thousand|dollars|pounds|euros)\b/i,
+  // Promises about other people's behaviour.
+  /\b(everyone|everybody|they|he|she)\s+will\s+(love|want|choose|approve|forgive|come back)\b/i,
+]
+
+export function isUnsafeLine(line: string): boolean {
+  return UNSAFE_PATTERNS.some((pattern) => pattern.test(line))
 }
 
 function quoteDraft(text: string): string {
@@ -127,15 +178,26 @@ Write exactly ${ADDED_LINES} lines to start them off. Make them strong and
 specific enough to be worth keeping, and plain enough to edit into their own
 words.`
 
-  const reply = await askProvider(credentials.provider, credentials.key, prompt, signal)
-  const picked = dropDuplicates(sanitiseLines(reply), existing).slice(0, ADDED_LINES)
+  const reply = await askProvider(
+    credentials.provider,
+    credentials.key,
+    prompt,
+    signal,
+    credentials.model,
+  )
+  const picked = dropDuplicates(sanitiseLines(reply.text), existing).slice(0, ADDED_LINES)
 
+  /*
+   * Nothing usable is a failure, not a result. Raising it means the caller's
+   * fallback runs and the person gets the offline suggestion instead of a
+   * button that visibly did nothing.
+   */
   if (picked.length === 0) {
-    return {
-      text,
-      note: `${findProvider(credentials.provider).name} did not return anything usable. Try once more.`,
-      changed: false,
-    }
+    throw new AiFailure(
+      'empty',
+      `${findProvider(credentials.provider).name} did not return anything usable.`,
+      credentials.provider,
+    )
   }
 
   const body = picked.join('\n')
@@ -156,7 +218,9 @@ words.`
  *
  * Line count and order are preserved so the result reads as *their* loop
  * edited, not a new one substituted. A reply with the wrong number of lines is
- * refused rather than guessed at.
+ * refused rather than guessed at — there is no honest way to map five rewrites
+ * back onto four originals, and guessing wrong silently deletes a line
+ * somebody wrote.
  */
 export async function aiImproveWords(
   text: string,
@@ -198,17 +262,23 @@ fiddling with it.
 
 Return exactly ${existing.length} lines, in the same order, one per line, unnumbered.`
 
-  const reply = await askProvider(credentials.provider, credentials.key, prompt, signal)
-  const rewritten = sanitiseLines(reply)
+  const reply = await askProvider(
+    credentials.provider,
+    credentials.key,
+    prompt,
+    signal,
+    credentials.model,
+  )
+  const rewritten = sanitiseLines(reply.text)
 
   // A different number of lines means the model reorganised the loop instead
-  // of editing it. Better to keep the original than to guess at the mapping.
+  // of editing it. Better to hand this to the offline engine than to guess.
   if (rewritten.length !== existing.length) {
-    return {
-      text,
-      note: `${findProvider(credentials.provider).name} returned a different set of lines, so nothing was changed. Try again.`,
-      changed: false,
-    }
+    throw new AiFailure(
+      'empty',
+      `${findProvider(credentials.provider).name} returned a different set of lines, so nothing was changed.`,
+      credentials.provider,
+    )
   }
 
   const changedCount = rewritten.filter(
@@ -246,13 +316,52 @@ function dropDuplicates(candidates: string[], existing: string[]): string[] {
   return kept
 }
 
-/** Wraps a call in the shared timeout, and in the caller's own cancellation. */
-export function withTimeout(signal?: AbortSignal): {
-  signal: AbortSignal
-  done: () => void
-} {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-  signal?.addEventListener('abort', () => controller.abort(), { once: true })
-  return { signal: controller.signal, done: () => clearTimeout(timer) }
+export interface HelperOutcome {
+  /** What to do to the draft. `null` means leave it completely alone. */
+  result: WordcraftResult | null
+  /** Set when the provider was tried and did not deliver. */
+  failure: AiFailure | null
+  /** True when the offline engine wrote the result instead. */
+  usedFallback: boolean
+}
+
+/**
+ * Run the provider, and quietly hand over to the offline engine if it fails.
+ *
+ * The whole point of the two helper buttons is that they always do something.
+ * A key that expired overnight, a train going into a tunnel, a daily quota
+ * that ran out — none of those should turn a press into a dead end, and none
+ * of them should cost somebody the words already in the box.
+ *
+ * The exception is a deliberate stop. Somebody who presses Stop wants nothing
+ * to happen, and helpfully substituting a different suggestion is not nothing.
+ */
+export async function helpWithFallback(
+  online: () => Promise<WordcraftResult>,
+  offline: () => WordcraftResult,
+  providerId: Credentials['provider'],
+): Promise<HelperOutcome> {
+  try {
+    return { result: await online(), failure: null, usedFallback: false }
+  } catch (error) {
+    const failure = classifyFailure(error, providerLabel(providerId))
+
+    if (failure.kind === 'cancelled') {
+      return { result: null, failure, usedFallback: false }
+    }
+
+    const fallback = offline()
+    return {
+      result: {
+        ...fallback,
+        note: `${failure.message} ${
+          fallback.changed
+            ? 'Manifester’s own helper wrote this one instead.'
+            : 'Manifester’s own helper had nothing to add either.'
+        }`,
+      },
+      failure,
+      usedFallback: true,
+    }
+  }
 }
