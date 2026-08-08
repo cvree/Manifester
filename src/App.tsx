@@ -7,6 +7,7 @@ import { PlayerRoute } from './routes/PlayerRoute'
 import { LibraryProvider } from './state/LibraryProvider'
 import { PreferencesProvider } from './state/PreferencesProvider'
 import { SessionProvider } from './state/SessionProvider'
+import { StageProvider } from './state/StageProvider'
 import { ThemeProvider } from './state/ThemeProvider'
 
 /**
@@ -24,26 +25,28 @@ export default function App() {
       <PreferencesProvider>
         <LibraryProvider>
           <SessionProvider>
-            <Router>
-              <Routes>
-                <Route element={<AppShell />}>
-                  <Route index element={<Navigate to="/create" replace />} />
-                  <Route path="/create" element={<CreateRoute />} />
-                  <Route path="/player" element={<PlayerRoute />} />
-                  <Route path="/library" element={<LibraryRoute />} />
-                  <Route path="/about" element={<AboutRoute />} />
-                  <Route
-                    path="/saved"
-                    element={<Navigate to="/library" replace />}
-                  />
-                  <Route
-                    path="/sounds"
-                    element={<Navigate to="/library?show=sounds" replace />}
-                  />
-                  <Route path="*" element={<Navigate to="/create" replace />} />
-                </Route>
-              </Routes>
-            </Router>
+            <StageProvider>
+              <Router>
+                <Routes>
+                  <Route element={<AppShell />}>
+                    <Route index element={<Navigate to="/create" replace />} />
+                    <Route path="/create" element={<CreateRoute />} />
+                    <Route path="/player" element={<PlayerRoute />} />
+                    <Route path="/library" element={<LibraryRoute />} />
+                    <Route path="/about" element={<AboutRoute />} />
+                    <Route
+                      path="/saved"
+                      element={<Navigate to="/library" replace />}
+                    />
+                    <Route
+                      path="/sounds"
+                      element={<Navigate to="/library?show=sounds" replace />}
+                    />
+                    <Route path="*" element={<Navigate to="/create" replace />} />
+                  </Route>
+                </Routes>
+              </Router>
+            </StageProvider>
           </SessionProvider>
         </LibraryProvider>
       </PreferencesProvider>

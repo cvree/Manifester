@@ -8,6 +8,8 @@ import { EmptyState } from '../components/EmptyState'
 import {
   BreathIcon,
   CloseIcon,
+  CollapseIcon,
+  ExpandIcon,
   PauseIcon,
   PlayIcon,
   PulseIcon,
@@ -31,8 +33,10 @@ import {
   feelSummary,
 } from '../lib/summaries'
 import { useBreathing } from '../lib/useBreathing'
+import { useStageExpansion } from '../lib/useStageExpansion'
 import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
+import { useStage } from '../state/StageProvider'
 
 /**
  * The player.
@@ -40,6 +44,11 @@ import { useSession } from '../state/SessionProvider'
  * A calm ritual space rather than a media dashboard: one large breathing
  * guide, the line you are hearing, and the two controls that matter. Levels
  * and settings are present but quiet, below the fold of the stage.
+ *
+ * The stage can also grow to fill the screen. That is one class and one tween
+ * on this same markup — see `useStageExpansion` — rather than a second player:
+ * the words, the pass, the clock, the breath and the audio are the same ones,
+ * still running, and the only thing that changes is how much room they have.
  */
 export function PlayerRoute() {
   const navigate = useNavigate()
@@ -56,6 +65,7 @@ export function PlayerRoute() {
     setLiveMusicVolume,
   } = useSession()
   const { preferences } = usePreferences()
+  const { expanded, setExpanded } = useStage()
   const [sheet, setSheet] = useState<PanelKey | null>(null)
 
   const hasText = countWords(draft.text) > 0
@@ -63,6 +73,14 @@ export function PlayerRoute() {
   const playing = session.status === 'playing'
   const paused = session.status === 'paused'
   const complete = session.status === 'complete'
+
+  // Expanded mode. The completion card replaces the stage, so it takes the
+  // expansion with it rather than leaving a full-screen box with no orb in it.
+  const { stageRef, slotRef, toggle } = useStageExpansion({
+    expanded,
+    onChange: setExpanded,
+    available: !complete,
+  })
 
   // The guide follows the session: it breathes while you listen and holds
   // still the moment you pause.
@@ -169,7 +187,12 @@ export function PlayerRoute() {
           <div
             role="alert"
             data-rise
-            className="flex items-start gap-3 rounded-[1.25rem] border border-[var(--gold)] bg-[var(--gold-soft)] px-4 py-3.5 lg:col-span-2"
+            inert={expanded}
+            className={cx(
+              'flex items-start gap-3 rounded-[1.25rem] border border-[var(--gold)] bg-[var(--gold-soft)] px-4 py-3.5 lg:col-span-2',
+              'transition-opacity duration-[620ms] ease-[var(--ease-breath)]',
+              expanded && 'pointer-events-none opacity-0',
+            )}
           >
             <p className="grow text-[0.92rem] leading-relaxed text-ink">
               {session.notice}
@@ -186,156 +209,213 @@ export function PlayerRoute() {
         )}
 
         {/* ── The stage ── */}
-        {complete ? (
-          <Card data-rise level="stage" className="lg:col-start-1">
-            <div className="flex flex-col items-center px-2 py-8 text-center">
-              <span
-                aria-hidden="true"
-                className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--gold-soft)] text-[1.7rem] text-[var(--gold)]"
-              >
-                <SparkIcon />
-              </span>
-              <h1 className="type-title">Your loop is complete.</h1>
-              <p className="type-body mt-3 max-w-[34ch] text-center">
-                You listened for {formatClock(session.elapsedSeconds)} across{' '}
-                {session.cycles} {session.cycles === 1 ? 'pass' : 'passes'}. Take a
-                breath before you move on.
-              </p>
-              <div className="mt-7 flex flex-wrap justify-center gap-3">
-                <Button variant="primary" size="lg" onClick={() => start()}>
-                  Listen again
-                </Button>
-                <Button variant="secondary" size="lg" onClick={() => stop()}>
-                  Done for now
-                </Button>
-              </div>
-            </div>
-          </Card>
-        ) : (
-          <section
-            data-rise
-            className="surface-stage relative flex flex-col items-center px-5 py-8 sm:px-8 lg:col-start-1 lg:py-10"
-          >
-            <p className="type-label">{stateLabel}</p>
-            <h1 className="mt-2 max-w-full truncate text-center font-display text-[1.75rem] leading-tight text-ink sm:text-[2rem]">
-              {session.title || draft.title.trim() || 'Untitled loop'}
-            </h1>
-
-            <div className="relative my-8 flex items-center justify-center">
-              <BreathingVisualizer
-                runtime={breathing}
-                style={preferences.breathStyle}
-                size="lg"
-                showPhase={preferences.breathingEnabled && playing}
-                awaken={awaken}
-              />
-            </div>
-
-            {/* The line you are hearing. */}
-            <p className="line-clamp-5 min-h-[4rem] max-w-[32ch] text-center font-display text-[1.25rem] leading-snug whitespace-pre-line text-ink sm:text-[1.4rem]">
-              {currentLine ?? 'Ready when you are.'}
-            </p>
-
-            {/* Transport: one large control, one small one. */}
-            <div className="mt-8 flex flex-col items-center gap-5">
-              <button
-                type="button"
-                onClick={primaryAction}
-                disabled={!hasText}
-                aria-label={
-                  playing
-                    ? 'Pause the loop'
-                    : paused
-                      ? 'Resume the loop'
-                      : 'Start the loop'
-                }
-                className={cx(
-                  'interactive relative flex h-[5.5rem] w-[5.5rem] items-center justify-center rounded-full',
-                  'text-[2rem] text-[var(--bg-0)]',
-                  'bg-[linear-gradient(175deg,color-mix(in_oklab,var(--rose-deep)_88%,white)_0%,var(--rose-deep)_64%)]',
-                  'shadow-[inset_0_1px_0_rgb(255_255_255/0.32),0_18px_44px_-16px_var(--glow)]',
-                  'disabled:cursor-not-allowed disabled:opacity-40',
-                )}
-              >
-                {playing ? <PauseIcon /> : <PlayIcon className="translate-x-[3px]" />}
-              </button>
-
-              <div className="flex items-center gap-3">
+        {/*
+          The slot holds the stage's place in the page. While the stage is
+          expanded it is lifted out of the flow, and without this the column
+          beside it would collapse upward and the page would scroll under it.
+        */}
+        <div ref={slotRef} className="lg:col-start-1">
+          {complete ? (
+            <Card data-rise level="stage">
+              <div className="flex flex-col items-center px-2 py-8 text-center">
                 <span
-                  className="type-numeral text-[1.05rem] text-ink"
-                  aria-live="polite"
+                  aria-hidden="true"
+                  className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--gold-soft)] text-[1.7rem] text-[var(--gold)]"
                 >
-                  {timeLabel}
+                  <SparkIcon />
                 </span>
-                <span className="type-meta">{timeCaption}</span>
-                {!idle && (
-                  <>
-                    <span aria-hidden="true" className="text-ink-faint">
-                      ·
-                    </span>
-                    <span className="type-meta">
-                      Pass {session.cycles + 1}
-                    </span>
-                  </>
-                )}
+                <h1 className="type-title">Your loop is complete.</h1>
+                <p className="type-body mt-3 max-w-[34ch] text-center">
+                  You listened for {formatClock(session.elapsedSeconds)} across{' '}
+                  {session.cycles} {session.cycles === 1 ? 'pass' : 'passes'}. Take a
+                  breath before you move on.
+                </p>
+                <div className="mt-7 flex flex-wrap justify-center gap-3">
+                  <Button variant="primary" size="lg" onClick={() => start()}>
+                    Listen again
+                  </Button>
+                  <Button variant="secondary" size="lg" onClick={() => stop()}>
+                    Done for now
+                  </Button>
+                </div>
               </div>
+            </Card>
+          ) : (
+            <section
+              ref={stageRef}
+              data-rise
+              className={cx(
+                'surface-stage stage relative flex flex-col items-center px-5 py-8 sm:px-8 lg:py-10',
+                expanded && 'stage--immersive',
+              )}
+            >
+              {/* A pool of light under the orb, lit only while expanded. */}
+              <span aria-hidden="true" className="stage__aura" />
 
+              {/*
+                One button for both directions, in one place. Keeping it the
+                same element means the focus ring never moves, so expanding and
+                collapsing from the keyboard leaves you exactly where you were.
+              */}
               <button
                 type="button"
                 onClick={() => {
-                  cue('stop')
-                  stop()
+                  cue('tap')
+                  toggle()
                 }}
-                disabled={idle}
-                className="interactive inline-flex min-h-11 items-center gap-2 rounded-pill border border-[var(--control-border)] px-5 text-[0.92rem] font-medium text-ink-muted hover:bg-[var(--quiet)] hover:text-ink disabled:opacity-35"
+                aria-label={
+                  expanded
+                    ? 'Collapse the visualiser back into the page'
+                    : 'Expand the visualiser to fill the screen'
+                }
+                aria-expanded={expanded}
+                title={expanded ? 'Collapse' : 'Expand'}
+                className="stage__toggle interactive flex h-11 w-11 items-center justify-center rounded-full border border-[var(--panel-border)] bg-[var(--panel)] text-[1.05rem] text-ink-faint hover:text-ink"
               >
-                <StopIcon className="text-[0.85rem]" />
-                End session
+                {expanded ? <CollapseIcon /> : <ExpandIcon />}
               </button>
-            </div>
 
-            {/* Progress through this pass. */}
-            {!idle && (
-              <div className="mt-8 w-full max-w-sm">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="type-meta">
-                    {session.delayRemaining != null
-                      ? `Next pass in ${session.delayRemaining}s`
-                      : session.chunkTotal > 0
-                        ? // "Line" only when a chunk really is a line. A line
-                          // too long to speak in one breath is split, and then
-                          // this is counting parts of it.
-                          `${session.chunkTotal === lines.length ? 'Line' : 'Part'} ${
-                            session.chunkIndex + 1
-                          } of ${session.chunkTotal}`
-                        : 'Speaking'}
-                  </span>
-                  {session.trackName && (
-                    <span className="type-meta truncate">{session.trackName}</span>
-                  )}
-                </div>
-                <div
-                  className="h-1.5 w-full overflow-hidden rounded-pill bg-[var(--control-sunken)]"
-                  role="progressbar"
-                  aria-label="Progress through this pass"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(passProgress)}
-                >
-                  <div
-                    className="h-full rounded-pill bg-[var(--rose)] transition-[width] duration-500 ease-[var(--ease-calm)]"
-                    style={{ width: `${passProgress}%` }}
+              <div className="stage__top flex w-full flex-col items-center">
+                <p className="type-label">{stateLabel}</p>
+                <h1 className="stage__title mt-2 max-w-full truncate text-center font-display text-[1.75rem] leading-tight text-ink sm:text-[2rem]">
+                  {session.title || draft.title.trim() || 'Untitled loop'}
+                </h1>
+              </div>
+
+              {/*
+                The orb and the words it is saying, as one block: expanded, this
+                is what takes all the room that is going, and it stays centred
+                in it.
+              */}
+              <div className="stage__focus flex w-full flex-col items-center">
+                <div className="stage__orb relative my-8 flex items-center justify-center">
+                  <BreathingVisualizer
+                    runtime={breathing}
+                    style={preferences.breathStyle}
+                    size={expanded ? 'stage' : 'lg'}
+                    showPhase={preferences.breathingEnabled && playing}
+                    awaken={awaken}
                   />
                 </div>
+
+                {/* The line you are hearing. */}
+                <p className="stage__line line-clamp-5 min-h-[4rem] max-w-[32ch] text-center font-display text-[1.25rem] leading-snug whitespace-pre-line text-ink sm:text-[1.4rem]">
+                  {currentLine ?? 'Ready when you are.'}
+                </p>
               </div>
-            )}
-          </section>
-        )}
+
+              {/* Transport: one large control, one small one. */}
+              <div className="stage__transport mt-8 flex flex-col items-center gap-5">
+                <button
+                  type="button"
+                  onClick={primaryAction}
+                  disabled={!hasText}
+                  aria-label={
+                    playing
+                      ? 'Pause the loop'
+                      : paused
+                        ? 'Resume the loop'
+                        : 'Start the loop'
+                  }
+                  className={cx(
+                    'stage__play interactive relative flex h-[5.5rem] w-[5.5rem] items-center justify-center rounded-full',
+                    'text-[2rem] text-[var(--bg-0)]',
+                    'bg-[linear-gradient(175deg,color-mix(in_oklab,var(--rose-deep)_88%,white)_0%,var(--rose-deep)_64%)]',
+                    'shadow-[inset_0_1px_0_rgb(255_255_255/0.32),0_18px_44px_-16px_var(--glow)]',
+                    'disabled:cursor-not-allowed disabled:opacity-40',
+                  )}
+                >
+                  {playing ? <PauseIcon /> : <PlayIcon className="translate-x-[3px]" />}
+                </button>
+
+                <div className="flex items-center gap-3">
+                  <span
+                    className="type-numeral text-[1.05rem] text-ink"
+                    aria-live="polite"
+                  >
+                    {timeLabel}
+                  </span>
+                  <span className="type-meta">{timeCaption}</span>
+                  {!idle && (
+                    <>
+                      <span aria-hidden="true" className="text-ink-faint">
+                        ·
+                      </span>
+                      <span className="type-meta">
+                        Pass {session.cycles + 1}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    cue('stop')
+                    stop()
+                  }}
+                  disabled={idle}
+                  className="interactive inline-flex min-h-11 items-center gap-2 rounded-pill border border-[var(--control-border)] px-5 text-[0.92rem] font-medium text-ink-muted hover:bg-[var(--quiet)] hover:text-ink disabled:opacity-35"
+                >
+                  <StopIcon className="text-[0.85rem]" />
+                  End session
+                </button>
+              </div>
+
+              {/* Progress through this pass. */}
+              {!idle && (
+                <div className="stage__meter mt-8 w-full max-w-sm">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <span className="type-meta">
+                      {session.delayRemaining != null
+                        ? `Next pass in ${session.delayRemaining}s`
+                        : session.chunkTotal > 0
+                          ? // "Line" only when a chunk really is a line. A line
+                            // too long to speak in one breath is split, and then
+                            // this is counting parts of it.
+                            `${session.chunkTotal === lines.length ? 'Line' : 'Part'} ${
+                              session.chunkIndex + 1
+                            } of ${session.chunkTotal}`
+                          : 'Speaking'}
+                    </span>
+                    {session.trackName && (
+                      <span className="type-meta truncate">{session.trackName}</span>
+                    )}
+                  </div>
+                  <div
+                    className="h-1.5 w-full overflow-hidden rounded-pill bg-[var(--control-sunken)]"
+                    role="progressbar"
+                    aria-label="Progress through this pass"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(passProgress)}
+                  >
+                    <div
+                      className="h-full rounded-pill bg-[var(--rose)] transition-[width] duration-500 ease-[var(--ease-calm)]"
+                      style={{ width: `${passProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+        </div>
 
         {/* ── The quiet column ── */}
+        {/*
+          It slides quietly out of the way while the stage has the screen, and
+          goes inert with it: nothing behind an expanded stage should be
+          reachable by tab, or announced to a screen reader, while it is there.
+        */}
         <div
           data-rise
-          className="space-y-4 lg:col-start-2 lg:sticky lg:top-6 lg:self-start"
+          inert={expanded}
+          aria-hidden={expanded || undefined}
+          className={cx(
+            'space-y-4 lg:col-start-2 lg:sticky lg:top-6 lg:self-start',
+            'transition-[opacity,transform] duration-[620ms] ease-[var(--ease-breath)]',
+            expanded && 'pointer-events-none translate-y-4 opacity-0',
+          )}
         >
           <Card level="panel" title="Levels">
             <div className="space-y-5">

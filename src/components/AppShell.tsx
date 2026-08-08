@@ -6,6 +6,7 @@ import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
 import { useIsCompact, useReducedMotion } from '../lib/motion'
 import { useSession } from '../state/SessionProvider'
+import { useStage } from '../state/StageProvider'
 import { useTheme } from '../state/ThemeProvider'
 import { CosmicBackground } from './CosmicBackground'
 import {
@@ -37,6 +38,7 @@ export function AppShell() {
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
   const { session, pause, resume } = useSession()
+  const { expanded: stageExpanded } = useStage()
   const reducedMotion = useReducedMotion()
   const compact = useIsCompact()
   const mainRef = useRef<HTMLElement>(null)
@@ -55,6 +57,14 @@ export function AppShell() {
    * holds the only navigation there is.
    */
   const immersive = compact && isPlaying && onPlayer && !navRevealed
+
+  /*
+   * Expanding the player's stage does the same thing on every size of screen,
+   * and for the same reason — except there the way back is the collapse
+   * control on the stage itself, and Escape, so the chrome can go on a desktop
+   * too without stranding anyone.
+   */
+  const chromeHidden = immersive || stageExpanded
 
   // Any route change, or ending the session, restores the normal chrome.
   useEffect(() => setNavRevealed(false), [location.pathname])
@@ -80,7 +90,9 @@ export function AppShell() {
 
   return (
     <div className="relative flex min-h-dvh flex-col">
-      <CosmicBackground active={isPlaying} />
+      {/* The garden warms while a session runs, and again while it is all
+          there is on screen. */}
+      <CosmicBackground active={isPlaying || stageExpanded} />
 
       <a
         href="#main"
@@ -92,9 +104,10 @@ export function AppShell() {
       <header
         className={cx(
           'safe-top px-4 pb-3 transition-opacity duration-500 sm:px-6 lg:px-10',
-          immersive && 'opacity-0',
+          chromeHidden && 'pointer-events-none opacity-0',
         )}
-        aria-hidden={immersive || undefined}
+        inert={chromeHidden}
+        aria-hidden={chromeHidden || undefined}
       >
         <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-4">
           <NavLink
@@ -217,19 +230,20 @@ export function AppShell() {
       {/* The phone's floating navigation. */}
       <nav
         aria-label="Main sections"
-        aria-hidden={immersive || undefined}
+        inert={chromeHidden}
+        aria-hidden={chromeHidden || undefined}
         className={cx(
           'pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 lg:hidden',
           'transition-[transform,opacity] duration-500 ease-[var(--ease-calm)]',
-          immersive && 'translate-y-[130%] opacity-0',
+          chromeHidden && 'translate-y-[130%] opacity-0',
         )}
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <ul
           className={cx(
             'surface-sheet flex w-full max-w-md items-stretch gap-1 rounded-[1.5rem] p-1.5',
-            immersive && 'pointer-events-none',
-            !immersive && 'pointer-events-auto',
+            chromeHidden && 'pointer-events-none',
+            !chromeHidden && 'pointer-events-auto',
           )}
         >
           {TABS.map(({ to, label, icon: Icon }) => (
@@ -237,7 +251,7 @@ export function AppShell() {
               <NavLink
                 to={to}
                 onClick={() => cue('select')}
-                tabIndex={immersive ? -1 : undefined}
+                tabIndex={chromeHidden ? -1 : undefined}
                 className={({ isActive }) =>
                   cx(
                     'interactive flex min-h-[3.25rem] flex-col items-center justify-center gap-1 rounded-[1.15rem] px-1',
@@ -261,8 +275,13 @@ export function AppShell() {
         </ul>
       </nav>
 
-      {/* Bring the chrome back from immersive mode. */}
-      {immersive && (
+      {/*
+        Bring the chrome back from immersive mode. Not while the stage is
+        expanded: that has its own way out, in the corner where it belongs,
+        and a second one at the bottom edge would only be a second thing to
+        explain.
+      */}
+      {immersive && !stageExpanded && (
         <button
           type="button"
           onClick={() => {
