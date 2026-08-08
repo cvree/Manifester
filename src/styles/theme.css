@@ -1537,6 +1537,23 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 /*
+ * The other half of a decision `useStageExpansion` already makes for its own
+ * GSAP tween: on a reduced-motion preference, or a compositor that cannot be
+ * trusted with real work (see `isLowPowerDevice` in `motion.ts`), the
+ * rectangle stops travelling and simply arrives. Every transition on the
+ * *inside* of the box — the padding, the radius, the glass, the orb's own
+ * `--size` — is keyed off `--stage-travel`, so collapsing it here is enough
+ * to turn the whole interior into the same kind of snap, without touching the
+ * short, independent timings a button's own press still animates on. The two
+ * halves have to agree: a box that jumps while its contents still spend 620ms
+ * easing into their new sizes is the animation, minus only the part that
+ * made it readable.
+ */
+.stage--instant {
+  --stage-travel: 0.001ms;
+}
+
+/*
  * The phone case, and the plainest one: the stage is the screen, edge to edge,
  * with the device's own safe areas held back as padding so no control ever
  * lands under a notch or a home indicator.
@@ -1666,6 +1683,11 @@ html:not(.dark) .breath-aurora__veil {
 
 .stage--immersive .stage__aura {
   opacity: 1;
+}
+
+/* Its own fixed 900ms isn't reached by overriding `--stage-travel`. */
+.stage--instant .stage__aura {
+  transition-duration: 0.001ms;
 }
 
 /* ── What travels, and on what clock ── */
