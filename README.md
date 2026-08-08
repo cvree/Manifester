@@ -716,6 +716,25 @@ have taken their share — so the expanded stage passes it down as `--stage-orb`
 and the visualiser reads it. Three heights of screen get three answers, and a
 shallow window tightens the spacing before it shrinks the orb.
 
+**The fullscreen request happens before the animation, not beside it.**
+Entering fullscreen is itself a viewport-resizing transition; the first version
+of this fired it in parallel with the stage's own CSS/GSAP transition, which
+put two compositor-heavy changes on the same frame. On a browser leaning on
+software compositing — Chrome with "Use hardware acceleration" switched off —
+that combination reached a real renderer crash (`STATUS_ACCESS_VIOLATION`) the
+moment someone tapped *Expand*. `useStageExpansion` now waits for
+`requestFullscreen()` to settle, one way or the other, before `change(true)`
+ever runs — so the stage only ever travels through a viewport that has already
+finished changing shape, and the browser's own fullscreen transition and ours
+never land on the same frame. `collapse()` does the same in reverse: fullscreen
+is exited first, and the shrink starts once that has resolved. Belt and
+braces, [`isLowPowerDevice`](src/lib/motion.ts) now also reads the WebGL
+renderer string, so a desktop with acceleration disabled in the browser's own
+settings is recognised the same way a modest phone already was, and both the
+GSAP tween and the CSS transitions on the inside of the box (`.stage--instant`)
+are skipped in favour of the state simply arriving — the same fallback already
+used for `prefers-reduced-motion`, applied for a different reason.
+
 **GSAP and Lenis, used sparingly.** GSAP handles one entrance stagger per screen,
 and the player's expansion.
 Lenis is mounted only on the About screen, which is the one long-scrolling page —

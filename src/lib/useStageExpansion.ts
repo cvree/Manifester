@@ -28,9 +28,10 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type RefObject,
 } from 'react'
-import { prefersReducedMotion } from './motion'
+import { isLowPowerDevice, prefersReducedMotion, useReducedMotion } from './motion'
 
 /**
  * Slow enough to read as one continuous movement, short enough that it never
@@ -62,7 +63,12 @@ function travel(
   gsap.killTweensOf(stage)
   gsap.set(stage, { clearProps: TWEENED })
 
-  if (prefersReducedMotion()) {
+  // Reduced motion is a preference; a software-rendered compositor is a
+  // constraint. Either way the honest answer is the same one already used
+  // for it elsewhere: hold still, and let the destination arrive without a
+  // journey rather than run one on hardware — or a setting — that cannot be
+  // trusted to carry it smoothly.
+  if (prefersReducedMotion() || isLowPowerDevice()) {
     onComplete?.()
     return
   }
@@ -105,6 +111,13 @@ interface StageExpansion {
   slotRef: RefObject<HTMLDivElement | null>
   /** Expand it, or bring it back. One control does both. */
   toggle: () => void
+  /**
+   * True on a reduced-motion preference or a renderer that cannot be trusted
+   * with the trip. The caller adds it as a class (`.stage--instant`) so the
+   * CSS transitions on the inside of the box agree with the GSAP tween
+   * `travel()` is already skipping for the same reason.
+   */
+  instant: boolean
 }
 
 export function useStageExpansion({
@@ -148,8 +161,6 @@ export function useStageExpansion({
   }, [])
 
   const expand = useCallback(() => {
-    change(true)
-
     /*
      * Real fullscreen where the browser offers it: the point of expanding is
      * to be left alone with the words, and a tab strip is not that. It is
@@ -157,33 +168,76 @@ export function useStageExpansion({
      * behind it comes too — fullscreening the stage alone would take the orb
      * out of its own sky. iOS has no element fullscreen at all, so this
      * quietly does nothing there and the layer below does all the work.
+     *
+     * It is asked for *before* the stage itself changes, and the travel does
+     * not start until the browser has settled into it one way or the other.
+     * Entering fullscreen is its own viewport-resizing transition; starting
+     * our own animation on the same tick means two compositor-heavy changes
+     * landing on the same frame, and on a renderer already leaning on
+     * software work that has been enough to bring the tab down. Waiting the
+     * one request out costs at most the time the browser's own fullscreen
+     * transition already takes, and buys a stage that only ever travels
+     * through a viewport that has already finished changing shape.
      */
     const root = document.documentElement
-    if (document.fullscreenElement || typeof root.requestFullscreen !== 'function') {
+    const canRequestFullscreen =
+      !document.fullscreenElement && typeof root.requestFullscreen === 'function'
+
+    if (!canRequestFullscreen) {
+      change(true)
       return
     }
+
     root
       .requestFullscreen()
       .then(() => {
         ownsFullscreen.current = true
+        change(true)
       })
       .catch(() => {
-        // Blocked or unsupported. Expanded mode does not depend on it.
+        // Blocked, dismissed, or unsupported here. Expanding is still worth
+        // doing without it.
+        change(true)
       })
   }, [change])
 
   const collapse = useCallback(() => {
-    change(false)
+    // Escape is handled below both by our own listener and, natively, by the
+    // browser leaving fullscreen — which can call back in here a second time
+    // for the same press. Once collapsed, a second call is a no-op.
+    if (!expanded) return
+
     if (ownsFullscreen.current && document.fullscreenElement) {
-      void document.exitFullscreen?.().catch(() => {})
+      ownsFullscreen.current = false
+      // Left exactly as it was entered: fullscreen settles first, and only
+      // then does the stage travel, so the two transitions never overlap.
+      const exit = document.exitFullscreen?.bind(document)
+      if (exit) {
+        void exit()
+          .catch(() => {})
+          .finally(() => change(false))
+        return
+      }
     }
-    ownsFullscreen.current = false
-  }, [change])
+    change(false)
+  }, [expanded, change])
 
   const toggle = useCallback(() => {
     if (expanded) collapse()
     else expand()
   }, [expanded, expand, collapse])
+
+  /*
+   * `travel()` already skips the GSAP tween on a preference or a renderer
+   * that cannot be trusted with it, but that leaves the *interior* of the
+   * box — the padding, the radius, the glass, the orb's own `--size` — still
+   * easing over the same 620ms in plain CSS, since those transitions are
+   * always on. `instant` is the other half of that same decision, for the
+   * caller to add as a class (`.stage--instant`) so both halves of the stage
+   * agree about whether this is a journey or a jump.
+   */
+  const [lowPower] = useState(isLowPowerDevice)
+  const instant = useReducedMotion() || lowPower
 
   /* ── The travel ── */
 
@@ -294,5 +348,5 @@ export function useStageExpansion({
     [],
   )
 
-  return { stageRef, slotRef, toggle }
+  return { stageRef, slotRef, toggle, instant }
 }

@@ -53,8 +53,41 @@ export function useIsCompact(): boolean {
 }
 
 /**
- * A conservative guess at whether continuous canvas animation is a good idea.
- * Used to drop the drifting particle layer on modest phones.
+ * Whether the compositor is running on the CPU rather than the GPU — the
+ * state Chrome falls back to when "Use hardware acceleration" is switched off
+ * in its own settings, or when the platform has no usable GPU driver at all.
+ *
+ * Software compositing turns an animated stack of blurred, filtered,
+ * simultaneously-changing layers from a GPU footnote into real CPU work every
+ * frame, and Chromium's software rasteriser has a documented history of
+ * crashing outright under that load rather than merely running slowly.
+ *
+ * Detected from the WebGL renderer string rather than any permissions or
+ * device-memory signal, because it is the one thing that actually answers the
+ * question: a powerful desktop with acceleration disabled in `chrome://settings`
+ * reports here exactly like a phone with no GPU at all. The context is thrown
+ * away immediately either way — this never keeps a WebGL context open.
+ */
+function hasSoftwareRendering(): boolean {
+  if (typeof document === 'undefined') return false
+  try {
+    const canvas = document.createElement('canvas')
+    const gl = (canvas.getContext('webgl') ??
+      canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null
+    if (!gl) return true
+    const info = gl.getExtension('WEBGL_debug_renderer_info')
+    const renderer = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : ''
+    return /swiftshader|llvmpipe|software|basic render|angle \(software/i.test(renderer)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * A conservative guess at whether continuous animation and heavy compositing
+ * are a good idea here. Used to drop the drifting particle layer on modest
+ * phones, and to make the player's stage snap to its expanded shape instead
+ * of travelling there when the renderer cannot be trusted with the trip.
  */
 export function isLowPowerDevice(): boolean {
   if (typeof navigator === 'undefined') return false
@@ -63,7 +96,7 @@ export function isLowPowerDevice(): boolean {
   if (typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 4) {
     return true
   }
-  return false
+  return hasSoftwareRendering()
 }
 
 /** True when the app is running from the home screen rather than a browser tab. */

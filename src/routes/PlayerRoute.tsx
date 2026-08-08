@@ -76,7 +76,7 @@ export function PlayerRoute() {
 
   // Expanded mode. The completion card replaces the stage, so it takes the
   // expansion with it rather than leaving a full-screen box with no orb in it.
-  const { stageRef, slotRef, toggle } = useStageExpansion({
+  const { stageRef, slotRef, toggle, instant } = useStageExpansion({
     expanded,
     onChange: setExpanded,
     available: !complete,
@@ -247,6 +247,7 @@ export function PlayerRoute() {
               className={cx(
                 'surface-stage stage relative flex flex-col items-center px-5 py-8 sm:px-8 lg:py-10',
                 expanded && 'stage--immersive',
+                instant && 'stage--instant',
               )}
             >
               {/* A pool of light under the orb, lit only while expanded. */}
