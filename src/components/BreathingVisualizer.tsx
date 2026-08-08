@@ -14,7 +14,10 @@ import type { BreathingRuntime } from '../lib/useBreathing'
  * once a second, for the countdown, and never for the animation itself.
  *
  * The same component appears small in the Create preview and large in the
- * Player; only `--size` changes.
+ * Player; only `--size` changes. It is a registered custom property, so when
+ * the Player's stage expands the orb *grows* to its new size rather than
+ * jumping to it — and because every layer is measured in `--size`, the petals,
+ * rings and stars all travel with it. See "The immersive stage" in `theme.css`.
  */
 
 const SPOKES = [0, 60, 120, 180, 240, 300]
@@ -22,12 +25,20 @@ const RIPPLES = [0, 1, 2, 3]
 const AURORA = [0, 1, 2]
 const STARS = 12
 
-export type VisualizerSize = 'sm' | 'md' | 'lg'
+export type VisualizerSize = 'sm' | 'md' | 'lg' | 'stage'
 
+/*
+ * `stage` is the expanded player, and it is the one size not decided here:
+ * how big the orb may be depends on how much room the immersive layout has
+ * left around it, which only the layout knows. It reads `--stage-orb` off the
+ * expanded stage — see "The immersive stage" in `theme.css` — and falls back
+ * to `lg` anywhere else, so the value is always a length.
+ */
 const SIZES: Record<VisualizerSize, string> = {
   sm: 'clamp(11rem, 34vw, 13rem)',
   md: 'clamp(13rem, 42vw, 16rem)',
   lg: 'clamp(15rem, 58vw, 21rem)',
+  stage: 'var(--stage-orb, clamp(15rem, 58vw, 21rem))',
 }
 
 interface BreathingVisualizerProps {

@@ -165,6 +165,22 @@ export const CloseIcon = (props: IconProps) => (
   </Icon>
 )
 
+/** Four corners pushed outward — grow the stage to fill the screen. */
+export const ExpandIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M14.2 4.5h5.3v5.3M9.8 19.5H4.5v-5.3" />
+    <path d="m19.5 4.5-6 6M4.5 19.5l6-6" />
+  </Icon>
+)
+
+/** The same corners drawn back in — return to the page. */
+export const CollapseIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M19.5 9.8h-5.3V4.5M4.5 14.2h5.3v5.3" />
+    <path d="m14.2 9.8 5.3-5.3M9.8 14.2l-5.3 5.3" />
+  </Icon>
+)
+
 export const InfoIcon = (props: IconProps) => (
   <Icon {...props}>
     <circle cx="12" cy="12" r="8.6" />

@@ -142,6 +142,14 @@ app.
   desk. On a phone the navigation slides away while a session runs, and a strip
   at the bottom edge brings it straight back.
 - One large play/pause control, with a smaller *End session* below it.
+- **An expanded view**, one tap from the corner of the stage: the player grows
+  into the whole screen, the guide grows with it, and the header, the
+  navigation and the settings column step back until nothing is left but the
+  words, the breath and the controls. It is the same player throughout — the
+  session, the clock, the pass count and the audio carry straight on — and the
+  way back is the same button, the Escape key, or leaving fullscreen however
+  your browser offers to. It is written up under
+  [Decisions worth explaining](#decisions-worth-explaining).
 - A **breathing guide** in one of six forms, with a thin ring reporting progress
   through the phase, the phase name and a countdown in the centre. Ten patterns,
   five breath voices, and custom timing for every phase — it has a section of
@@ -673,7 +681,43 @@ defines the screen. The rule this replaces is the one the redesign existed to
 fix: when every card shares the same opacity, border, shadow and radius, there is
 no hierarchy left for the eye to use.
 
-**GSAP and Lenis, used sparingly.** GSAP handles one entrance stagger per screen.
+**Expanded mode is the same player, not a second one.** Tapping *Expand* on the
+player adds one class to the stage and tweens its rectangle. Nothing is
+portalled, cloned or re-mounted, which is the whole design: the session, the
+timer, the pass number, the breathing hook and every audio node are the same
+objects they were a moment ago, so growing the box cannot interrupt a word or
+reset a count. A separate full-screen player component would have had to be
+handed all of that state — and would have got it subtly wrong the first time
+the two disagreed.
+
+The work splits along the line of what CSS can actually do.
+[`useStageExpansion`](src/lib/useStageExpansion.ts) tweens the *rectangle*,
+because a box cannot be transitioned out of a grid cell and into `position:
+fixed` — the property that has to change is `position`, and it does not
+animate. It measures the stage before the class lands and again after, and GSAP
+travels between the two; a slot element holds the stage's place in the page so
+nothing behind it shifts. Everything *inside* the box — the spacing, the
+padding, the radius, the glass, the size of the words — is transitioned in CSS
+on the same duration and the same easing, so the whole composition arrives
+together. Both halves are eased at both ends and neither overshoots: it is a
+room being opened, not a panel being popped.
+
+The orb grows rather than jumps because `--size` is a *registered* custom
+property (`@property`, `syntax: '<length>'`), so it can be transitioned — and
+since every layer of every form is measured in `--size`, one transition carries
+the petals, the rings, the stars and the water with it. One trap worth naming,
+because the symptom does not point at the cause: a registered property's
+`initial-value` must be computationally independent, so `15rem` invalidates the
+whole `@property` rule and the only sign of it is that the orb snaps.
+
+How large the orb may be is a layout question rather than a drawing one — it
+depends on what is left once the title, the line, the transport and the meter
+have taken their share — so the expanded stage passes it down as `--stage-orb`
+and the visualiser reads it. Three heights of screen get three answers, and a
+shallow window tightens the spacing before it shrinks the orb.
+
+**GSAP and Lenis, used sparingly.** GSAP handles one entrance stagger per screen,
+and the player's expansion.
 Lenis is mounted only on the About screen, which is the one long-scrolling page —
 it never wraps the player, the sheets, the sliders or any input. Both bow out
 completely when `prefers-reduced-motion` is set.
@@ -814,13 +858,15 @@ src/
     SettingRow.tsx        one row of that list, stating its own value
     AppearanceSettings    the hue dial and the day/night switch
   routes/         Create, Player, Library (loops + sounds), About
-  state/          Theme, Library (IndexedDB), Session (playback engines)
+  state/          Theme, Library (IndexedDB), Session (playback engines),
+                  Stage (whether the player has taken over the screen)
   lib/
     speech.ts       line-per-utterance chunking, voices, the looping speaker
     voiceRanking.ts scores device voices and picks the best of each style
     breathing.ts    pure breath-phase maths, patterns and forms
     breathAudio.ts  the breath's own synthesised voices
     useBreathing.ts drives the orb from the wall clock
+    useStageExpansion.ts  grows the player into the screen, and back
     feedback.ts     haptics and generated interface tones
     recorder.ts     microphone capture for exports
     exportAudio.ts  offline bed rendering, decoding, normalisation

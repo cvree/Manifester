@@ -897,6 +897,29 @@
  * veil, a turning wave — lives on a *child* element, so its animation and the
  * breath's own transform never fight over the same property.
  */
+
+/*
+ * The third custom property, and the only one that is ever transitioned.
+ *
+ * Registering it is what lets the orb *grow* when the player's stage expands
+ * instead of jumping to its new size — and since every layer of every form is
+ * measured in `--size`, one transition here carries the petals, the rings, the
+ * stars and the water with it, in step, for free. `--e` and `--p` are left
+ * unregistered on purpose: they are rewritten every frame from the breathing
+ * hook, and a transition on either would fight the clock.
+ *
+ * The initial value is in pixels rather than the `15rem` it mirrors, and it
+ * has to be: a registered property's initial value must be computationally
+ * independent, and `rem` is not. Written in `rem` the whole rule is thrown
+ * away — silently, and with the only symptom being that the orb snaps to its
+ * new size instead of growing into it.
+ */
+@property --size {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 240px;
+}
+
 .breath {
   --e: 0;
   --p: 0;
@@ -907,6 +930,7 @@
   display: grid;
   place-items: center;
   isolation: isolate;
+  transition: --size var(--stage-travel, 620ms) var(--ease-breath);
 }
 
 .breath > * {
@@ -1472,6 +1496,400 @@ html:not(.dark) .breath-aurora__veil {
 
   .breath--awaken {
     animation: none;
+  }
+}
+
+/* ── The immersive stage ────────────────────────────────────── */
+
+/*
+ * Expanded mode: the player's stage lifts out of the page and grows until it
+ * is very nearly the whole screen, and everything around it steps back.
+ *
+ * It is the same element the whole way through. Nothing is portalled, cloned
+ * or re-mounted, so the session, the clock, the pass count, the breath and the
+ * audio never learn that the box around them changed shape — which is the
+ * entire reason expanded mode is a class here rather than a second player.
+ *
+ * The work is split in two, along the line of what CSS can actually do:
+ *
+ *   - the *rectangle* is tweened in `useStageExpansion`, because a box cannot
+ *     be transitioned out of a grid cell and into `position: fixed` — the
+ *     property that has to change is `position`, and it does not animate;
+ *   - everything *inside* the rectangle is transitioned here, on one duration
+ *     and one easing, so the orb, the words and the controls arrive at the
+ *     same moment as the edges do.
+ *
+ * Both halves are eased at both ends and neither overshoots. This is a room
+ * being opened, not a panel being popped, and the difference between the two
+ * is entirely in the easing.
+ */
+
+.stage {
+  /* Kept in step with `STAGE_TRAVEL_SECONDS` in `useStageExpansion`. */
+  --stage-travel: 620ms;
+  isolation: isolate;
+  transition:
+    padding var(--stage-travel) var(--ease-breath),
+    border-radius var(--stage-travel) var(--ease-breath),
+    border-color var(--stage-travel) var(--ease-breath),
+    box-shadow var(--stage-travel) var(--ease-breath),
+    background-color var(--stage-travel) var(--ease-breath);
+}
+
+/*
+ * The phone case, and the plainest one: the stage is the screen, edge to edge,
+ * with the device's own safe areas held back as padding so no control ever
+ * lands under a notch or a home indicator.
+ */
+.stage--immersive {
+  position: fixed;
+  inset: 0;
+  z-index: 42;
+  justify-content: space-between;
+  border-radius: 0;
+  border-color: transparent;
+  box-shadow: none;
+
+  /*
+   * The glass thins as it grows. It is still the same panel — the same warm
+   * bloom at its top edge, the same blur — but at this size it is standing in
+   * for the room rather than for a card in it, and the garden behind it, the
+   * pools of light and the pollen, should carry on through. The gradient is
+   * left alone and only the colour underneath is transitioned: a gradient
+   * cross-fade would be a second thing happening, and there is enough
+   * happening already.
+   */
+  background-color: color-mix(in srgb, var(--panel) 58%, transparent);
+  padding:
+    calc(env(safe-area-inset-top) + 0.9rem)
+    calc(env(safe-area-inset-right) + 1.15rem)
+    calc(env(safe-area-inset-bottom) + 0.9rem)
+    calc(env(safe-area-inset-left) + 1.15rem);
+
+  /*
+   * A safety valve, and only that: on a screen too short to hold the whole
+   * composition — a phone on its side, a laptop with a shallow window — the
+   * stage scrolls rather than clipping the words or burying the controls.
+   * The sizes below are chosen so it almost never comes to this.
+   */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+
+  /*
+   * How big the orb may be, which is the one thing the visualiser cannot
+   * decide for itself: it depends on what is left once the title, the line,
+   * the transport and the meter have taken their share, and that is a layout
+   * question rather than a drawing one.
+   *
+   * `--stage-room` is the height of the stage itself, and the reserve is what
+   * the rest of the composition actually measures at this size — 27.5rem here,
+   * and less on shorter screens, where the spacing tightens before the orb
+   * gives anything up. The orb takes what is left, to a limit of 42rem: past
+   * that it stops reading as an orb and starts reading as a background.
+   */
+  --stage-room: 100dvh;
+  --stage-orb: clamp(11rem, min(78vw, var(--stage-room) - 27.5rem), 42rem);
+  --stage-gap: 1rem;
+  --stage-stack: 0.75rem;
+  --stage-play: 4.75rem;
+  --stage-line: 4rem;
+}
+
+.stage--immersive::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * From `sm` up it stops being a screen and becomes a room: about 95% of the
+ * viewport, with a margin of ground left showing on every side. The margin is
+ * the point — full bleed on a large display reads as a browser bug, and this
+ * reads as a deliberate space.
+ */
+@media (min-width: 640px) {
+  .stage--immersive {
+    top: max(2.5vh, env(safe-area-inset-top));
+    right: max(2.5vw, env(safe-area-inset-right));
+    bottom: max(2.5vh, env(safe-area-inset-bottom));
+    left: max(2.5vw, env(safe-area-inset-left));
+    border-radius: calc(var(--radius-panel) + 0.5rem);
+    border-color: var(--panel-border);
+    box-shadow:
+      inset 0 1px 0 var(--panel-highlight),
+      var(--panel-shadow-lift);
+    padding: clamp(1rem, 1.8vh, 1.6rem) clamp(1.75rem, 4vw, 3.5rem);
+    /* Which leaves the orb 95% of the viewport to be measured against. */
+    --stage-room: 95dvh;
+  }
+}
+
+/*
+ * Shallow screens: a small laptop, or a phone turned on its side. The orb
+ * still grows, but the room it grows into is borrowed from the spacing around
+ * the controls rather than from the words.
+ */
+@media (max-height: 800px) {
+  .stage--immersive {
+    --stage-orb: clamp(11rem, min(74vw, var(--stage-room) - 25rem), 30rem);
+    --stage-gap: 0.8rem;
+    --stage-stack: 0.6rem;
+    --stage-play: 4.35rem;
+    --stage-line: 3.25rem;
+  }
+}
+
+@media (max-height: 620px) {
+  .stage--immersive {
+    --stage-orb: clamp(8rem, min(56vw, var(--stage-room) - 21.5rem), 22rem);
+    --stage-gap: 0.55rem;
+    --stage-stack: 0.5rem;
+    --stage-play: 3.9rem;
+    --stage-line: 2.75rem;
+  }
+}
+
+/* A pool of light under the orb, and the only thing added by expanding. */
+.stage__aura {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  /* Slower than the box: the light settles a moment after the edges do. */
+  transition: opacity 900ms var(--ease-calm);
+  background: radial-gradient(
+    58% 46% at 50% 44%,
+    color-mix(in oklab, var(--rose) 13%, transparent) 0%,
+    transparent 72%
+  );
+}
+
+.stage--immersive .stage__aura {
+  opacity: 1;
+}
+
+/* ── What travels, and on what clock ── */
+
+.stage__top,
+.stage__focus,
+.stage__orb,
+.stage__line,
+.stage__transport,
+.stage__meter {
+  transition-duration: var(--stage-travel);
+  transition-timing-function: var(--ease-breath);
+}
+
+/*
+ * In the card the corner control sits beside the state label, which is short
+ * and centred, and clears the title's line below it — so the title keeps the
+ * full width it always had. Expanded, the padding above it is tighter and the
+ * two would meet, so the block gives way instead of the control moving.
+ */
+.stage__top {
+  transition-property: padding-inline;
+}
+
+.stage__focus {
+  flex: 0 1 auto;
+  transition-property: flex-grow;
+}
+
+.stage__orb {
+  transition-property: margin;
+}
+
+.stage__line {
+  transition-property: font-size, max-width, min-height;
+}
+
+.stage__transport {
+  transition-property: margin-top, gap;
+}
+
+.stage__meter {
+  transition-property: margin-top, max-width, opacity;
+}
+
+/*
+ * `.interactive` carries a `transition` shorthand of its own, and a bare
+ * `transition-property` here would replace it wholesale — taking the press
+ * with it. The two controls that also travel restate both halves, each on its
+ * own clock: the journey is slow, the answer to a tap is not.
+ */
+.stage__play,
+.stage__toggle {
+  transition:
+    width var(--stage-travel) var(--ease-breath),
+    height var(--stage-travel) var(--ease-breath),
+    font-size var(--stage-travel) var(--ease-breath),
+    top var(--stage-travel) var(--ease-breath),
+    right var(--stage-travel) var(--ease-breath),
+    background-color 200ms var(--ease-calm),
+    border-color 200ms var(--ease-calm),
+    color 200ms var(--ease-calm),
+    transform 220ms var(--ease-spring),
+    box-shadow 220ms var(--ease-calm);
+}
+
+.stage__toggle {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 6;
+}
+
+/* ── Where everything lands once it is expanded ── */
+
+.stage--immersive .stage__top {
+  padding-inline: 3.5rem;
+}
+
+/*
+ * The orb and the line it is speaking take every bit of height the rest of
+ * the composition is not using, and stay centred in it. This is the whole of
+ * the recomposition: on a wide desktop the stage stops being a tall card with
+ * things stacked in it and becomes a title at the top, controls at the bottom,
+ * and the visualiser holding the middle.
+ */
+.stage--immersive .stage__focus {
+  flex-grow: 1;
+  justify-content: center;
+}
+
+.stage--immersive .stage__orb {
+  margin-block: var(--stage-gap);
+}
+
+/*
+ * The words grow with the room, but not without limit: past about 30
+ * characters a line stops being one thing the eye takes in and becomes
+ * something to read across. The reserved height keeps the orb from shifting
+ * as a one-line affirmation gives way to a two-line one, and shrinks on
+ * screens that cannot spare it.
+ */
+.stage--immersive .stage__line {
+  font-size: clamp(1.35rem, 0.95rem + 1.4vw, 2rem);
+  max-width: min(30ch, 100%);
+  min-height: var(--stage-line);
+  -webkit-line-clamp: 5;
+}
+
+.stage--immersive .stage__transport {
+  margin-top: var(--stage-gap);
+  gap: var(--stage-stack);
+}
+
+.stage--immersive .stage__play {
+  width: var(--stage-play);
+  height: var(--stage-play);
+  font-size: calc(var(--stage-play) * 0.36);
+}
+
+/* Still there, still readable, no longer asking for attention. */
+.stage--immersive .stage__meter {
+  margin-top: var(--stage-stack);
+  max-width: min(30rem, 100%);
+  opacity: 0.82;
+}
+
+.stage--immersive .stage__toggle {
+  top: calc(env(safe-area-inset-top) + 0.9rem);
+  right: calc(env(safe-area-inset-right) + 0.9rem);
+}
+
+@media (min-width: 640px) {
+  .stage--immersive .stage__toggle {
+    top: 1.1rem;
+    right: 1.1rem;
+  }
+}
+
+/* The phase word scales with the orb it sits inside. */
+.stage--immersive .breath-caption > :first-child {
+  font-size: clamp(1.5rem, calc(var(--size) * 0.11), 2.4rem);
+}
+
+/*
+ * Wide and shallow — a phone on its side, or a desktop window that has been
+ * pushed down to a strip. Stacking simply does not fit here: everything would
+ * be squeezed into a band a couple of hundred pixels tall, and the orb would
+ * end up smaller expanded than it was in the card, which is the one thing
+ * expanding must never do.
+ *
+ * So the composition turns on its side with it. The orb takes the full height
+ * on the left, and the title, the words and the controls read down the right —
+ * the same pieces in the same order, using the axis that actually has room.
+ * `display: contents` on the focus block is what lets the orb and its line be
+ * placed independently without a second set of markup for this one case.
+ */
+@media (max-height: 620px) and (min-width: 700px) {
+  .stage--immersive {
+    display: grid;
+    grid-template-columns: auto minmax(14rem, 1fr);
+    /*
+     * Rows are left to size themselves. Given an explicit track list they
+     * will shrink to fit the strip when the content is taller than it, and a
+     * shrunk row does not clip — it lets its content run into the row below.
+     */
+    grid-template-areas:
+      'orb top'
+      'orb line'
+      'orb transport'
+      'orb meter';
+    align-content: center;
+    align-items: center;
+    column-gap: clamp(1.25rem, 4vw, 3rem);
+    --stage-orb: min(46vw, 100dvh - 4rem, 24rem);
+    --stage-play: 3.5rem;
+    --stage-stack: 0.4rem;
+    --stage-gap: 0.5rem;
+  }
+
+  /*
+   * The column beside the orb is short, and everything in it has to fit
+   * without the rows compressing into each other: a grid track will shrink
+   * to its content's *minimum* when there is no room, and for a paragraph
+   * that minimum is one word wide and many lines tall.
+   */
+  .stage--immersive .stage__title {
+    font-size: clamp(1.25rem, 1rem + 0.7vw, 1.6rem);
+  }
+
+  .stage--immersive .stage__line {
+    font-size: clamp(1.1rem, 0.95rem + 0.5vw, 1.4rem);
+    max-width: 100%;
+    -webkit-line-clamp: 2;
+  }
+
+  .stage--immersive .stage__focus {
+    display: contents;
+  }
+
+  .stage--immersive .stage__orb {
+    grid-area: orb;
+    margin: 0;
+  }
+
+  .stage--immersive .stage__top {
+    grid-area: top;
+    padding-inline: 3rem 0;
+  }
+
+  .stage--immersive .stage__line {
+    grid-area: line;
+    min-height: 0;
+    margin-top: var(--stage-stack);
+  }
+
+  .stage--immersive .stage__transport {
+    grid-area: transport;
+    margin-top: var(--stage-gap);
+  }
+
+  .stage--immersive .stage__meter {
+    grid-area: meter;
+    margin-top: var(--stage-stack);
   }
 }
 
