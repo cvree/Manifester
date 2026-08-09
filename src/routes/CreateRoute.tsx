@@ -27,6 +27,7 @@ import { cue, primeFeedback } from '../lib/feedback'
 import { countWords } from '../lib/format'
 import { draftToLoop } from '../lib/loops'
 import { useReducedMotion } from '../lib/motion'
+import { SmoothScroll, scrollToCentre } from '../lib/smoothScroll'
 import {
   affirmationLines,
   brainwaveSummary,
@@ -187,7 +188,10 @@ export function CreateRoute() {
    */
   const openSetting = useCallback((setting: RitualSetting) => {
     if (setting === 'timer') {
-      timerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Through the helper rather than `scrollIntoView`: while Lenis is
+      // driving the page, a native scroll under it leaves the two disagreeing
+      // about where the page is, and the next wheel event snaps it back.
+      scrollToCentre(timerRef.current)
       return
     }
     setPanel(setting === 'rhythm' ? 'brainwave' : setting)
@@ -378,7 +382,12 @@ export function CreateRoute() {
   )
 
   return (
-    <>
+    /*
+      The other screen long enough to be worth gliding down. The editor and
+      the sheets keep their own scrollers — see `data-lenis-prevent` on both —
+      so smoothing the page never reaches inside a control.
+    */
+    <SmoothScroll>
       {/*
         One column until there is genuinely room for two. Between a phone and
         a laptop the column is capped and centred rather than stretched — a
@@ -675,7 +684,7 @@ export function CreateRoute() {
           </div>
         </div>
       )}
-    </>
+    </SmoothScroll>
   )
 }
 

@@ -154,11 +154,17 @@ app.
   through the phase, the phase name and a countdown in the centre. Ten patterns,
   five breath voices, and custom timing for every phase — it has a section of
   its own below. It pauses and resumes with the session.
+- **Background breathing**: the atmosphere around the guide expands and settles
+  with it, on the same clock, at a percent or two of scale. On by default and
+  quiet enough that most people feel it before they notice it. It can be turned
+  off under **Breathing**, and it is written up below.
 - **Delay between loops**, 0–60 seconds, counted down on screen (*"Next loop in
   6s"*) and frozen exactly where it was if you pause.
 - Time remaining, or elapsed time when there is no timer.
 - Progress through the current pass, and how many passes you have listened to.
-- Voice volume, sound volume, and speed adjust live.
+- Voice volume, sound volume, and speed adjust live. Voice runs 0–100%, because
+  100% is as loud as a browser will ever speak — see
+  [Decisions worth explaining](#decisions-worth-explaining).
 - A mini player follows you to the other tabs while a session is running.
 - When the timer ends everything fades out and the screen says *Your loop is
   complete.*
@@ -310,6 +316,24 @@ on a voice that played the same flat hiss both ways.
 
 Vibration is offered separately, where the device supports it. iPhone does not
 let web apps vibrate, and the app says so rather than showing a dead switch.
+
+### The room breathes too
+
+**Background breathing** — the fourth switch under Breathing, on by default —
+lets the atmosphere around the guide expand and settle with it. On the in-breath
+the light behind the orb opens, the vignette relaxes, the haze widens and a few
+motes of pollen drift outward; on the out-breath all of it gathers back in. It
+is deliberately small: a percent or two of scale and a few percent of light,
+which is enough to feel and not enough to watch.
+
+It rides on the guide's own clock rather than having one of its own, which is
+why it sits under the guide's switch rather than beside it: with the guide off
+there is no breath for the room to follow, and a four-second pulse pretending to
+be your breathing would be worse than nothing. The same goes for pausing — the
+room settles rather than stopping — and for `prefers-reduced-motion`, which
+keeps the atmosphere and drops the movement. How that is wired, and why it can
+never drift out of step with the orb, is under
+[Decisions worth explaining](#decisions-worth-explaining).
 
 ---
 
@@ -597,7 +621,7 @@ better engineering answer.
 | Styling | Tailwind CSS v4 via `@tailwindcss/vite` |
 | PWA | `vite-plugin-pwa` (Workbox `generateSW`) |
 | Animation | GSAP + `@gsap/react` (`useGSAP`) |
-| Smooth scrolling | Lenis (`lenis/react`), on the About screen only |
+| Smooth scrolling | Lenis (`lenis/react`), on Create and About only |
 | Speech | Web Speech API (`SpeechSynthesisUtterance`) |
 | Sound | Web Audio API + `HTMLAudioElement` |
 | Storage | IndexedDB (hand-rolled wrapper, no dependency) + a little `localStorage` |
@@ -614,6 +638,80 @@ real document, deep links survive a reload, and the service worker only ever has
 one HTML file to cache. A `404.html` fallback is included as a belt-and-braces
 redirect for any stray path.
 
+**The voice slider stops at 100%, because that is where the voice stops.**
+`SpeechSynthesisUtterance.volume` is spec'd to `[0, 1]` and every browser clamps
+it there, because speech synthesis renders outside the page entirely — there is
+no Web Audio node to put a gain on. The setting used to run to 2 on the
+reasoning that a *recorded* voice mixed into an exported file could use the
+headroom even though the spoken one could not. In practice that meant a slider
+that read "200%", a readout that agreed with it, and a voice that had not
+changed since 100%: the app was making a promise on the browser's behalf that
+the browser had no intention of keeping.
+
+The export path did not need it either. `masterGainFor` in
+[`exportAudio.ts`](src/lib/exportAudio.ts) normalises the finished mix, so
+pushing the voice past 1 there only ever changed its *balance* against the bed —
+which is what the Sound slider is for, and that one still runs to 200% because
+it has real makeup gain behind it in a graph this app owns. So the ceiling is
+now 1 everywhere, `MAX_VOICE_VOLUME` and `LIVE_VOICE_VOLUME_CAP` agree, and a
+loop saved under the old ceiling is brought back to 100% by `normaliseSettings`
+— the level it had actually been playing at all along.
+
+**The room breathes on the player's clock, not on one of its own.** The player
+is wrapped in an atmosphere ([`PlayerAtmosphere.tsx`](src/components/PlayerAtmosphere.tsx)):
+a breathing field of light behind the orb, two aurora veils on slow
+incommensurable orbits, a haze that gathers inward as you empty, seven motes
+that draw outward as you fill, and a vignette that relaxes and deepens with the
+breath.
+
+The tempting way to build that is a keyframe or an interval — and it is wrong,
+because it would agree with the orb for about a minute and then spend the rest
+of the session visibly disagreeing with it. Instead `useBreathing` takes a list
+of `mirrors`, and writes `--e` and `--p` onto the orb, the stage and the
+atmosphere in the same pass of the same `requestAnimationFrame` loop, from the
+same `breathStateAt` call. There is one breath in the room and everything in it
+is following that one, to the millisecond, because it is the same number.
+
+Two details make it survivable rather than merely correct:
+
+- **`--field`**, a registered custom property every layer multiplies its
+  movement by. `--e` is rewritten sixty times a second and so can never be
+  transitioned, but this one is only ever *read* alongside it — so pausing a
+  session eases it to zero over a second and the whole room glides back to its
+  resting pose while the breath simply stops. Turning Background breathing off
+  does the same thing, and leaves the atmosphere lit, coloured and deep.
+- **Nothing viewport-sized goes behind a `filter: blur()`**, and every gradient
+  reaches full transparency inside its own element — the same two rules the
+  Cosmic Garden was already built on. A frame costs the compositor a transform
+  and an opacity on a handful of already-promoted layers, and the main thread
+  nothing at all.
+
+The richer layers are dropped on the hardware that cannot afford them, by the
+same [`isLowPowerDevice`](src/lib/motion.ts) check the pollen canvas uses, and
+`prefers-reduced-motion` holds `--field` at zero and stops the two self-running
+drifts — leaving the full composition, still lit, holding a pose. Reduced motion
+should still look designed.
+
+**The orb is measured against the room it has to fit in.** Making the visualiser
+bigger is one number; making it bigger *without* pushing the words it introduces
+off the bottom of a laptop window is a clamp against viewport height, and making
+it bigger without the odd result that *expanding* the stage hands it less room
+than the card did is a second constraint on top. So the resting size is
+`clamp(min(16rem, 74vw), min(64vw, 44vh), 27rem)` and the expanded size is
+whatever is left of the stage once the rest of the composition has taken its
+measured share. The two are tuned against each other: from about 780px of
+viewport height upward — where the great majority of windows are — the orb is
+about a quarter larger than it was in the card, and half again as large as that
+when the stage opens.
+
+One thing that cost an afternoon and is worth writing down: **a transformed
+child contributes its transformed box to its parent's scrollable overflow.** The
+pool of light under the orb breathed by scaling around 1, which meant that for
+half of every in-breath it was a percent taller than the stage — and the
+expanded stage, which scrolls only as a safety valve, quietly grew a scrollbar
+once per breath. Scales inside a scroll container open *up to* 1 rather than
+around it, which is the same rule the halo inside the orb already followed.
+
 **No Vanta.** Vanta's effects require `three.js`, which would add roughly half a
 megabyte and a continuous WebGL render loop to an app whose entire point is to
 run quietly on a phone for thirty minutes. Instead
@@ -625,6 +723,16 @@ small 2D-canvas field of drifting pollen and fireflies. The canvas is skipped
 entirely under reduced motion or on low-memory / low-core devices, and the
 pointer parallax only ever binds on a device that reports a fine pointer, so it
 never competes with touch scrolling.
+
+Re-evaluated when the player gained its own atmosphere, and the answer did not
+change. FOG and CLOUDS are the two effects close enough to Cosmic Garden to be
+worth prototyping, and turning either of them down far enough to be tasteful
+here — slow, abstract, low-contrast, brand-coloured, and not following the
+mouse — leaves an effect doing less than the six CSS layers already in place,
+for half a megabyte of `three.js` and a WebGL context held open for the length
+of a thirty-minute session on a phone. The whole point of this app is to run
+quietly in a pocket. Vanta earns its place in a hero section; it does not earn
+it here.
 
 **A decorative gradient must reach transparency inside its own element.** This
 is the rule the atmosphere is built on, and it is worth stating because
@@ -736,10 +844,23 @@ are skipped in favour of the state simply arriving — the same fallback already
 used for `prefers-reduced-motion`, applied for a different reason.
 
 **GSAP and Lenis, used sparingly.** GSAP handles one entrance stagger per screen,
-and the player's expansion.
-Lenis is mounted only on the About screen, which is the one long-scrolling page —
-it never wraps the player, the sheets, the sliders or any input. Both bow out
-completely when `prefers-reduced-motion` is set.
+the player's expansion, and the order things arrive in when the stage opens into
+a room — the atmosphere first and slowest, then the title, the words and the
+controls, then the fine detail once everything else has come to rest. It is
+given only the properties the stylesheet is *not* transitioning: a GSAP tween
+and a CSS transition on the same property is a tug of war the transition wins
+slowly and visibly.
+
+Lenis is mounted on the two screens that genuinely scroll — Create, which you
+move up and down while you work, and About, which is long to read. It never
+wraps the player, where there is essentially nothing to scroll, and the two
+elements with scrollers of their own (the affirmation editor and a sheet's body)
+carry `data-lenis-prevent` so the wheel over them is never taken by the page
+behind. One instance at a time, driven through
+[`smoothScroll.tsx`](src/lib/smoothScroll.tsx), because two `root` instances
+would be two loops fighting over one scroll position. Both bow out completely
+when `prefers-reduced-motion` is set — someone who asked for less movement has
+not asked for slower movement.
 
 ### Rotating the palette
 
@@ -872,6 +993,8 @@ src/
   components/     design system + composed UI
     Sheet.tsx             the one modal surface: bottom sheet / centred dialog
     BreathingVisualizer   all six guide forms, plus the phase ring
+    PlayerAtmosphere      the room the player breathes in, on the orb's clock
+    CosmicBackground      the twilight garden behind every screen
     RitualPreview.tsx     the live picture of the finished ritual
     CustomizePanel.tsx    the advanced settings, as summarised rows + sheets
     SettingRow.tsx        one row of that list, stating its own value
@@ -884,8 +1007,10 @@ src/
     voiceRanking.ts scores device voices and picks the best of each style
     breathing.ts    pure breath-phase maths, patterns and forms
     breathAudio.ts  the breath's own synthesised voices
-    useBreathing.ts drives the orb from the wall clock
+    useBreathing.ts drives the orb — and everything mirroring it — from the
+                    wall clock
     useStageExpansion.ts  grows the player into the screen, and back
+    smoothScroll.tsx  Lenis on the two screens that genuinely scroll
     feedback.ts     haptics and generated interface tones
     recorder.ts     microphone capture for exports
     exportAudio.ts  offline bed rendering, decoding, normalisation

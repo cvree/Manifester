@@ -1,6 +1,6 @@
 import { useMemo, type CSSProperties, type RefObject } from 'react'
 import { cx } from '../lib/cx'
-import { isLowPowerDevice, useReducedMotion } from '../lib/motion'
+import { isLowPowerDevice } from '../lib/motion'
 
 /**
  * The room the player sits in.
@@ -42,12 +42,16 @@ interface PlayerAtmosphereProps {
   /** Receives `--e` and `--p` from the breathing hook, in step with the orb. */
   fieldRef: RefObject<HTMLDivElement | null>
   /**
-   * True only when there is a real breath to follow: the guide is on, the
-   * background-breathing preference is on, and a session is actually playing.
-   * When it goes false the room does not snap back — `--field` eases to zero
-   * and every layer settles to its resting pose over about a second.
+   * How much of its movement each layer should spend: 1 when there is a real
+   * breath to follow, 0 otherwise. The player decides — it is the one that
+   * knows whether the guide is on, the preference is on, a session is playing
+   * and motion is wanted — and it sets the same number on the stage, so the
+   * light inside the glass and the light beyond it can never disagree.
+   *
+   * Going to 0 is not a stop. `--field` is registered and eased (`theme.css`),
+   * so every layer glides back to its resting pose over about a second.
    */
-  breathing: boolean
+  amplitude: number
   /** True while the stage has the whole screen. */
   immersive: boolean
 }
@@ -72,11 +76,9 @@ const MOTES = [
 
 export function PlayerAtmosphere({
   fieldRef,
-  breathing,
+  amplitude,
   immersive,
 }: PlayerAtmosphereProps) {
-  const reducedMotion = useReducedMotion()
-
   /*
    * Measured once. The answer cannot change while the page is open, and it
    * costs a throwaway WebGL context to ask — see `isLowPowerDevice`.
@@ -98,13 +100,7 @@ export function PlayerAtmosphere({
       ref={fieldRef}
       aria-hidden="true"
       className={cx('player-field', immersive && 'player-field--immersive')}
-      style={
-        {
-          // The amplitude every layer multiplies its movement by. One number,
-          // eased, so "stop breathing" is a settle rather than a stop.
-          '--field': breathing && !reducedMotion ? 1 : 0,
-        } as CSSProperties
-      }
+      style={{ '--field': amplitude } as CSSProperties}
     >
       <span className="player-field__glow" />
 

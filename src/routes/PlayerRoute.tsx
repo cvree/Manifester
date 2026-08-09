@@ -383,7 +383,7 @@ export function PlayerRoute() {
       */}
       <PlayerAtmosphere
         fieldRef={fieldRef}
-        breathing={environmentBreathing}
+        amplitude={fieldAmplitude}
         immersive={expanded}
       />
 

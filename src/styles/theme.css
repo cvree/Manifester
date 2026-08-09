@@ -549,13 +549,41 @@
     /* No grey flash on iOS, and no 300ms wait before :active paints. */
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+
+    /*
+     * The ring is always here, and it is transparent and flush until focus
+     * lands — which is what lets it bloom outward rather than appear. An
+     * outline takes no space at any width, so carrying one costs nothing but
+     * the two properties below being animatable when they are needed.
+     */
+    outline: 2px solid transparent;
+    outline-offset: 0;
+
     transition:
       background-color 200ms var(--ease-calm),
       border-color 200ms var(--ease-calm),
       color 200ms var(--ease-calm),
       transform 220ms var(--ease-spring),
       box-shadow 220ms var(--ease-calm),
+      outline-color 180ms var(--ease-calm),
+      outline-offset 240ms var(--ease-calm),
       filter 200ms var(--ease-calm);
+  }
+
+  .interactive:focus-visible {
+    outline-color: var(--rose-deep);
+    outline-offset: 3px;
+  }
+
+  /*
+   * Reduced motion still gets the ring; it simply arrives rather than opening.
+   * A focus indicator is not decoration, so it is never the thing that is
+   * dropped — only the way it makes its entrance.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .interactive {
+      transition-duration: 0ms;
+    }
   }
 
   /*
@@ -1884,10 +1912,14 @@ html:not(.dark) .breath-aurora__veil {
    *
    *   - `64vw` keeps it from crowding a narrow window;
    *   - `44vh` keeps it from pushing the words it is meant to be introducing
-   *     off the bottom of a shallow one — and, just as importantly, keeps it
-   *     under what the expanded stage will be able to offer at the same
-   *     height. Expanding must never make the orb smaller, and the expanded
-   *     stage has a fixed height budget where this one can scroll;
+   *     off the bottom of a shallow one, and keeps it under what the expanded
+   *     stage can offer at the same height — expanding should not hand the orb
+   *     less room than it already had. That holds from about 780px of viewport
+   *     height upward, which is where the great majority of windows are. Below
+   *     it the expanded stage runs out of vertical budget first and the orb
+   *     does give a little back, exactly as it did before this was tuned;
+   *     the alternative is shrinking the card everywhere to match the
+   *     shortest window anyone might use, which helps nobody;
    *   - `27rem` is where it stops reading as an object and starts reading as
    *     a background.
    *
@@ -2064,13 +2096,20 @@ html:not(.dark) .breath-aurora__veil {
 
 .stage--immersive .stage__aura {
   /*
-   * A percent and a half of scale, and about a tenth of its own brightness.
-   * Under a 40rem orb that is a few pixels of light moving, which is all it
-   * should ever be — the orb is what breathes, and this is what it breathes
-   * into.
+   * Three percent of scale, and about a tenth of its own brightness. Under a
+   * 40rem orb that is a few pixels of light moving, which is all it should
+   * ever be — the orb is what breathes, and this is what it breathes into.
+   *
+   * The scale opens *up to* 1 rather than around it, and that is not a style
+   * choice. The stage scrolls when it has to, and a transformed child
+   * contributes its transformed box to the scrollable area — so an aura that
+   * spent any part of the breath above 1 grew the stage's scroll height by a
+   * percent of the viewport and put a scrollbar on the most carefully
+   * composed screen in the app, once per in-breath. Same rule the halo inside
+   * the orb already follows, for the same reason.
    */
   opacity: calc(0.92 + (var(--e) - 0.5) * 0.16 * var(--field));
-  transform: scale(calc(1 + (var(--e) - 0.5) * 0.03 * var(--field)));
+  transform: scale(calc(1 - (1 - var(--e)) * 0.03 * var(--field)));
   will-change: transform, opacity;
 }
 
@@ -2331,9 +2370,20 @@ html:not(.dark) .breath-aurora__veil {
   transition-duration: 1400ms;
 }
 
-.stage--immersive[data-quiet='true']:focus-within .stage__top,
-.stage--immersive[data-quiet='true']:focus-within .stage__meter,
-.stage--immersive[data-quiet='true']:focus-within .stage__leave {
+/*
+ * `:has(:focus-visible)`, not `:focus-within`, and the difference is the whole
+ * behaviour.
+ *
+ * Expanding the stage is a click on a button inside it, so `:focus-within`
+ * holds from that moment until focus goes somewhere else — which is never,
+ * because there is nowhere else to click. The room could not go quiet at all
+ * with a mouse. `:focus-visible` is the browser's own answer to "is this
+ * person actually driving from the keyboard", so a keyboard user keeps every
+ * control lit and a mouse user gets the stillness they came for.
+ */
+.stage--immersive[data-quiet='true']:has(:focus-visible) .stage__top,
+.stage--immersive[data-quiet='true']:has(:focus-visible) .stage__meter,
+.stage--immersive[data-quiet='true']:has(:focus-visible) .stage__leave {
   opacity: 1;
   transition-duration: var(--stage-travel);
 }
@@ -2470,7 +2520,9 @@ html:not(.dark) .breath-aurora__veil {
   background: var(--panel-solid);
   border: 2px solid var(--rose-deep);
   box-shadow: 0 2px 8px rgb(58 50 44 / 0.22);
-  transition: transform 160ms var(--ease-calm);
+  transition:
+    transform 160ms var(--ease-calm),
+    box-shadow 200ms var(--ease-calm);
 }
 
 .range-input::-moz-range-thumb {
@@ -2480,10 +2532,28 @@ html:not(.dark) .breath-aurora__veil {
   background: var(--panel-solid);
   border: 2px solid var(--rose-deep);
   box-shadow: 0 2px 8px rgb(58 50 44 / 0.22);
+  transition:
+    transform 160ms var(--ease-calm),
+    box-shadow 200ms var(--ease-calm);
 }
 
+/*
+ * A halo while you hold it. Dragging a slider on a touch screen puts a finger
+ * exactly where the feedback is, so the answer has to be visible around the
+ * thumb rather than under it.
+ */
 .range-input:active::-webkit-slider-thumb {
   transform: scale(1.14);
+  box-shadow:
+    0 2px 8px rgb(58 50 44 / 0.22),
+    0 0 0 7px color-mix(in oklab, var(--rose) 18%, transparent);
+}
+
+.range-input:active::-moz-range-thumb {
+  transform: scale(1.14);
+  box-shadow:
+    0 2px 8px rgb(58 50 44 / 0.22),
+    0 0 0 7px color-mix(in oklab, var(--rose) 18%, transparent);
 }
 
 /* Hide scrollbar on horizontal strips without losing the scroll. */
