@@ -39,14 +39,17 @@ export interface Preferences {
   breathSoundVolume: number
   breathHapticCues: boolean
   /**
-   * Whether the player's atmosphere breathes with the guide.
+   * Whether the player is wrapped in a living environment rather than sitting
+   * on the ordinary Cosmic Garden.
    *
-   * It rides on the same clock rather than having one of its own, so this can
-   * only ever be true *as well as* `breathingEnabled` — with the guide off
-   * there is no breath for the room to follow, and inventing one would be a
-   * four-second pulse pretending to be your breathing.
+   * Independent of `breathingEnabled` on purpose. What the environment *is* —
+   * the light, the colour, the depth, the horizon — is this switch; whether it
+   * moves is the guide's, because the room rides on the guide's clock rather
+   * than having one of its own and inventing one would be a four-second pulse
+   * pretending to be your breathing. With the guide off the room is simply
+   * still, which is a room, and not a broken effect.
    */
-  backgroundBreathing: boolean
+  backgroundVisualizer: boolean
   /** Interface taps and confirmations. */
   uiSounds: boolean
   uiHaptics: boolean
@@ -81,7 +84,7 @@ const DEFAULTS: Preferences = {
    * percent of light is not an effect anyone has to opt into; it is what stops
    * the orb reading as a widget sitting on a page.
    */
-  backgroundBreathing: true,
+  backgroundVisualizer: true,
   uiSounds: true,
   uiHaptics: true,
   aiEnabled: true,
@@ -96,9 +99,10 @@ interface PreferencesContextValue {
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null)
 
-/** What was stored before the breath had voices and forms of its own. */
+/** What was stored before the breath had voices, forms and a room of its own. */
 interface LegacyPreferences {
   breathSoundCues?: boolean
+  backgroundBreathing?: boolean
 }
 
 function load(): Preferences {
@@ -120,6 +124,19 @@ function load(): Preferences {
      */
     if (parsed.breathSound == null && typeof parsed.breathSoundCues === 'boolean') {
       merged.breathSound = parsed.breathSoundCues ? 'chime' : 'off'
+    }
+
+    /*
+     * The room used to be called Background breathing and was only ever the
+     * *movement* of the atmosphere. It is now the atmosphere itself, and it
+     * has a switch of its own — but someone who had turned the old one off had
+     * turned the room off, and that decision carries.
+     */
+    if (
+      parsed.backgroundVisualizer == null &&
+      typeof parsed.backgroundBreathing === 'boolean'
+    ) {
+      merged.backgroundVisualizer = parsed.backgroundBreathing
     }
 
     merged.breathSoundVolume = Math.min(
