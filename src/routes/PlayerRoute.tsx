@@ -434,6 +434,7 @@ export function PlayerRoute() {
         immersive={expanded}
         settled={complete}
         utterance={playing ? (currentLine ?? undefined) : undefined}
+        mode={preferences.backgroundMode}
       />
 
       <div className="mx-auto grid max-w-xl grid-cols-[minmax(0,1fr)] gap-6 lg:max-w-none lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8 xl:grid-cols-[minmax(0,1fr)_26rem]">
@@ -772,6 +773,7 @@ export function PlayerRoute() {
                 preferences.breathStyle,
                 preferences.breathSound,
                 preferences.backgroundVisualizer,
+                preferences.backgroundMode,
               )}
               onClick={() => {
                 cue('tap')

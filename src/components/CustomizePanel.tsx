@@ -291,6 +291,7 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
               preferences.breathStyle,
               preferences.breathSound,
               preferences.backgroundVisualizer,
+              preferences.backgroundMode,
             )}
             onClick={() => openPanel('breathing')}
             accent={preferences.breathingEnabled || preferences.backgroundVisualizer}

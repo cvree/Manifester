@@ -115,7 +115,7 @@ export function SavedLoopCard({
     {
       id: 'duplicate',
       label: 'Duplicate',
-      hint: 'A separate copy to change freely',
+      hint: 'A separate copy to edit',
       icon: <CopyIcon />,
       onSelect: duplicate,
     },

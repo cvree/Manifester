@@ -627,6 +627,9 @@ export function CreateRoute() {
             canPreview={speechSupported}
             onPreview={() => previewVoice(undefined, lines[0])}
             onStopPreview={stopPreview}
+            onStart={handleStart}
+            canStart={canStart}
+            starting={starting}
             onOpenSetting={openSetting}
           />
         </div>

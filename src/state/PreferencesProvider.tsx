@@ -26,6 +26,11 @@ import {
   type BreathPattern,
   type BreathStyleId,
 } from '../lib/breathing'
+import {
+  DEFAULT_BACKGROUND_CHOICE,
+  isBackgroundChoice,
+  type BackgroundChoice,
+} from '../lib/environment'
 import { setHapticsEnabled, setSoundEnabled } from '../lib/feedback'
 import { readLocal, writeLocal } from '../lib/storage'
 
@@ -50,6 +55,12 @@ export interface Preferences {
    * still, which is a room, and not a broken effect.
    */
   backgroundVisualizer: boolean
+  /**
+   * Which room that environment is — Atmosphere, Rings, Waterline,
+   * Curtains, Starfield or Stillness — or `random`, which drifts between all of them
+   * a minute and a half at a time. See `BACKGROUND_MODES`.
+   */
+  backgroundMode: BackgroundChoice
   /** Interface taps and confirmations. */
   uiSounds: boolean
   uiHaptics: boolean
@@ -85,6 +96,13 @@ const DEFAULTS: Preferences = {
    * the orb reading as a widget sitting on a page.
    */
   backgroundVisualizer: true,
+  /*
+   * Atmosphere: the room this app has always had. A first session should look
+   * the way the app is described rather than opening on whichever of six rooms
+   * the developer liked best that week — the other five are one tap away, and
+   * "drift between all of them" is one tap further.
+   */
+  backgroundMode: DEFAULT_BACKGROUND_CHOICE,
   uiSounds: true,
   uiHaptics: true,
   aiEnabled: true,
@@ -137,6 +155,15 @@ function load(): Preferences {
       typeof parsed.backgroundBreathing === 'boolean'
     ) {
       merged.backgroundVisualizer = parsed.backgroundBreathing
+    }
+
+    /*
+     * A room that no longer exists — a build where one was renamed, or a
+     * hand-edited value — falls back to the default rather than to a class
+     * name nothing in the stylesheet answers to and an empty screen.
+     */
+    if (!isBackgroundChoice(merged.backgroundMode)) {
+      merged.backgroundMode = DEFAULT_BACKGROUND_CHOICE
     }
 
     merged.breathSoundVolume = Math.min(

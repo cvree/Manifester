@@ -15,20 +15,32 @@
 /**
  * The kinds of room the background visualiser can be.
  *
- * Only `atmosphere` is built. The union names the others because the shape of
- * the thing is the point: a mode is an id in this list, an entry in
- * `BACKGROUND_MODES`, and a `.player-field--<id>` block in `theme.css` that
- * re-tints or re-weights the layers already there. It is not a second
- * component, a second clock or a second set of geometry, and keeping it that
- * way is what makes "one day, an Aurora mode" a morning's work rather than a
- * rewrite.
+ * Named so that none of them shares a name with a *breathing form* (`Bloom`,
+ * `Ripple`, `Aurora`, `Tide` and the rest, in `breathing.ts`). The two settings
+ * sit in the same sheet, and two lists with four names in common is a sheet
+ * where nobody can tell which "Tide" they just chose.
+ *
+ * A mode is an id in this list, an entry in `BACKGROUND_MODES`, a set of layers
+ * in `BackgroundScene` and a `.player-scene--<id>` block in `theme.css`. It is
+ * never a second clock: every one of them is drawn from the same `--e`, `--e-mid`
+ * and `--e-far` the orb is using, on the same frame, so no mode can disagree
+ * with the breath and no two modes can disagree with each other. That is also
+ * what makes a crossfade between two of them safe — see `useBackgroundScenes`.
+ *
+ * The room around them does not change: the warm ground wash, the horizon, the
+ * vignette and the light behind a spoken line are the same in every mode. What
+ * changes is what the breath is *made visible as*.
  */
 export type BackgroundModeId =
   | 'atmosphere'
-  | 'aurora'
-  | 'constellation'
-  | 'tide'
-  | 'void'
+  | 'rings'
+  | 'waterline'
+  | 'curtains'
+  | 'starfield'
+  | 'stillness'
+
+/** What the setting can hold: a mode, or the instruction to drift between them. */
+export type BackgroundChoice = BackgroundModeId | 'random'
 
 export interface BackgroundMode {
   id: BackgroundModeId
@@ -42,14 +54,98 @@ export const BACKGROUND_MODES: BackgroundMode[] = [
     name: 'Atmosphere',
     description: 'Fog, light and a slow aurora. The room as it is.',
   },
+  {
+    id: 'rings',
+    name: 'Rings',
+    description: 'A ring of light leaving on every in-breath, travelling out.',
+  },
+  {
+    id: 'waterline',
+    name: 'Waterline',
+    description: 'The room fills like water as you breathe in, and draws back.',
+  },
+  {
+    id: 'curtains',
+    name: 'Curtains',
+    description: 'Light reaching down the screen, and lifting again.',
+  },
+  {
+    id: 'starfield',
+    name: 'Starfield',
+    description: 'A field of stars opening outward around you.',
+  },
+  {
+    id: 'stillness',
+    name: 'Stillness',
+    description: 'Almost nothing. One deep field, and the dark breathing in it.',
+  },
 ]
 
 export const DEFAULT_BACKGROUND_MODE: BackgroundModeId = 'atmosphere'
+export const DEFAULT_BACKGROUND_CHOICE: BackgroundChoice = DEFAULT_BACKGROUND_MODE
 
 export function findBackgroundMode(id: string): BackgroundMode {
   return (
     BACKGROUND_MODES.find((mode) => mode.id === id) ?? BACKGROUND_MODES[0]
   )
+}
+
+export function isBackgroundChoice(value: unknown): value is BackgroundChoice {
+  if (value === 'random') return true
+  return BACKGROUND_MODES.some((mode) => mode.id === value)
+}
+
+/** What the setting is called where there is only room for its name. */
+export function backgroundChoiceName(choice: BackgroundChoice): string {
+  return choice === 'random' ? 'Drifting' : findBackgroundMode(choice).name
+}
+
+/* ── Drifting between rooms ─────────────────────────────────── */
+
+/**
+ * How long a room is held before the next one begins to arrive.
+ *
+ * Long enough that the change is something you notice having happened rather
+ * than something you watch happen: about eighteen breaths at a four-second
+ * pattern. A visualiser that reinvents itself every thirty seconds is a
+ * screensaver, and this is meant to be a room.
+ */
+export const SCENE_HOLD_MS = 96_000
+
+/**
+ * And how long the two rooms overlap. Deliberately most of a whole breath, so
+ * the arriving room is already breathing in step by the time it is visible —
+ * there is no frame at which one is doing something the other is not.
+ */
+export const SCENE_FADE_MS = 4200
+
+/**
+ * The next room to drift into, given the one on screen.
+ *
+ * Never the same one twice — a "random" that repeats itself reads as the
+ * feature having stalled — and pure, so the sequencing is testable without
+ * waiting a minute and a half for it.
+ *
+ * `roll` is a number in [0, 1): `Math.random()` at the call site, a fixture in
+ * the tests.
+ */
+export function nextScene(
+  current: BackgroundModeId,
+  roll: number,
+): BackgroundModeId {
+  const others = BACKGROUND_MODES.filter((mode) => mode.id !== current)
+  if (others.length === 0) return current
+  return others[pick(others.length, roll)].id
+}
+
+/** Any room at all — the one the first drift of a session opens in. */
+export function sceneAt(roll: number): BackgroundModeId {
+  return BACKGROUND_MODES[pick(BACKGROUND_MODES.length, roll)].id
+}
+
+/** `Math.floor`, with the `roll === 1` case that would land past the end. */
+function pick(count: number, roll: number): number {
+  return Math.min(count - 1, Math.max(0, Math.floor(roll * count)))
 }
 
 /* ── How the breath travels ─────────────────────────────────── */

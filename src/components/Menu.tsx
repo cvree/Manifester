@@ -42,7 +42,7 @@ interface MenuProps {
 /** Below this the menu arrives as a sheet from the bottom edge instead. */
 const SHEET_QUERY = '(max-width: 639px)'
 
-const MENU_WIDTH = 248
+const MENU_WIDTH = 264
 /** Breathing room kept between the menu and the edge of the window. */
 const EDGE = 10
 /** The gap between the button and the menu it opens. */
@@ -304,10 +304,16 @@ function ActionRow({ action, onSelect, first, size, ref }: ActionRowProps) {
           {action.icon}
         </span>
       )}
-      <span className="min-w-0 grow">
+      <span className="min-w-0 grow py-1.5">
         <span className="block truncate">{action.label}</span>
+        {/*
+          The label truncates and the hint wraps. A hint is a whole short
+          sentence, and half of one is worse than none — but a title someone
+          chose can be any length at all, and a menu that widens to fit it is
+          not a menu.
+        */}
         {action.hint && (
-          <span className="type-meta mt-0.5 block truncate">{action.hint}</span>
+          <span className="type-meta mt-0.5 block leading-snug">{action.hint}</span>
         )}
       </span>
     </button>

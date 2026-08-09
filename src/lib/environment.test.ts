@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
+import { BREATH_STYLES } from './breathing'
 import {
   BACKGROUND_MODES,
+  backgroundChoiceName,
   BREATH_LAG_SECONDS,
   DEFAULT_BACKGROUND_MODE,
   findBackgroundMode,
+  isBackgroundChoice,
   MOTE_FIELD,
+  nextScene,
+  sceneAt,
+  SCENE_FADE_MS,
+  SCENE_HOLD_MS,
 } from './environment'
 
 /**
@@ -57,7 +64,77 @@ describe('MOTE_FIELD', () => {
 describe('modes', () => {
   it('resolves the default, and falls back rather than returning nothing', () => {
     expect(findBackgroundMode(DEFAULT_BACKGROUND_MODE).id).toBe('atmosphere')
-    expect(findBackgroundMode('tide')).toBe(BACKGROUND_MODES[0])
+    // A room that no longer exists resolves to one that does, rather than to
+    // a class name the stylesheet has no answer for and an empty screen.
+    expect(findBackgroundMode('nowhere')).toBe(BACKGROUND_MODES[0])
+  })
+
+  it('never shares a name with a breathing form', () => {
+    // The two settings sit in the same sheet. Four names in common — which is
+    // where this started — is a sheet where nobody can tell which "Tide" they
+    // just chose.
+    const forms = new Set(BREATH_STYLES.map((style) => style.name))
+    for (const mode of BACKGROUND_MODES) {
+      expect(forms.has(mode.name), mode.name).toBe(false)
+    }
+  })
+
+  it('offers a real choice of rooms, each one described', () => {
+    expect(BACKGROUND_MODES.length).toBeGreaterThanOrEqual(5)
+    for (const mode of BACKGROUND_MODES) {
+      expect(mode.name).not.toBe('')
+      expect(mode.description).not.toBe('')
+    }
+    // Every id distinct: two rooms sharing one would make the picker lie.
+    const ids = new Set(BACKGROUND_MODES.map((mode) => mode.id))
+    expect(ids.size).toBe(BACKGROUND_MODES.length)
+  })
+
+  it('knows what may be stored in the setting', () => {
+    expect(isBackgroundChoice('random')).toBe(true)
+    expect(isBackgroundChoice(DEFAULT_BACKGROUND_MODE)).toBe(true)
+    expect(isBackgroundChoice('nowhere')).toBe(false)
+    expect(isBackgroundChoice(undefined)).toBe(false)
+  })
+
+  it('names the setting, drifting included', () => {
+    expect(backgroundChoiceName('random')).toBe('Drifting')
+    expect(backgroundChoiceName('waterline')).toBe('Waterline')
+  })
+})
+
+describe('drifting between rooms', () => {
+  it('never lands on the room it is leaving', () => {
+    for (const mode of BACKGROUND_MODES) {
+      for (const roll of [0, 0.17, 0.42, 0.5, 0.83, 0.999]) {
+        expect(nextScene(mode.id, roll)).not.toBe(mode.id)
+      }
+    }
+  })
+
+  it('can reach every other room', () => {
+    const reached = new Set(
+      Array.from({ length: 200 }, (_, i) =>
+        nextScene('atmosphere', i / 200),
+      ),
+    )
+    expect(reached.size).toBe(BACKGROUND_MODES.length - 1)
+  })
+
+  it('stays in range at the ends of the roll', () => {
+    // `Math.random()` is [0, 1), but a fixture — or a browser rounding a
+    // float — must not be able to index past the end of the list.
+    expect(BACKGROUND_MODES.map((mode) => mode.id)).toContain(sceneAt(0))
+    expect(BACKGROUND_MODES.map((mode) => mode.id)).toContain(sceneAt(1))
+    expect(BACKGROUND_MODES.map((mode) => mode.id)).toContain(sceneAt(0.999999))
+  })
+
+  it('holds a room long enough to be a room, and crosses inside the hold', () => {
+    expect(SCENE_HOLD_MS).toBeGreaterThanOrEqual(30_000)
+    expect(SCENE_FADE_MS).toBeLessThan(SCENE_HOLD_MS)
+    // Long enough to cover a whole breath at the default pattern, so the
+    // arriving room is already in step by the time it can be seen.
+    expect(SCENE_FADE_MS).toBeGreaterThanOrEqual(3000)
   })
 })
 

@@ -41,6 +41,18 @@ interface RitualPreviewProps {
   previewing: boolean
   canPreview: boolean
   /**
+   * Begin the loop from here.
+   *
+   * The preview is the picture of the finished thing, and on a desktop it is
+   * the right-hand column — which meant the one button that acts on what you
+   * are looking at was in the other column, below the fold. Hearing a line and
+   * starting the loop are the same question at two sizes, so they are the same
+   * pair of buttons in the same place.
+   */
+  onStart: () => void
+  canStart: boolean
+  starting: boolean
+  /**
    * Take me to the control behind this tile. The preview does not know
    * whether that means opening a sheet or scrolling the page — Create owns
    * both the sheet state and the layout, so it decides.
@@ -115,6 +127,9 @@ export function RitualPreview({
   onStopPreview,
   previewing,
   canPreview,
+  onStart,
+  canStart,
+  starting,
   onOpenSetting,
   className,
 }: RitualPreviewProps) {
@@ -200,29 +215,67 @@ export function RitualPreview({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={() => {
-            cue('tap')
-            if (previewing) onStopPreview()
-            else onPreview()
-          }}
-          disabled={!canPreview}
-          className={cx(
-            'interactive pressable mt-6 inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
-            previewing
-              ? 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]'
-              : 'border-[var(--control-border)] bg-[var(--control)] text-ink',
-            'disabled:cursor-not-allowed disabled:opacity-45',
-          )}
-        >
-          {previewing ? (
-            <PauseIcon className="text-[0.85rem]" />
-          ) : (
-            <PlayIcon className="text-[0.85rem]" />
-          )}
-          {previewing ? 'Stop preview' : 'Hear a line'}
-        </button>
+        {/*
+          Start the loop, and hear one line of it. The pair sit together
+          because they are the same question at two sizes — and Start is the
+          filled one, because a preview is a step on the way to it rather than
+          an alternative to it.
+        */}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+          <button
+            type="button"
+            onClick={onStart}
+            disabled={!canStart || starting}
+            aria-busy={starting || undefined}
+            className={cx(
+              'interactive pressable inline-flex min-h-12 items-center gap-2.5 rounded-pill border border-transparent px-6 text-[0.95rem] font-medium',
+              'bg-[linear-gradient(175deg,color-mix(in_oklab,var(--rose-deep)_86%,white)_0%,var(--rose-deep)_62%)] text-[var(--bg-0)]',
+              'shadow-[0_1px_0_rgb(255_255_255/0.28)_inset,0_8px_24px_-10px_var(--glow)]',
+              'hover:brightness-[1.05]',
+              'disabled:cursor-not-allowed disabled:opacity-45',
+            )}
+          >
+            {starting ? (
+              <span
+                aria-hidden="true"
+                className="h-[1.05em] w-[1.05em] shrink-0 animate-spin rounded-full border-2 border-[color-mix(in_oklab,currentColor_28%,transparent)] border-t-current"
+              />
+            ) : (
+              <PlayIcon className="text-[0.85rem]" />
+            )}
+            {starting ? 'Beginning…' : 'Start loop'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              cue('tap')
+              if (previewing) onStopPreview()
+              else onPreview()
+            }}
+            disabled={!canPreview}
+            className={cx(
+              'interactive pressable inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
+              previewing
+                ? 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]'
+                : 'border-[var(--control-border)] bg-[var(--control)] text-ink',
+              'disabled:cursor-not-allowed disabled:opacity-45',
+            )}
+          >
+            {previewing ? (
+              <PauseIcon className="text-[0.85rem]" />
+            ) : (
+              <VoiceIcon className="text-[0.95rem]" />
+            )}
+            {previewing ? 'Stop preview' : 'Hear a line'}
+          </button>
+        </div>
+
+        {!canStart && (
+          <p className="type-meta mt-2.5 text-center">
+            Write a line to begin.
+          </p>
+        )}
 
         {/*
           The summary of everything the loop is made of — and the shortcut to

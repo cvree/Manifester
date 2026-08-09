@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   auditionBreathVoice,
   BREATH_VOICES,
@@ -22,10 +22,12 @@ import {
   type BreathStyleId,
 } from '../lib/breathing'
 import { cx } from '../lib/cx'
+import { BACKGROUND_MODES } from '../lib/environment'
 import { cue, hapticsSupported } from '../lib/feedback'
 import { revealSection } from '../lib/scroll'
 import { useBreathing } from '../lib/useBreathing'
 import type { Preferences } from '../state/PreferencesProvider'
+import { BackgroundSceneThumbnail } from './BackgroundScene'
 import {
   BreathingVisualizer,
   BreathStyleThumbnail,
@@ -170,8 +172,8 @@ export function BreathingSettings({
         label="Background visualiser"
         description={
           preferences.breathingEnabled
-            ? 'Let the atmosphere around you expand and settle with each breath.'
-            : 'The atmosphere stays lit and still until the breathing guide is on.'
+            ? 'Let the whole screen behind the player expand and settle with each breath.'
+            : 'The room stays lit and still until the breathing guide is on.'
         }
         checked={preferences.backgroundVisualizer}
         onChange={(backgroundVisualizer) => {
@@ -179,6 +181,56 @@ export function BreathingSettings({
           if (backgroundVisualizer) cue('tap')
         }}
       />
+
+      {/*
+        The rooms, under the switch that turns them on.
+
+        Every tile is the room itself at a fixed half-open pose — the same
+        markup and the same stylesheet as the thing behind the player, not a
+        drawing of it — so what you pick from cannot quietly stop resembling
+        what you get.
+      */}
+      {preferences.backgroundVisualizer && (
+        <div>
+          <FieldLabel hint="Behind the player">The room</FieldLabel>
+          <div
+            role="radiogroup"
+            aria-label="Background visualiser room"
+            className="grid grid-cols-2 gap-2"
+          >
+            {BACKGROUND_MODES.map((mode) => (
+              <RoomTile
+                key={mode.id}
+                name={mode.name}
+                description={mode.description}
+                selected={preferences.backgroundMode === mode.id}
+                onSelect={() => {
+                  onChange({ backgroundMode: mode.id })
+                  cue('select')
+                }}
+              >
+                <BackgroundSceneThumbnail mode={mode.id} />
+              </RoomTile>
+            ))}
+            <RoomTile
+              name="Drifting"
+              description="All six in turn, crossfading every minute or so. Held still if you have asked for reduced motion."
+              selected={preferences.backgroundMode === 'random'}
+              onSelect={() => {
+                onChange({ backgroundMode: 'random' })
+                cue('select')
+              }}
+              className="col-span-2"
+            >
+              <span className="player-scene-drift" aria-hidden="true">
+                {BACKGROUND_MODES.slice(0, 3).map((mode) => (
+                  <BackgroundSceneThumbnail key={mode.id} mode={mode.id} />
+                ))}
+              </span>
+            </RoomTile>
+          </div>
+        </div>
+      )}
 
       {preferences.breathingEnabled && (
         <>
@@ -457,6 +509,52 @@ function StyleTile({
       <span className="block text-[0.9rem] font-medium text-ink">{name}</span>
       <span className="block text-[0.76rem] leading-snug text-ink-muted">
         {description}
+      </span>
+    </button>
+  )
+}
+
+/**
+ * One room in the picker. Wider than a form tile because the picture is the
+ * point: you are choosing a place, and a 3.5rem swatch of it is not a choice.
+ */
+function RoomTile({
+  name,
+  description,
+  selected,
+  onSelect,
+  className,
+  children,
+}: {
+  name: string
+  description: string
+  selected: boolean
+  onSelect: () => void
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      aria-label={`${name}. ${description}`}
+      onClick={onSelect}
+      className={cx(
+        'interactive pressable flex flex-col gap-2 rounded-2xl border p-2 text-left',
+        'transition-[background-color,border-color] duration-200',
+        selected
+          ? 'border-[var(--rose)] bg-[var(--rose-soft)]'
+          : 'border-[var(--border)] bg-[var(--surface-sunken)] hover:border-[var(--border-strong)]',
+        className,
+      )}
+    >
+      {children}
+      <span className="px-1 pb-0.5">
+        <span className="block text-[0.9rem] font-medium text-ink">{name}</span>
+        <span className="mt-0.5 block text-[0.76rem] leading-snug text-ink-muted">
+          {description}
+        </span>
       </span>
     </button>
   )

@@ -1,11 +1,12 @@
 import { useMemo, type CSSProperties, type RefObject } from 'react'
 import {
-  DEFAULT_BACKGROUND_MODE,
-  MOTE_FIELD,
-  type BackgroundModeId,
+  DEFAULT_BACKGROUND_CHOICE,
+  type BackgroundChoice,
 } from '../lib/environment'
 import { cx } from '../lib/cx'
-import { isLowPowerDevice } from '../lib/motion'
+import { isLowPowerDevice, useReducedMotion } from '../lib/motion'
+import { useBackgroundScenes } from '../lib/useBackgroundScenes'
+import { BackgroundScene } from './BackgroundScene'
 
 /**
  * The room the player sits in.
@@ -17,28 +18,22 @@ import { isLowPowerDevice } from '../lib/motion'
  * frame, as the ones driving the orb. There is no second clock here, no
  * keyframed pulse and no interval: see `mirrors` in `useBreathing`.
  *
- * Seven bands of depth, and each of them earns its place:
+ * Three of its bands belong to the room itself and never change:
  *
  *   1. a warm ground wash that comes up as you empty and recedes as you fill —
  *      the room's temperature, and the only layer that runs *against* the
  *      breath rather than with it;
- *   2. the breathing field — one broad pool of light behind the orb, which is
- *      the layer that actually reads as the room inhaling — and behind it the
- *      far field, drawn two thirds of a second in arrears so that an in-breath
- *      appears to travel outward rather than land everywhere at once;
- *   3. the echo: a faint halo that only exists where the lagged breath is
- *      still ahead of the live one, so a full inhale leaves something behind
- *      it for a moment and nothing can ever accumulate;
- *   4. three aurora clouds — rose-lavender above, sage below, gold to one
- *      side — on very slow, deliberately incommensurable orbits, so the colour
- *      never repeats a pose;
- *   5. two haze planes at different depths: one near and broad, one further
- *      out and tighter, which is what turns four gradients into a volume;
- *   6. motes — eighteen points of pollen light with depth values, drifting out
- *      and settling back. The first thing dropped on modest hardware;
- *   7. the horizon and the vignette. The quietest band and the one doing the
+ *   2. a brief warming of the air behind each spoken line;
+ *   3. the horizon and the vignette. The quietest band and the one doing the
  *      most: it is what keeps the eye on the words without ever asking it to
  *      move.
+ *
+ * Between them sits the scene — what the breath is actually drawn as, which is
+ * the part the Background visualiser setting chooses: Atmosphere, Rings, Waterline,
+ * Curtains, Starfield or Stillness, or all of them in turn. See
+ * `BackgroundScene` for the rooms and `useBackgroundScenes` for the drift
+ * between them; both of them read the same breath this element is carrying, so
+ * a change of room is a crossfade and never a restart.
  *
  * Three rules hold the whole thing together, and all three are the house rules
  * the garden was already built on (see "The atmosphere" in `theme.css`):
@@ -88,8 +83,8 @@ interface PlayerAtmosphereProps {
    * there is nothing being said.
    */
   utterance?: string
-  /** Which kind of room this is. See `BACKGROUND_MODES`. */
-  mode?: BackgroundModeId
+  /** Which kind of room this is, or `random` to drift. See `BACKGROUND_MODES`. */
+  mode?: BackgroundChoice
 }
 
 export function PlayerAtmosphere({
@@ -98,8 +93,10 @@ export function PlayerAtmosphere({
   immersive,
   settled = false,
   utterance,
-  mode = DEFAULT_BACKGROUND_MODE,
+  mode = DEFAULT_BACKGROUND_CHOICE,
 }: PlayerAtmosphereProps) {
+  const reducedMotion = useReducedMotion()
+  const scenes = useBackgroundScenes({ choice: mode, reducedMotion })
   /*
    * Measured once. The answer cannot change while the page is open, and it
    * costs a throwaway WebGL context to ask — see `isLowPowerDevice`.
@@ -123,7 +120,6 @@ export function PlayerAtmosphere({
       aria-hidden="true"
       className={cx(
         'player-field',
-        `player-field--${mode}`,
         immersive && 'player-field--immersive',
         settled && 'player-field--settled',
       )}
@@ -132,60 +128,23 @@ export function PlayerAtmosphere({
       {/* 1 · Temperature. Warm as you empty, receding as you fill. */}
       <span className="player-field__warm" />
 
-      {/* 2 · The breath itself, near and far. */}
-      <span className="player-field__wave" />
-      <span className="player-field__glow" />
-
-      {/* 3 · What a full inhale leaves behind it. */}
-      <span className="player-field__echo" />
-
       {/*
-        4 and 5 · Colour and haze, wrapped together.
+        2 · The room itself.
 
-        The wrapper is not decoration: its opacity is plain, so GSAP has
-        something it can reveal without fighting the per-frame calculations on
-        the layers inside it. A tween and a `calc(var(--e) …)` on the same
-        property is a tug of war with no winner.
+        Usually one. Two for a few seconds while a drift is crossfading, and
+        the pair are at the same instant of the same breath the whole way
+        across, because neither of them owns a clock — see `BackgroundScene`.
       */}
-      {rich && (
-        <span className="player-field__clouds">
-          <span className="player-field__cloud player-field__cloud--a" />
-          <span className="player-field__cloud player-field__cloud--b" />
-          <span className="player-field__cloud player-field__cloud--c" />
-          <span className="player-field__haze player-field__haze--near" />
-          <span className="player-field__haze player-field__haze--far" />
-        </span>
-      )}
-
-      {/*
-        6 · The points of light.
-
-        Always mounted when the hardware can afford them, and hidden by the
-        stylesheet where there is no room for them to travel through without
-        landing on the words — a mote behind a paragraph is not atmosphere, it
-        is a smudge. Hiding it there rather than unmounting it keeps the field
-        the same field: nothing is re-placed by expanding the stage.
-      */}
-      {rich && (
-        <span className="player-field__motes">
-          {MOTE_FIELD.map((mote) => (
-            <span
-              key={`${mote.angle}-${mote.distance}`}
-              className="player-field__mote"
-              style={
-                {
-                  '--angle': `${mote.angle}deg`,
-                  '--distance': mote.distance,
-                  '--depth': mote.depth,
-                  '--dot': `${mote.size}px`,
-                  '--delay': `${mote.delay}s`,
-                  '--twinkle': `${mote.period}s`,
-                } as CSSProperties
-              }
-            />
-          ))}
-        </span>
-      )}
+      {scenes.map((scene) => (
+        <BackgroundScene
+          key={scene.key}
+          mode={scene.id}
+          entering={scene.entering}
+          leaving={scene.leaving}
+          rich={rich}
+          immersive={immersive}
+        />
+      ))}
 
       {/*
         The words affecting the room they are spoken into: a brief, very faint
@@ -196,7 +155,7 @@ export function PlayerAtmosphere({
         <span key={utterance} className="player-field__utter" />
       )}
 
-      {/* 7 · Depth. The horizon, and the vignette over everything. */}
+      {/* 3 · Depth. The horizon, and the vignette over everything. */}
       <span className="player-field__depth">
         {rich && (
           <>

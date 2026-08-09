@@ -1839,6 +1839,14 @@ html:not(.dark) .breath-aurora__veil {
   --heart-y: 44%;
   /* How far the motes may travel from it. */
   --reach: min(34vw, 30vh);
+  /*
+   * The unit every room sizes itself in: the short side of the screen. Rings,
+   * curtains and starfields are drawn against this rather than against the
+   * element's own box, so a circle is a circle on a phone and on a monitor —
+   * and so the picker's thumbnails can render the *same* markup by overriding
+   * this one number.
+   */
+  --span: min(100vw, 100vh);
   /* How far the horizon opens on a full in-breath. */
   --swell: 9px;
 
@@ -2362,6 +2370,736 @@ html:not(.dark) .breath-aurora__veil {
   .player-field__mote {
     opacity: calc((0.16 + var(--depth, 0.5) * 0.24) * var(--mix-mote));
   }
+}
+
+/* ── The rooms ──────────────────────────────────────────────── */
+
+/*
+ * What the breath is *drawn as*.
+ *
+ * The room around these — the warm ground wash, the horizon, the vignette, the
+ * light behind a spoken line — is the same in every one of them. What changes
+ * here is the shape the breath takes: light gathering (Atmosphere), a ring
+ * leaving (Rings), water rising (Waterline), light reaching down (Curtains), a
+ * field opening outward (Starfield), or almost nothing at all (Stillness).
+ *
+ * Not one of them has a clock. Every breathing half below is `var(--e)`,
+ * `var(--e-mid)` or `var(--e-far)` — expansion now, a quarter-second ago, two
+ * thirds of a second ago — written onto `.player-field` by the same
+ * `breathStateAt` call that drives the orb. That is what makes two rooms safe
+ * to have on screen at once: mid-drift they are the same instant of the same
+ * breath, drawn two ways, so a crossfade can never catch one of them at the
+ * wrong point of a cycle. Anything self-running here is a slow drift damped by
+ * `--sway`, which the breath takes to a quarter through a hold.
+ *
+ * And the three house rules hold throughout: every gradient reaches full
+ * transparency inside its own element, nothing viewport-sized goes behind a
+ * `filter: blur()`, and no gradient is recomputed per frame — the only
+ * animated properties in this whole section are `transform` and `opacity`.
+ */
+
+.player-scene {
+  position: absolute;
+  inset: 0;
+  will-change: opacity;
+}
+
+/*
+ * The drift between two rooms. 4200ms here is `SCENE_FADE_MS` in
+ * `environment.ts`, and the two have to agree: the hook keeps both rooms
+ * mounted for exactly as long as this takes to finish.
+ *
+ * The pair are not linear opposites. Both hold above the halfway mark through
+ * the middle of the exchange, because two soft lights crossing at 0.5 each
+ * read as a dip in the room's brightness — an equal-power crossfade, which is
+ * the same reason the audio bus does not linearly fade a track out either.
+ */
+.player-scene--entering {
+  animation: scene-in 4200ms var(--ease-calm) both;
+}
+
+.player-scene--leaving {
+  animation: scene-out 4200ms var(--ease-calm) both;
+}
+
+@keyframes scene-in {
+  0% {
+    opacity: 0;
+  }
+  62% {
+    opacity: 0.84;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes scene-out {
+  0% {
+    opacity: 1;
+  }
+  38% {
+    opacity: 0.84;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ── Rings ──────────────────────────────────────────────────── */
+
+/*
+ * The breath made visible as distance travelled.
+ *
+ * Four rings, all centred on the heart, each reading the breath further back
+ * in time than the one inside it: live, a quarter-second back, two thirds of a
+ * second back, and the far sample again at a wider radius and a lower opacity.
+ * Nothing is spawned and nothing is cleaned up — the ring that appears to
+ * travel outward is four fixed elements at four fixed lags, which is the same
+ * device the near and far fields have always used, drawn where it can be seen.
+ *
+ * The inner rings carry the colour and the outer ones are nearly white, so an
+ * in-breath reads as warmth thinning into light as it goes.
+ */
+.player-scene__ring {
+  position: absolute;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * var(--scale));
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    transparent 58%,
+    var(--tint) 74%,
+    transparent 92%
+  );
+  transform: translate(-50%, -50%)
+    scale(calc(1 + (var(--lag) - 0.5) * var(--travel) * var(--drive)));
+  opacity: calc(
+    (var(--base) + (var(--lag) - 0.5) * var(--swing) * var(--drive)) * var(--mix)
+  );
+  will-change: transform, opacity;
+}
+
+.player-scene__ring--1 {
+  --scale: 0.82;
+  --lag: var(--e);
+  --travel: 0.5;
+  --tint: color-mix(in oklab, var(--rose) 46%, transparent);
+  --base: 0.64;
+  --swing: 0.3;
+}
+
+.player-scene__ring--2 {
+  --scale: 1.26;
+  --lag: var(--e-mid);
+  --travel: 0.42;
+  --tint: color-mix(in oklab, var(--rose) 30%, transparent);
+  --base: 0.5;
+  --swing: 0.34;
+}
+
+.player-scene__ring--3 {
+  --scale: 1.76;
+  --lag: var(--e-far);
+  --travel: 0.34;
+  --tint: color-mix(in oklab, var(--moonlight) 62%, transparent);
+  --base: 0.42;
+  --swing: 0.3;
+}
+
+.player-scene__ring--4 {
+  --scale: 2.4;
+  --lag: var(--e-far);
+  --travel: 0.26;
+  --tint: color-mix(in oklab, var(--twilight) 40%, transparent);
+  --base: 0.3;
+  --swing: 0.22;
+}
+
+/* The light the rings leave from: a broad pool that fills with the breath. */
+.player-scene__pool {
+  position: absolute;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * 1.1);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--rose) 26%, transparent) 0%,
+    color-mix(in oklab, var(--gold) 10%, transparent) 40%,
+    transparent 68%
+  );
+  transform: translate(-50%, -50%)
+    scale(calc(0.9 + var(--e) * 0.22 * var(--drive)));
+  opacity: calc((0.52 + (var(--e) - 0.5) * 0.3 * var(--drive)) * var(--mix));
+  will-change: transform, opacity;
+}
+
+/*
+ * One wide, slow ellipse turning behind the rings. It is what stops a set of
+ * concentric circles from reading as a target: the light is not evenly
+ * distributed around them, and where it is heaviest keeps moving.
+ */
+.player-scene__petal {
+  position: absolute;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * 1.5);
+  height: calc(var(--span) * 0.92);
+  margin: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--twilight) 15%, transparent) 0%,
+    color-mix(in oklab, var(--sage) 6%, transparent) 46%,
+    transparent 72%
+  );
+  opacity: calc(0.5 * var(--mix-cloud));
+  animation: petal-turn 137s linear infinite;
+  will-change: transform;
+}
+
+@keyframes petal-turn {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg)
+      scale(calc(1 + var(--e-far) * 0.06 * var(--sway)));
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg)
+      scale(calc(1 + var(--e-far) * 0.06 * var(--sway)));
+  }
+}
+
+/* ── Waterline ──────────────────────────────────────────────── */
+
+/*
+ * The room fills as you breathe in, and draws back as you breathe out.
+ *
+ * Three water planes rise from below the bottom edge — the near one on the
+ * live breath, the two behind it on the lagged samples — so the surface
+ * arrives in three unhurried steps and the water has a body rather than an
+ * edge. Each plane's top is a shallow ellipse rather than a straight line,
+ * which is the difference between water and a progress bar.
+ *
+ * The bright line at the surface is the one thing in the app that keys off
+ * `--m`, the breath's own slope: it is brightest halfway up and halfway down
+ * and nearly gone at the turns, because water is most visible while it moves.
+ */
+.player-scene__water {
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  bottom: -46%;
+  height: 96%;
+  border-radius: 46% 54% 0 0 / 14% 12% 0 0;
+  transform: translate3d(0, calc((1 - var(--lag) * var(--drive)) * var(--rise)), 0);
+  opacity: calc(var(--base) * var(--mix));
+  will-change: transform, opacity;
+}
+
+.player-scene__water--far {
+  --lag: var(--e-far);
+  --rise: 46%;
+  --base: 0.6;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--twilight) 62%, transparent) 0%,
+    color-mix(in oklab, var(--twilight) 34%, transparent) 46%,
+    transparent 96%
+  );
+}
+
+.player-scene__water--mid {
+  --lag: var(--e-mid);
+  --rise: 41%;
+  --base: 0.66;
+  border-radius: 58% 42% 0 0 / 12% 15% 0 0;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--twilight) 54%, transparent) 0%,
+    color-mix(in oklab, var(--rose) 20%, transparent) 52%,
+    transparent 94%
+  );
+}
+
+.player-scene__water--near {
+  --lag: var(--e);
+  --rise: 36%;
+  --base: 0.76;
+  border-radius: 50% 50% 0 0 / 10% 10% 0 0;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--twilight) 68%, transparent) 0%,
+    color-mix(in oklab, var(--rose) 24%, transparent) 40%,
+    transparent 88%
+  );
+}
+
+/* The deep: everything below the water, holding the bottom of the screen. */
+.player-scene__deep {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 62%;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--twilight) 46%, transparent) 0%,
+    transparent 86%
+  );
+  opacity: calc(0.8 * var(--mix-depth));
+}
+
+.player-scene__surface {
+  position: absolute;
+  left: -6%;
+  right: -6%;
+  bottom: 22%;
+  height: calc(var(--span) * 0.2);
+  background: radial-gradient(
+    58% 50% at 50% 50%,
+    color-mix(in oklab, var(--moonlight) 96%, transparent) 0%,
+    color-mix(in oklab, var(--gold) 22%, transparent) 44%,
+    transparent 76%
+  );
+  transform: translate3d(0, calc((0.5 - var(--e) * var(--drive)) * 150%), 0);
+  opacity: calc((0.4 + var(--m) * 0.5 * var(--drive)) * var(--mix));
+  will-change: transform, opacity;
+}
+
+/* A wide, slow glint travelling across the water. */
+.player-scene__shimmer {
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  bottom: 10%;
+  height: 34%;
+  background: radial-gradient(
+    40% 60% at 34% 50%,
+    color-mix(in oklab, var(--moonlight) 20%, transparent) 0%,
+    transparent 70%
+  );
+  opacity: calc(0.5 * var(--mix-cloud));
+  animation: tide-glint 97s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes tide-glint {
+  0%,
+  100% {
+    transform: translate3d(calc(-9% * var(--sway)), 0, 0);
+  }
+  50% {
+    transform: translate3d(calc(9% * var(--sway)), 0, 0);
+  }
+}
+
+/* ── Curtains ───────────────────────────────────────────────── */
+
+/*
+ * Curtains reaching down the screen as you fill, and lifting as you empty.
+ *
+ * Five of them, at their own widths and their own places, each scaled from the
+ * top edge so the light grows *downward* into the room rather than outward
+ * from a point. They are spread across the three samples of the breath, so an
+ * in-breath crosses the sky instead of stretching it as one sheet — the same
+ * lag that makes the atmosphere's fields read as a wave, given a direction you
+ * can see.
+ *
+ * Every curtain is a single soft ellipse: no masks, no blurs, and no edges
+ * anywhere that a scale could walk into view.
+ */
+.player-scene__curtain {
+  position: absolute;
+  top: -12%;
+  left: var(--x);
+  width: calc(var(--span) * var(--w));
+  height: calc(100% * var(--h, 1));
+  transform: translateX(-50%) skewX(var(--skew))
+    scaleY(calc(0.4 + var(--lag) * 0.9 * var(--drive)));
+  transform-origin: top center;
+  /*
+   * Two gradients, and the pair is what makes this a curtain rather than a
+   * wash: a narrow bright ribbon down the middle, inside a much broader halo
+   * that carries the colour out to nothing. One gradient alone gives either a
+   * hard band or a fog, and a curtain is neither.
+   */
+  background:
+    radial-gradient(20% 70% at 50% 2%, var(--tint) 0%, transparent 72%),
+    radial-gradient(58% 86% at 50% 0%, var(--tint-2) 0%, transparent 78%);
+  opacity: calc(
+    (var(--base) + (var(--lag) - 0.5) * 0.3 * var(--drive)) * var(--mix)
+  );
+  animation: curtain-sway var(--sway-time, 89s) ease-in-out infinite;
+  animation-delay: var(--sway-delay, 0s);
+  will-change: transform, opacity;
+}
+
+/*
+ * The sway moves the curtain's *foot* and leaves its head where it is, which
+ * is how a hanging thing moves. `--sway` damps it to a quarter through a hold,
+ * so a held breath holds the whole sky.
+ */
+@keyframes curtain-sway {
+  0%,
+  100% {
+    margin-left: calc(var(--drift-x, 2%) * var(--sway) * -1);
+  }
+  50% {
+    margin-left: calc(var(--drift-x, 2%) * var(--sway));
+  }
+}
+
+.player-scene__curtain--a {
+  --x: 20%;
+  --w: 0.2;
+  --h: 1.06;
+  --skew: -8deg;
+  --lag: var(--e);
+  --tint: color-mix(in oklab, var(--sage) 74%, transparent);
+  --tint-2: color-mix(in oklab, var(--sage) 22%, transparent);
+  --base: 0.66;
+  --drift-x: 2.4%;
+  --sway-time: 89s;
+}
+
+.player-scene__curtain--b {
+  --x: 42%;
+  --w: 0.15;
+  --h: 0.92;
+  --skew: 6deg;
+  --lag: var(--e-mid);
+  --tint: color-mix(in oklab, var(--rose) 78%, transparent);
+  --tint-2: color-mix(in oklab, var(--rose) 22%, transparent);
+  --base: 0.72;
+  --drift-x: -1.8%;
+  --sway-time: 113s;
+  --sway-delay: -29s;
+}
+
+.player-scene__curtain--c {
+  --x: 66%;
+  --w: 0.19;
+  --h: 1.02;
+  --skew: -5deg;
+  --lag: var(--e-far);
+  --tint: color-mix(in oklab, var(--twilight) 82%, transparent);
+  --tint-2: color-mix(in oklab, var(--twilight) 24%, transparent);
+  --base: 0.62;
+  --drift-x: 2%;
+  --sway-time: 131s;
+  --sway-delay: -53s;
+}
+
+.player-scene__curtain--d {
+  --x: 7%;
+  --w: 0.12;
+  --h: 0.8;
+  --skew: 9deg;
+  --lag: var(--e-far);
+  --tint: color-mix(in oklab, var(--moonlight) 76%, transparent);
+  --tint-2: color-mix(in oklab, var(--moonlight) 20%, transparent);
+  --base: 0.5;
+  --drift-x: -2.6%;
+  --sway-time: 149s;
+  --sway-delay: -17s;
+}
+
+.player-scene__curtain--e {
+  --x: 87%;
+  --w: 0.16;
+  --h: 0.86;
+  --skew: -10deg;
+  --lag: var(--e-mid);
+  --tint: color-mix(in oklab, var(--gold) 52%, transparent);
+  --tint-2: color-mix(in oklab, var(--gold) 16%, transparent);
+  --base: 0.46;
+  --drift-x: 1.6%;
+  --sway-time: 167s;
+  --sway-delay: -71s;
+}
+
+/* The sky the curtains hang in, and the ground their light falls on. */
+.player-scene__sky {
+  position: absolute;
+  inset: -10% -10% auto;
+  height: 68%;
+  background: radial-gradient(
+    80% 100% at 50% 0%,
+    color-mix(in oklab, var(--twilight) 34%, transparent) 0%,
+    transparent 72%
+  );
+  opacity: calc((0.66 + (var(--e-far) - 0.5) * 0.24 * var(--drive)) * var(--mix));
+  will-change: opacity;
+}
+
+.player-scene__ground {
+  position: absolute;
+  inset: auto -10% -12% -10%;
+  height: 46%;
+  background: radial-gradient(
+    70% 100% at 50% 100%,
+    color-mix(in oklab, var(--sage) 24%, transparent) 0%,
+    transparent 68%
+  );
+  opacity: calc((0.44 + (var(--e-far) - 0.5) * 0.24 * var(--drive)) * var(--mix-depth));
+  will-change: opacity;
+}
+
+/* ── Starfield ──────────────────────────────────────────────── */
+
+/*
+ * The same eighteen points of light the atmosphere keeps in its corners,
+ * brought to the front and given the whole screen to travel across.
+ *
+ * Depth is what makes this a room rather than a picture being scaled: a near
+ * point moves half again as far on an in-breath as a distant one, so filling
+ * your lungs opens the field into depth. The twinkle owns `opacity` and the
+ * breath owns `transform`, which is the same division of labour the motes and
+ * the clouds already keep.
+ */
+.player-scene__stars {
+  position: absolute;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: 0;
+  height: 0;
+}
+
+.player-scene__star {
+  position: absolute;
+  width: var(--dot, 2px);
+  height: var(--dot, 2px);
+  margin: calc(var(--dot, 2px) / -2);
+  border-radius: 999px;
+  background: var(--pollen);
+  box-shadow: 0 0 calc(5px + var(--depth, 0.5) * 10px) 1px
+    color-mix(in oklab, var(--pollen) 46%, transparent);
+  transform: rotate(var(--angle))
+    translateX(
+      calc(
+        var(--span) * 0.56 * var(--distance) *
+          (0.68 + var(--e) * (0.16 + 0.4 * var(--depth, 0.5)) * var(--drive))
+      )
+    );
+  animation: star-twinkle var(--twinkle, 17s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform, opacity;
+}
+
+@keyframes star-twinkle {
+  0%,
+  100% {
+    opacity: calc((0.18 + var(--depth, 0.5) * 0.2) * var(--mix-mote));
+  }
+  50% {
+    opacity: calc((0.42 + var(--depth, 0.5) * 0.5) * var(--mix-mote));
+  }
+}
+
+/* Two faint orbits, so the field has structure as well as scatter. */
+.player-scene__orbit {
+  position: absolute;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * var(--scale));
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    transparent 66%,
+    color-mix(in oklab, var(--moonlight) 18%, transparent) 80%,
+    transparent 94%
+  );
+  transform: translate(-50%, -50%)
+    scale(calc(1 + (var(--lag) - 0.5) * 0.18 * var(--drive)));
+  opacity: calc(var(--base) * var(--mix));
+  will-change: transform, opacity;
+}
+
+.player-scene__orbit--near {
+  --scale: 0.72;
+  --lag: var(--e-mid);
+  --base: 0.5;
+}
+
+.player-scene__orbit--far {
+  --scale: 1.24;
+  --lag: var(--e-far);
+  --base: 0.32;
+}
+
+/* The band of dust the points are scattered through. */
+.player-scene__dust {
+  position: absolute;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * 1.9);
+  height: calc(var(--span) * 0.66);
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--twilight) 16%, transparent) 0%,
+    color-mix(in oklab, var(--moonlight) 8%, transparent) 44%,
+    transparent 74%
+  );
+  opacity: calc(0.55 * var(--mix-cloud));
+  animation: dust-turn 181s linear infinite;
+  will-change: transform;
+}
+
+@keyframes dust-turn {
+  0% {
+    transform: translate(-50%, -50%) rotate(-18deg);
+  }
+  50% {
+    transform: translate(-50%, -50%) rotate(18deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(-18deg);
+  }
+}
+
+/* ── Stillness ──────────────────────────────────────────────── */
+
+/*
+ * One field, and the dark around it.
+ *
+ * The room for the times the rest of the screen is already carrying enough. It
+ * breathes as fully as any of the others — a tenth of scale, which is more
+ * than anything else here moves — and there is simply nothing else in it to
+ * look at, which is the point rather than an omission.
+ */
+.player-scene__breath {
+  position: absolute;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * 1.35);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--rose) 20%, transparent) 0%,
+    color-mix(in oklab, var(--twilight) 12%, transparent) 42%,
+    transparent 70%
+  );
+  transform: translate(-50%, -50%)
+    scale(calc(0.86 + var(--e) * 0.28 * var(--drive)));
+  opacity: calc((0.6 + (var(--e) - 0.5) * 0.28 * var(--drive)) * var(--mix));
+  will-change: transform, opacity;
+}
+
+/*
+ * The dark, drawn as its own layer rather than left to the page: it closes in
+ * as you empty and opens as you fill, which in a room with nothing else in it
+ * is the whole of the breath.
+ */
+.player-scene__hollow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    108% 92% at var(--heart-x) var(--heart-y),
+    transparent 24%,
+    color-mix(in srgb, var(--bg-0) 46%, transparent) 92%
+  );
+  opacity: calc((0.7 - (var(--e) - 0.5) * 0.3 * var(--drive)) * var(--mix-depth));
+  will-change: opacity;
+}
+
+/* ── The rooms, on a device that has asked for less ─────────── */
+
+/*
+ * Reduced motion keeps every room and loses only its self-running drift. The
+ * breath-driven halves are already still, because `--field` is held at 0 by
+ * the player and everything here is multiplied by `--drive`. What is left is
+ * the full composition holding a pose — which is what the whole app does under
+ * this preference, rather than falling back to a lesser design.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .player-scene__petal,
+  .player-scene__shimmer,
+  .player-scene__curtain,
+  .player-scene__dust,
+  .player-scene__star {
+    animation: none;
+    will-change: auto;
+  }
+
+  .player-scene__star {
+    opacity: calc((0.3 + var(--depth, 0.5) * 0.34) * var(--mix-mote));
+  }
+}
+
+/* ── A room, small ──────────────────────────────────────────── */
+
+/*
+ * The picker's thumbnails: the same markup, the same stylesheet, a fixed
+ * half-open pose, and a box a hundredth of the size. `--span` is the only
+ * reason that works — every room measures itself against it, so shrinking it
+ * shrinks the room rather than cropping it.
+ *
+ * It carries its own night ground, because these are rooms made of light and
+ * a preview of light on the daylight palette would be a preview of nothing.
+ */
+.player-scene-thumb {
+  --span: 3.6rem;
+  --heart-x: 50%;
+  --heart-y: 52%;
+  --reach: 2.2rem;
+  --drive: 1;
+  --sway: 1;
+  --settle: 0;
+
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  /*
+   * Mixed toward black rather than taken from the palette's own grounds: these
+   * are rooms made of light, and `--bg-0` is a warm cream by day. A preview of
+   * soft light on cream is a preview of nothing, so the thumbnail keeps its own
+   * night — tinted with the theme's twilight, so it still turns with the hue
+   * dial rather than sitting outside the palette.
+   */
+  background:
+    radial-gradient(
+      120% 100% at 50% 0%,
+      color-mix(in srgb, var(--twilight) 34%, black) 0%,
+      transparent 72%
+    ),
+    color-mix(in srgb, var(--twilight) 13%, black);
+}
+
+/*
+ * Two rooms measure themselves differently from the rest, and a preview has to
+ * show what the room is *about*: Rings wants its rings to fit inside the tile, and
+ * Starfield's field wants to fill it rather than gather in the middle.
+ */
+.player-scene-thumb .player-scene--rings {
+  --span: 2.5rem;
+}
+
+.player-scene-thumb .player-scene--starfield {
+  --span: 7.5rem;
+}
+
+/* Nothing in a still picture of a room should be moving. */
+.player-scene-thumb * {
+  animation: none !important;
+}
+
+/*
+ * Drifting, previewed as what it is: three rooms side by side, the middle one
+ * a little larger because it is the one you would be in.
+ */
+.player-scene-drift {
+  display: grid;
+  grid-template-columns: 1fr 1.24fr 1fr;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 /* ── The immersive stage ────────────────────────────────────── */

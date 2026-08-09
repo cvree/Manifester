@@ -46,8 +46,10 @@ app.
   stack into one focused column.
 - The **live preview** breathes with your chosen pattern, cycles your lines the
   way the loop will read them, takes its colour from the ambience you picked, and
-  states the voice, sound, length, delay and rhythm in one glance. A *Hear a line*
-  button speaks your own first line in your chosen voice.
+  states the voice, sound, length, delay and rhythm in one glance. **Start loop**
+  and *Hear a line* sit together underneath it — the same question at two sizes,
+  and on a desktop it puts the button that acts on what you are looking at in the
+  column you are looking at, rather than in the other one.
 - **Every tile in that preview is a shortcut**, not a readout: tapping Voice,
   Sound, Delay or Rhythm opens the setting it reports, and Length scrolls to the
   session-length card. The Rhythm tile is shown even when the rhythm is off,
@@ -154,12 +156,16 @@ app.
   through the phase, the phase name and a countdown in the centre. Ten patterns,
   five breath voices, and custom timing for every phase — it has a section of
   its own below. It pauses and resumes with the session.
-- **A background visualiser**: the whole player becomes a room that expands and
-  settles with the guide — light gathering behind the orb, colour and haze at
-  three depths, a scattering of pollen, a horizon that opens on the in-breath.
-  It runs on the guide's own clock, at a percent or two of scale, and it is on
-  by default because at that depth most people feel it before they notice it.
-  It can be turned off under **Breathing**, and it is written up below.
+- **A background visualiser**: the whole screen becomes a room that expands and
+  settles with the guide, in one of **six rooms** — **Atmosphere** (light,
+  colour and haze gathering behind the orb), **Rings** (a ring of light leaving
+  on every in-breath and travelling out across the screen), **Waterline** (the
+  room filling like water and drawing back), **Curtains** (light reaching down
+  the screen and lifting), **Starfield** (a field of stars opening outward), and
+  **Stillness** (one deep field, and nothing else). Or **Drifting**, which moves
+  between all six, a minute and a half at a time, crossfading over four seconds.
+  Every room runs on the guide's own clock, and it is on by default. Rooms are
+  chosen under **Breathing**, and all of it is written up below.
 - **Delay between loops**, 0–60 seconds, counted down on screen (*"Next loop in
   6s"*) and frozen exactly where it was if you pause.
 - Time remaining, or elapsed time when there is no timer.
@@ -336,13 +342,34 @@ let web apps vibrate, and the app says so rather than showing a dead switch.
 
 **Background visualiser** — the second switch under Breathing, on by default —
 turns the whole player into a room that answers to your breath. On the in-breath
-the light behind the orb opens, the far field follows a moment later, the haze
-separates, the vignette relaxes, the horizon descends a few pixels and the
-pollen drifts outward; on the out-breath all of it gathers back in and the
-colour goes fractionally warmer. It is deliberately small — a percent or two of
-scale and a few percent of light, which is enough to feel and not enough to
-watch — and the intended order is that you notice how calm it is well before you
-notice that the screen is moving at all.
+the light opens, the far field follows a moment later, the haze separates, the
+vignette relaxes and the horizon descends a few pixels; on the out-breath all of
+it gathers back in and the colour goes fractionally warmer.
+
+**Six rooms, one breath.** Under the switch is a picker, and each tile is the
+room itself at a fixed half-open pose — the same markup and the same stylesheet
+as the thing behind the player, so what you choose from cannot quietly stop
+resembling what you get.
+
+| Room | What the breath is drawn as |
+| --- | --- |
+| **Atmosphere** | The original: near and far fields of light, the echo a full inhale leaves behind, three aurora clouds on incommensurable orbits, haze at two depths, and eighteen points of pollen light. |
+| **Rings** | Four rings leaving the centre and opening across the whole screen, each reading the breath further back in time than the one inside it. |
+| **Waterline** | Three water planes rising from below the bottom edge, with a bright surface line that is brightest halfway up — water is most visible while it moves. |
+| **Curtains** | Five curtains of light scaling down from the top edge, each on a different sample of the breath, so the light ripples across the sky instead of stretching as one sheet. |
+| **Starfield** | The same eighteen points, given the whole screen: near stars travel half again as far as distant ones, so filling your lungs opens the field into depth. |
+| **Stillness** | One field, and the dark around it. For the times the rest of the screen is already carrying enough. |
+
+**Drifting** holds a room for about a minute and a half and then crossfades to
+another over four seconds — never the same one twice in a row. The crossfade is
+safe for one specific reason: a room is not an animation. Both rooms are drawn
+from the same `--e`, `--e-mid` and `--e-far` the orb is using, so mid-drift they
+are the same instant of the same breath drawn two ways, and there is no frame at
+which one of them is somewhere the other is not. The pair also do not fade
+linearly past each other — both hold above the halfway mark through the middle
+of the exchange, because two soft lights crossing at half strength read as the
+room dimming. With `prefers-reduced-motion` on, drifting picks a room and keeps
+it: a crossfade is only a fade, but a room *changing* is a change of scene.
 
 The one thing worth knowing about it is that the breath does not arrive
 everywhere at once. Light near the orb is drawn at *now*; light further out is
@@ -1209,7 +1236,9 @@ src/
     Sheet.tsx             the one modal surface: bottom sheet / centred dialog
     BreathingVisualizer   all six guide forms, plus the phase ring
     PlayerAtmosphere      the room the player breathes in, on the orb's clock —
-                          seven bands of light, colour, haze, pollen and depth
+                          temperature, the scene, and the depth over both
+    BackgroundScene       the six rooms, and the still frames the picker shows
+    Menu.tsx              the "…" menu: anchored on a desktop, a sheet on a phone
     CosmicBackground      the twilight garden behind every screen
     RitualPreview.tsx     the live picture of the finished ritual
     CustomizePanel.tsx    the advanced settings, as summarised rows + sheets
