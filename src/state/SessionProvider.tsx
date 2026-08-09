@@ -104,6 +104,19 @@ interface SessionContextValue {
   setLiveVoiceVolume: (value: number) => void
   setLiveMusicVolume: (value: number) => void
   setLiveRate: (value: number) => void
+  setLivePitch: (value: number) => void
+  /**
+   * Change who is reading, mid-session, without restarting it.
+   *
+   * `voiceURI` of `null` means "the best voice of this style on this device",
+   * which is the same question `start` asks — so it is resolved here rather
+   * than handed to the speech loop unanswered.
+   */
+  setLiveVoice: (patch: {
+    voiceURI: string | null
+    voiceName: string | null
+    voiceStyle?: LoopSettings['voiceStyle']
+  }) => void
   /** Change the brainwave rhythm, taking effect at once during a session. */
   setBrainwave: (patch: Partial<BrainwaveSettings>) => void
 }
@@ -522,6 +535,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [updateSettings],
   )
 
+  const setLivePitch = useCallback(
+    (value: number) => {
+      updateSettings({ pitch: value })
+      speechRef.current?.updateOptions({ pitch: value })
+    },
+    [updateSettings],
+  )
+
+  const setLiveVoice = useCallback<SessionContextValue['setLiveVoice']>(
+    ({ voiceURI, voiceName, voiceStyle }) => {
+      updateSettings({
+        voiceURI,
+        voiceName,
+        ...(voiceStyle ? { voiceStyle } : {}),
+      })
+      speechRef.current?.updateOptions({
+        voiceURI:
+          voiceURI ??
+          pickBestVoice(voices, voiceStyle ?? draft.settings.voiceStyle)
+            ?.voiceURI ??
+          null,
+      })
+    },
+    [updateSettings, voices, draft.settings.voiceStyle],
+  )
+
   const setBrainwave = useCallback<SessionContextValue['setBrainwave']>(
     (patch) => {
       setDraft((current) => {
@@ -615,6 +654,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLiveVoiceVolume,
       setLiveMusicVolume,
       setLiveRate,
+      setLivePitch,
+      setLiveVoice,
       setBrainwave,
     }),
     [
@@ -640,6 +681,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLiveVoiceVolume,
       setLiveMusicVolume,
       setLiveRate,
+      setLivePitch,
+      setLiveVoice,
       setBrainwave,
     ],
   )

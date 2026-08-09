@@ -36,7 +36,7 @@ const TABS = [
 export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { theme, toggleTheme } = useTheme()
+  const { theme, toggleTheme, nightLight } = useTheme()
   const { session, pause, resume } = useSession()
   const { expanded: stageExpanded } = useStage()
   const reducedMotion = useReducedMotion()
@@ -302,6 +302,21 @@ export function AppShell() {
       )}
 
       <InstallPrompt />
+
+      {/*
+        The night light: one warm pane, multiplied over everything.
+
+        Last in the source and highest in the stack on purpose — it has to
+        reach the expanded stage and the install prompt as well as the page,
+        because a screen that gets warmer everywhere except the one thing you
+        are looking at is worse than one that does not get warmer at all.
+
+        Mounted only when it would do something. At zero the tint is pure
+        white and multiplying by it is arithmetically a no-op, but a
+        viewport-sized blended layer is not free to composite, and the great
+        majority of people will never turn this on.
+      */}
+      {nightLight > 0 && <div aria-hidden="true" className="night-light" />}
     </div>
   )
 }

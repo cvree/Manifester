@@ -44,6 +44,14 @@
   --hue-shift: 0;
   transition: --hue-shift 700ms cubic-bezier(0.22, 1, 0.36, 1);
 
+  /*
+   * How much blue is taken out of the light, 0 to 1. Written by the theme
+   * provider, read by `.night-light` and by the two previews of it. Not
+   * transitioned: it is a dragged value, and a transition on a value that
+   * changes every frame is a screen that trails the finger.
+   */
+  --night-light: 0;
+
   /* ── Canvas ── */
   --bg-0-base: #f8f3ec;
   --bg-1-base: #efe9f3;
@@ -1831,12 +1839,39 @@ html:not(.dark) .breath-aurora__veil {
   --sway: calc(1 - (1 - var(--m)) * 0.75 * var(--drive));
 
   /*
-   * Where the orb is, and so where the room gathers. In the card the stage is
-   * the left column of a two-column grid on a desktop, which is why this is
-   * not simply the middle of the screen.
+   * Where the orb is, and so where the room gathers.
+   *
+   * These three are *measured* — `useHeartAnchor` writes the orb's centre and
+   * radius onto this element as lengths, on mount and whenever the layout
+   * around it moves. What is written here is only the pose held for the frame
+   * or two before the first measurement lands, and it is deliberately the old
+   * guess: roughly right, so nothing ever starts from the corner of the
+   * screen.
+   *
+   * Everything below is drawn around this point, which is the whole reason a
+   * measured centre was worth having: one pair of numbers re-centres the wash,
+   * the fields, the echo, the haze, the motes, the rings, the vignette and
+   * every room in the picker at once.
    */
   --heart-x: 50%;
   --heart-y: 44%;
+  /*
+   * The orb's own radius, and the room's one rule about the orb: nothing with
+   * an edge crosses it. See `.player-scene__figures`.
+   */
+  --halo: 9rem;
+  /*
+   * The hole that rule is made of. Written once here so the whole set of
+   * edged layers shares one mask, and so it is recomputed only when the orb
+   * actually moves or grows — never per frame.
+   */
+  --heart-clear: radial-gradient(
+    circle calc(var(--halo) * 1.32) at var(--heart-x) var(--heart-y),
+    transparent 0%,
+    transparent 58%,
+    rgb(0 0 0 / 0.55) 80%,
+    #000 100%
+  );
   /* How far the motes may travel from it. */
   --reach: min(34vw, 30vh);
   /*
@@ -2402,6 +2437,36 @@ html:not(.dark) .breath-aurora__veil {
   position: absolute;
   inset: 0;
   will-change: opacity;
+}
+
+/*
+ * ── Nothing crosses the orb ─────────────────────────────────
+ *
+ * The room is behind the glass, and the glass is translucent — which is the
+ * whole look, and also the one way the illusion can break. A ring's bright
+ * arc, a curtain's ribbon, the waterline or a star passing *across* the orb
+ * reads as being in front of it, because a hard edge over a soft object is
+ * the oldest depth cue there is. The orb stops being the nearest thing in the
+ * room and starts being a shape printed on the wallpaper.
+ *
+ * So every layer in a room that has an edge is drawn inside this wrapper, and
+ * this wrapper is masked with a hole exactly where the orb is: clear well
+ * inside the orb's silhouette, fully present a third of a radius past it, and
+ * a long soft ramp in between so there is no rim to see. What is *not* in here
+ * is everything soft — the glow, the pools, the washes, the sky, the deep. A
+ * hole in those would be a dark disc behind a translucent orb, which is the
+ * opposite of the fix.
+ *
+ * The mask is static: it is recomputed when the orb moves or resizes, and on
+ * no other frame. It sits on an untransformed wrapper on purpose — a mask on
+ * a transformed element travels with the transform, and a hole that follows a
+ * scaling ring is not a hole in the room.
+ */
+.player-scene__figures {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image: var(--heart-clear);
+  mask-image: var(--heart-clear);
 }
 
 /*
@@ -3046,6 +3111,8 @@ html:not(.dark) .breath-aurora__veil {
   --span: 3.6rem;
   --heart-x: 50%;
   --heart-y: 52%;
+  /* A picture of a room has no orb standing in it, so nothing is cut out. */
+  --heart-clear: none;
   --reach: 2.2rem;
   --drive: 1;
   --sway: 1;
@@ -3986,6 +4053,112 @@ html:not(.dark) .breath-aurora__veil {
   display: none;
 }
 
+/*
+ * While the palette band is being dragged.
+ *
+ * The 700ms sweep is what makes *choosing* a colour read as the light in the
+ * room changing rather than as a theme being swapped — and it is exactly the
+ * wrong thing while a finger is on the band, where it becomes 700ms of lag
+ * between the hand and the screen. The class is on for the length of a drag
+ * and off the instant it ends, so the sweep is there for every other way of
+ * changing the colour.
+ */
+html.tuning {
+  transition: none;
+}
+
+/* ── The drag bar ───────────────────────────────────────────── */
+
+/*
+ * A band you drag — see `DragBar.tsx`.
+ *
+ * Two rules do the whole of the geometry. The track fills the bar, and the
+ * handle's travel is inset by half its own width at each end, so the handle's
+ * *centre* lands under the finger and no part of it ever hangs off the bar.
+ * That is the same arrangement a native range input uses, written out.
+ *
+ * `--at` is the position, 0 to 1, written by the component. It is deliberately
+ * not transitioned: it is being rewritten as fast as the pointer moves, and a
+ * transition on a value that changes every frame is a handle that trails the
+ * finger.
+ */
+.drag-bar {
+  --handle: 2.1rem;
+
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 3rem;
+  border-radius: 999px;
+  cursor: pointer;
+  /* A horizontal drag is a drag, not an argument with the page's scroller. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.drag-bar__track {
+  position: absolute;
+  inset: 0.45rem 0;
+  display: block;
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 1px var(--control-border),
+    inset 0 1px 3px rgb(0 0 0 / 0.1);
+}
+
+.drag-bar__handle {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--handle) / 2 + (100% - var(--handle)) * var(--at, 0));
+  display: block;
+  width: var(--handle);
+  height: var(--handle);
+  border-radius: 999px;
+  border: 2px solid var(--panel-solid);
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 2px 10px rgb(58 50 44 / 0.28),
+    0 0 0 1px rgb(58 50 44 / 0.12);
+  transition:
+    box-shadow 200ms var(--ease-calm),
+    scale 180ms var(--ease-calm);
+}
+
+/*
+ * The halo, and why it is a halo. Dragging on a touch screen puts a finger
+ * exactly where the feedback would be, so the answer to "am I holding this"
+ * has to appear *around* the handle rather than under it.
+ *
+ * `scale` rather than `transform`, because the handle's `transform` is
+ * carrying its centring and the two would overwrite each other.
+ */
+.drag-bar:hover .drag-bar__handle {
+  box-shadow:
+    0 3px 14px rgb(58 50 44 / 0.32),
+    0 0 0 1px rgb(58 50 44 / 0.14);
+}
+
+.drag-bar[data-dragging='true'] .drag-bar__handle {
+  scale: 1.12;
+  box-shadow:
+    0 3px 14px rgb(58 50 44 / 0.32),
+    0 0 0 1px rgb(58 50 44 / 0.14),
+    0 0 0 9px color-mix(in oklab, var(--rose) 16%, transparent);
+}
+
+.drag-bar:focus-visible {
+  outline: none;
+}
+
+.drag-bar:focus-visible .drag-bar__handle {
+  box-shadow:
+    0 3px 14px rgb(58 50 44 / 0.32),
+    0 0 0 1px rgb(58 50 44 / 0.14),
+    0 0 0 4px color-mix(in oklab, var(--rose-deep) 55%, transparent);
+}
+
 /* ── Hue swatches ───────────────────────────────────────────── */
 
 /*
@@ -4019,6 +4192,196 @@ html:not(.dark) .breath-aurora__veil {
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.4),
     inset 0 0 0 1px rgb(0 0 0 / 0.06);
+}
+
+/* ── The palette band ───────────────────────────────────────── */
+
+/*
+ * The whole wheel, drawn as the palette actually is at each rotation.
+ *
+ * Thirteen stops of the lead colour, one every thirty degrees, through the
+ * same OKLCH expression the palette itself uses — so the band is not an
+ * illustration of what the dial does, it is the dial's own output laid out
+ * end to end. The first and last stops are the same colour, because the wheel
+ * has no ends and a band that started rose and finished violet would be
+ * lying about what happens when you drag past the right edge.
+ *
+ * `--rose-base` and friends are inherited from the root and carry no `var()`
+ * of their own, which is what lets a local rotation change the outcome here
+ * while the page-wide palette stays on the root's own `--hue-shift`.
+ *
+ * Above it sits a thin band of the *supporting* colours at the same
+ * rotations. It is what stops the control from reading as a generic rainbow:
+ * what changes when you drag this is a whole palette, and there is no honest
+ * way to show that with one colour.
+ */
+.hue-band {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background:
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      transparent 58%,
+      rgb(0 0 0 / 0.06) 58%,
+      rgb(0 0 0 / 0.06) 100%
+    ),
+    linear-gradient(
+      to right,
+      oklch(from var(--rose-base) l c calc(h + 0)) 0%,
+      oklch(from var(--rose-base) l c calc(h + 30)) 8.333%,
+      oklch(from var(--rose-base) l c calc(h + 60)) 16.667%,
+      oklch(from var(--rose-base) l c calc(h + 90)) 25%,
+      oklch(from var(--rose-base) l c calc(h + 120)) 33.333%,
+      oklch(from var(--rose-base) l c calc(h + 150)) 41.667%,
+      oklch(from var(--rose-base) l c calc(h + 180)) 50%,
+      oklch(from var(--rose-base) l c calc(h + 210)) 58.333%,
+      oklch(from var(--rose-base) l c calc(h + 240)) 66.667%,
+      oklch(from var(--rose-base) l c calc(h + 270)) 75%,
+      oklch(from var(--rose-base) l c calc(h + 300)) 83.333%,
+      oklch(from var(--rose-base) l c calc(h + 330)) 91.667%,
+      oklch(from var(--rose-base) l c calc(h + 360)) 100%
+    );
+}
+
+/* The supporting colours, in a thin ribbon along the bottom third. */
+.hue-band__support {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 42%;
+  display: block;
+  background: linear-gradient(
+    to right,
+    oklch(from var(--sage-base) l c calc(h + 0)) 0%,
+    oklch(from var(--gold-base) l c calc(h + 45)) 12.5%,
+    oklch(from var(--sage-base) l c calc(h + 90)) 25%,
+    oklch(from var(--gold-base) l c calc(h + 135)) 37.5%,
+    oklch(from var(--sage-base) l c calc(h + 180)) 50%,
+    oklch(from var(--gold-base) l c calc(h + 225)) 62.5%,
+    oklch(from var(--sage-base) l c calc(h + 270)) 75%,
+    oklch(from var(--gold-base) l c calc(h + 315)) 87.5%,
+    oklch(from var(--sage-base) l c calc(h + 360)) 100%
+  );
+  opacity: 0.9;
+}
+
+/*
+ * The handle carries the palette it is standing on: the lead colour, with the
+ * gold and the sage in the corners. Same three gradients as a swatch, at
+ * whatever rotation the dial is currently on — so what you are holding is a
+ * live sample of the answer.
+ */
+.hue-handle {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      circle at 30% 24%,
+      oklch(from var(--gold-base) l c calc(h + var(--h, 0))) 0%,
+      transparent 56%
+    ),
+    radial-gradient(
+      circle at 76% 80%,
+      oklch(from var(--sage-base) l c calc(h + var(--h, 0))) 0%,
+      transparent 60%
+    ),
+    oklch(from var(--rose-base) l c calc(h + var(--h, 0)));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
+}
+
+/*
+ * Where a named stop falls on the band, so the names in the row below are
+ * places you can see rather than a separate list. Inset by the same half
+ * handle as the handle's own travel — a tick that does not line up with the
+ * handle that lands on it is worse than no tick at all.
+ */
+.hue-band__tick {
+  position: absolute;
+  top: 29%;
+  left: calc(var(--handle) / 2 + (100% - var(--handle)) * var(--tick-at, 0));
+  width: 2px;
+  height: 0.42rem;
+  translate: -50% -50%;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.55);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.12);
+}
+
+/* ── The night light band ───────────────────────────────────── */
+
+/*
+ * The range drawn as what it does: the page's own paper colour, multiplied by
+ * the tint at each strength along the way. Two of the stops are computed
+ * exactly as the pane itself is — see `.night-light` — so the band is a true
+ * preview and not an approximation of one.
+ */
+.night-band {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: linear-gradient(
+    to right,
+    rgb(255 255 255) 0%,
+    rgb(255 236 218) 40%,
+    rgb(255 208 164) 72%,
+    rgb(255 181 107) 100%
+  );
+}
+
+/*
+ * On the night palette the same band is a slab of daylight in the middle of a
+ * dark panel. The colours have to stay what they are — it is a preview of a
+ * tint, and a preview drawn in the wrong colours is not one — so the whole
+ * band is simply carried down to the brightness the surfaces around it are
+ * sitting at. The handle is left alone: it is the marker, and it should be
+ * the brightest thing on the control.
+ */
+.dark .night-band {
+  filter: brightness(0.66);
+}
+
+.night-handle {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: inherit;
+  background: rgb(
+    255 calc(255 - 74 * var(--night-light, 0)) calc(255 - 148 * var(--night-light, 0))
+  );
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45);
+}
+
+/* ── The night light itself ─────────────────────────────────── */
+
+/*
+ * One warm pane over the finished page.
+ *
+ * `multiply` and not `opacity`, and the difference is the whole feature: a
+ * multiply can only take light away, so red passes untouched while green and
+ * blue are pulled down — a screen getting warmer. An alpha overlay *adds*
+ * orange to every pixel including the black ones, which lifts the blacks to
+ * brown, flattens the contrast of the type, and reads as a filter sitting on
+ * the app rather than as the light in the room changing.
+ *
+ * Because both the ink and the paper are multiplied by the same factor, every
+ * contrast ratio on the page survives exactly as it was. That is the property
+ * that makes this safe to offer at full strength.
+ *
+ * It is mounted only above zero (`AppShell`), so the overwhelming majority of
+ * sessions never composite a viewport-sized blended layer at all.
+ */
+.night-light {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background: rgb(
+    255 calc(255 - 74 * var(--night-light, 0)) calc(255 - 148 * var(--night-light, 0))
+  );
 }
 
 /* ── Sound scenes ───────────────────────────────────────────── */

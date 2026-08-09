@@ -30,6 +30,7 @@ import {
 } from '../components/Icons'
 import { SettingRow } from '../components/SettingRow'
 import { Slider } from '../components/Slider'
+import { VoiceQuickSettings } from '../components/VoiceQuickSettings'
 import { MAX_MUSIC_VOLUME } from '../lib/audioBus'
 import { cx } from '../lib/cx'
 import { primeBreathAudio } from '../lib/breathAudio'
@@ -46,6 +47,7 @@ import {
 import { useBackgroundMix } from '../lib/useBackgroundMix'
 import { useBreathing } from '../lib/useBreathing'
 import { useFittedLine } from '../lib/useFittedLine'
+import { useHeartAnchor } from '../lib/useHeartAnchor'
 import { useStageExpansion } from '../lib/useStageExpansion'
 import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
@@ -95,6 +97,12 @@ export function PlayerRoute() {
     dismissNotice,
     setLiveVoiceVolume,
     setLiveMusicVolume,
+    setLiveRate,
+    setLivePitch,
+    setLiveVoice,
+    voices,
+    voicesReady,
+    resolvedDeviceVoice,
   } = useSession()
   const { preferences } = usePreferences()
   const { expanded, setExpanded } = useStage()
@@ -117,6 +125,7 @@ export function PlayerRoute() {
 
   const fieldRef = useRef<HTMLDivElement>(null)
   const lineRef = useRef<HTMLParagraphElement>(null)
+  const orbRef = useRef<HTMLDivElement>(null)
 
   /*
    * The guide follows the session: it breathes while you listen and holds
@@ -171,6 +180,22 @@ export function PlayerRoute() {
     targets: mixTargets,
     reducedMotion,
   })
+
+  /*
+   * And where the room is gathered.
+   *
+   * The atmosphere is drawn around one point — `--heart-x`/`--heart-y` — and
+   * that point used to be a pair of percentages chosen to be roughly right on
+   * a phone and roughly right again on a desktop. It is measured now: the orb
+   * is asked where it is, and the room re-centres on the answer. Its radius
+   * comes with it as `--halo`, which is what lets a ring, a curtain or a star
+   * fade out before it can cross the orb — see `.player-scene__figures`.
+   */
+  const anchorTargets = useMemo<Array<RefObject<HTMLElement | null>>>(
+    () => [fieldRef],
+    [fieldRef],
+  )
+  useHeartAnchor(orbRef, anchorTargets, `${expanded}:${backgroundOn}:${complete}`)
 
   // Bloom the orb once, as the session comes to life.
   const [awaken, setAwaken] = useState(false)
@@ -557,7 +582,10 @@ export function PlayerRoute() {
                   registered property, the orb *grows* between the two rather
                   than being swapped for a bigger one.
                 */}
-                <div className="stage__orb relative my-6 flex items-center justify-center">
+                <div
+                  ref={orbRef}
+                  className="stage__orb relative my-6 flex items-center justify-center"
+                >
                   <BreathingVisualizer
                     runtime={breathing}
                     style={preferences.breathStyle}
@@ -744,6 +772,24 @@ export function PlayerRoute() {
                 value={draft.settings.musicVolume}
                 display={`${Math.round(draft.settings.musicVolume * 100)}%`}
                 onChange={setLiveMusicVolume}
+              />
+
+              {/*
+                The other three numbers that shape a voice, folded away under
+                the two that are always wanted. All of them are live — the
+                running speech loop is re-optioned rather than restarted — so
+                a voice that is a shade too fast can be fixed without leaving
+                the player or breaking the loop's step.
+              */}
+              <VoiceQuickSettings
+                settings={draft.settings}
+                voices={voices}
+                voicesReady={voicesReady}
+                resolved={resolvedDeviceVoice}
+                onVoiceChange={setLiveVoice}
+                onRateChange={setLiveRate}
+                onPitchChange={setLivePitch}
+                live={!idle}
               />
             </div>
             {!idle && (

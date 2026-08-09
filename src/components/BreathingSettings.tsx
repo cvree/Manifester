@@ -50,15 +50,22 @@ const PHASES: Array<{ key: keyof BreathPattern; label: string }> = [
   { key: 'holdOut', label: 'Rest' },
 ]
 
-/** The three questions this panel asks, in the order it asks them. */
-type Step = 'pattern' | 'form' | 'sound'
+/** The four questions this panel asks, in the order it asks them. */
+type Step = 'room' | 'pattern' | 'form' | 'sound'
 
 /**
  * Where answering each question takes you. Sound is the last one that leads
  * anywhere — after it the volume slider opens in place, and vibration is a
  * single toggle already in view, so there is nothing left to walk to.
+ *
+ * Choosing a room is an answer like any other, so it hands you the next
+ * question too. If the guide is switched off there is no next question — the
+ * pattern, form and sound sections are not on screen — and `revealSection`
+ * takes a missing section as "stay where you are", which is the right answer
+ * rather than a special case.
  */
 const NEXT_STEP: Partial<Record<Step, Step>> = {
+  room: 'pattern',
   pattern: 'form',
   form: 'sound',
 }
@@ -207,6 +214,7 @@ export function BreathingSettings({
                 onSelect={() => {
                   onChange({ backgroundMode: mode.id })
                   cue('select')
+                  advanceFrom('room')
                 }}
               >
                 <BackgroundSceneThumbnail mode={mode.id} />
@@ -219,6 +227,7 @@ export function BreathingSettings({
               onSelect={() => {
                 onChange({ backgroundMode: 'random' })
                 cue('select')
+                advanceFrom('room')
               }}
               className="col-span-2"
             >
@@ -249,7 +258,11 @@ export function BreathingSettings({
           </div>
 
           {/* ── Pattern ── */}
-          <div>
+          <div
+            ref={(node) => {
+              sections.current.pattern = node
+            }}
+          >
             <FieldLabel
               hint={valid ? `${formatSeconds(cycleSeconds(pattern))}s per breath` : undefined}
             >

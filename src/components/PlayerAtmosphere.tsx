@@ -35,6 +35,13 @@ import { BackgroundScene } from './BackgroundScene'
  * between them; both of them read the same breath this element is carrying, so
  * a change of room is a crossfade and never a restart.
  *
+ * All of it is drawn around one point — the orb's own centre, measured rather
+ * than guessed. The player writes it here as `--heart-x`/`--heart-y`, with the
+ * orb's radius as `--halo`; see `useHeartAnchor`. The radius is what keeps the
+ * room *behind* the orb: every layer in a room that has an edge is masked
+ * clear inside it, so a ring, a curtain or a star can never cross the one
+ * thing on this screen that has to read as the nearest.
+ *
  * Three rules hold the whole thing together, and all three are the house rules
  * the garden was already built on (see "The atmosphere" in `theme.css`):
  *

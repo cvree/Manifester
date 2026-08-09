@@ -164,15 +164,21 @@ app.
   the screen and lifting), **Starfield** (a field of stars opening outward), and
   **Stillness** (one deep field, and nothing else). Or **Drifting**, which moves
   between all six, a minute and a half at a time, crossfading over four seconds.
-  Every room runs on the guide's own clock, and it is on by default. Rooms are
-  chosen under **Breathing**, and all of it is written up below.
+  Every room runs on the guide's own clock, and it is on by default. Whichever
+  room you are in, it is centred on the orb itself — measured, not guessed —
+  and nothing in it with an edge ever crosses the orb. Rooms are chosen under
+  **Breathing**, where picking one walks you on to the next question, and all
+  of it is written up below.
 - **Delay between loops**, 0–60 seconds, counted down on screen (*"Next loop in
   6s"*) and frozen exactly where it was if you pause.
 - Time remaining, or elapsed time when there is no timer.
 - Progress through the current pass, and how many passes you have listened to.
-- Voice volume, sound volume, and speed adjust live. Voice runs 0–100%, because
-  100% is as loud as a browser will ever speak — see
-  [Decisions worth explaining](#decisions-worth-explaining).
+- Voice volume and sound volume adjust live, and under them a **Voice, speed
+  and pitch** disclosure changes who is reading, how fast and how high without
+  leaving the player: the running speech loop is re-optioned rather than
+  restarted, so each change lands on the next line and the loop never breaks
+  step. Voice runs 0–100%, because 100% is as loud as a browser will ever speak
+  — see [Decisions worth explaining](#decisions-worth-explaining).
 - A mini player follows you to the other tabs while a session is running.
 - When the timer ends everything fades out and the screen says *Your loop is
   complete.*
@@ -233,12 +239,17 @@ link to your sounds.
 **Everywhere**
 
 - Day and night colour themes.
-- **Eight palettes from one palette** — a hue dial on the About screen turns
-  every colour in the app at once. The rotation happens in OKLCH, so only the
-  hue moves: lightness, chroma, contrast and the spacing between the three
-  accents all survive untouched, which is why no position on the dial can look
-  worse than the one it shipped with. See
+- **Every palette from one palette** — a band you drag on the About screen
+  turns every colour in the app at once, through all 360 degrees, with twelve
+  named stops one tap away underneath it. The rotation happens in OKLCH, so
+  only the hue moves: lightness, chroma, contrast and the spacing between the
+  three accents all survive untouched, which is why no position on the dial can
+  look worse than the one it shipped with. See
   [Rotating the palette](#rotating-the-palette).
+- **A night light**, 0 to 100, on the same screen — a warm tint *multiplied*
+  over the finished page rather than laid over it with alpha, so red passes
+  untouched, green and blue come down, and every contrast ratio on the page is
+  exactly what it was. See [The night light](#the-night-light).
 - Full `prefers-reduced-motion` support — every animation is skipped, not just
   shortened.
 - Large touch targets (44 px minimum everywhere), labelled controls, visible
@@ -857,6 +868,36 @@ self-running drifts, leaving the full composition, still lit, holding a pose.
 The switch still fades rather than snapping. Reduced motion should still look
 designed.
 
+**The room is centred on the orb, because the orb is measured.** Everything in
+the atmosphere is drawn around one point, `--heart-x`/`--heart-y`, and that
+point used to be a pair of percentages — `50% / 44%`, with a hand-written `38%`
+past 1024px because the stage is the left column of a two-column grid there.
+Each of those numbers was right at exactly one window size; everywhere else the
+light gathered somewhere the orb was not, which is the difference between a room
+the orb is breathing in and a gradient the orb happens to be near.
+[`useHeartAnchor`](src/lib/useHeartAnchor.ts) measures the orb instead and writes
+its centre and radius onto the field as lengths. Not per frame — that would be a
+forced layout flush alongside the breath, which is the cost this whole stylesheet
+is built to avoid — but on a `ResizeObserver` on the orb (which the registered
+`--size` transition fires every frame of an expansion, for free), on scroll and
+viewport changes, and on a bounded frame loop after the layout is told to change.
+Every layer in `theme.css` was already drawn around that point, so the entire
+environment re-centres without one of them learning that it moved.
+
+**Nothing with an edge crosses the orb.** The card is translucent glass, which is
+the whole look and also the one way the illusion breaks: a ring's bright arc, a
+curtain's ribbon, the waterline or a star passing *across* the orb reads as being
+in front of it, because a hard edge over a soft object is the oldest depth cue
+there is. So the orb's measured radius comes along as `--halo`, and every layer in
+a room that has an edge is drawn inside one untransformed wrapper carrying one
+mask: clear well inside the orb's silhouette, fully present a third of a radius
+past it, a long soft ramp in between. Everything *soft* — the glow, the pools, the
+washes, the sky, the deep — stays outside that wrapper, because a hole in a wash
+would be a dark disc behind a translucent orb, which is the opposite of the fix.
+The wrapper is untransformed on purpose: a mask travels with its element's
+transform, and a hole that follows the scaling ring it is meant to be cut out of
+is not a hole.
+
 **The field is a place, so it is seeded rather than random.** The eighteen motes
 in [`environment.ts`](src/lib/environment.ts) are generated once at module load
 from a fixed seed, with their angles stratified — one per equal sector, jittered
@@ -1142,6 +1183,38 @@ the identity palette is declared first and the rotation lives behind
 dial is simply not offered (`supportsHueShift()` in
 [`src/lib/hue.ts`](src/lib/hue.ts)).
 
+### The night light
+
+A second, entirely separate colour control on the same screen: not *which* hue
+the palette is, but how much blue is left in the light coming off the screen.
+Zero to a hundred, dragged on the same kind of band.
+
+It is one fixed pane over the finished page with `mix-blend-mode: multiply`, and
+the blend mode is the whole feature. A multiply can only ever take light away —
+red passes untouched, green comes down to about seven tenths and blue to about
+four at full strength, which lands near a warm 2700K bulb. An alpha overlay
+would *add* orange to every pixel including the black ones, lifting the blacks
+to brown, flattening the contrast of the type, and reading as a filter sitting
+on the app rather than as the light in the room changing.
+
+Two properties follow from that, and both are why it can be offered at full
+strength without a warning:
+
+- **Contrast is preserved exactly.** Ink and paper are multiplied by the same
+  factor, so every ratio on the page is what it was at zero.
+- **Off is genuinely off.** At zero the tint is pure white, which is
+  arithmetically a no-op — and the element is not mounted at all below one, so
+  the overwhelming majority of sessions never composite a viewport-sized blended
+  layer.
+
+The pane is last in the shell and highest in the stack, so it reaches the
+expanded stage and the install prompt as well as the page: a screen that gets
+warmer everywhere except the thing you are looking at is worse than one that
+does not get warmer at all. The same multiply is applied in JavaScript to the
+`theme-color` meta tag, because a blend over the page is invisible to
+`getComputedStyle` and the OS window chrome would otherwise stay stubbornly blue
+above a page that no longer is.
+
 ---
 
 ## Local development
@@ -1243,7 +1316,9 @@ src/
     RitualPreview.tsx     the live picture of the finished ritual
     CustomizePanel.tsx    the advanced settings, as summarised rows + sheets
     SettingRow.tsx        one row of that list, stating its own value
-    AppearanceSettings    the hue dial and the day/night switch
+    AppearanceSettings    the palette band, the night light and day/night
+    DragBar.tsx           a band you drag, whose track is markup rather than
+                          a background image on a pseudo-element
   routes/         Create, Player, Library (loops + sounds), About
   state/          Theme, Library (IndexedDB), Session (playback engines),
                   Stage (whether the player has taken over the screen)
@@ -1258,6 +1333,8 @@ src/
                     at distance, and the seeded field of motes
     useBackgroundMix.ts   wakes and settles the room, without ever touching
                           the breath underneath it
+    useHeartAnchor.ts     measures the orb, so the room is centred on it rather
+                          than on a percentage that was right at one width
     useStageExpansion.ts  grows the player into the screen, and back
     smoothScroll.tsx  Lenis on the two screens that genuinely scroll
     feedback.ts     haptics and generated interface tones
@@ -1271,7 +1348,7 @@ src/
     storage.ts      IndexedDB + localStorage
     timer.ts        wall-clock session countdown
     motion.ts       reduced motion, low-power, breakpoint and platform detection
-    hue.ts          the eight stops on the palette dial, and what they mean
+    hue.ts          the palette dial's named stops, and the night light's maths
     summaries.ts    the one-line summary of every advanced setting
     engagement.ts   when the install suggestion has been earned
     wordcraft.ts    the offline writing helper: rewrite rules, no model

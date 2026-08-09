@@ -166,8 +166,8 @@ const SETTINGS: Array<{
   {
     icon: VoiceIcon,
     name: 'Voice',
-    where: 'Create → Customize',
-    what: 'Which of your device’s voices reads the words, how fast, and how high.',
+    where: 'Create → Customize, and Player → Levels',
+    what: 'Which of your device’s voices reads the words, how fast, and how high. On the Player it can be changed mid-session, and lands on the next line.',
   },
   {
     icon: WaveIcon,
@@ -365,7 +365,7 @@ export function AboutRoute() {
                 Make it yours
               </span>
             }
-            description="Turn the whole garden to a colour you like. It is remembered on this device."
+            description="Turn the whole garden to a colour you like, and take the blue out of the light for the evening. Both are remembered on this device."
           >
             <AppearanceSettings />
           </Card>

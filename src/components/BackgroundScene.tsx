@@ -20,6 +20,14 @@ import { MOTE_FIELD, type BackgroundModeId } from '../lib/environment'
  * every gradient reaches full transparency inside its own element, nothing
  * viewport-sized goes behind a `filter: blur()`, and no gradient is ever
  * recomputed per frame — movement is transform and opacity, and nothing else.
+ *
+ * There is a fourth rule now, and it is about the orb. Anything in a room
+ * with an *edge* — a ring, a curtain, the waterline, a star — is drawn inside
+ * `<Figures>`, which is masked clear where the orb stands. The glass the orb
+ * sits behind is translucent, and a hard edge crossing a soft object is read
+ * by the eye as being in front of it; the mask is what keeps the orb the
+ * nearest thing in its own room. Everything soft stays outside the wrapper,
+ * because a hole in a wash would be a dark disc rather than a clearance.
  */
 
 interface BackgroundSceneProps {
@@ -62,6 +70,18 @@ export function BackgroundScene({
   )
 }
 
+/**
+ * The layers of a room that have an edge, held clear of the orb.
+ *
+ * One untransformed wrapper carrying one mask — see `.player-scene__figures`.
+ * Untransformed on purpose: a mask travels with its element's transform, so a
+ * hole punched into a scaling ring would scale with it, and a hole that
+ * follows the thing it is meant to be cut out of is not a hole.
+ */
+function Figures({ children }: { children: ReactNode }) {
+  return <span className="player-scene__figures">{children}</span>
+}
+
 /* ── The rooms ──────────────────────────────────────────────── */
 
 const LAYERS: Record<BackgroundModeId, (rich: boolean) => ReactNode> = {
@@ -85,24 +105,26 @@ const LAYERS: Record<BackgroundModeId, (rich: boolean) => ReactNode> = {
         </span>
       )}
       {rich && (
-        <span className="player-field__motes">
-          {MOTE_FIELD.map((mote) => (
-            <span
-              key={`${mote.angle}-${mote.distance}`}
-              className="player-field__mote"
-              style={
-                {
-                  '--angle': `${mote.angle}deg`,
-                  '--distance': mote.distance,
-                  '--depth': mote.depth,
-                  '--dot': `${mote.size}px`,
-                  '--delay': `${mote.delay}s`,
-                  '--twinkle': `${mote.period}s`,
-                } as CSSProperties
-              }
-            />
-          ))}
-        </span>
+        <Figures>
+          <span className="player-field__motes">
+            {MOTE_FIELD.map((mote) => (
+              <span
+                key={`${mote.angle}-${mote.distance}`}
+                className="player-field__mote"
+                style={
+                  {
+                    '--angle': `${mote.angle}deg`,
+                    '--distance': mote.distance,
+                    '--depth': mote.depth,
+                    '--dot': `${mote.size}px`,
+                    '--delay': `${mote.delay}s`,
+                    '--twinkle': `${mote.period}s`,
+                  } as CSSProperties
+                }
+              />
+            ))}
+          </span>
+        </Figures>
       )}
     </>
   ),
@@ -120,11 +142,13 @@ const LAYERS: Record<BackgroundModeId, (rich: boolean) => ReactNode> = {
   rings: (rich) => (
     <>
       <span className="player-scene__pool" />
-      <span className="player-scene__ring player-scene__ring--1" />
-      <span className="player-scene__ring player-scene__ring--2" />
-      <span className="player-scene__ring player-scene__ring--3" />
-      {rich && <span className="player-scene__ring player-scene__ring--4" />}
       {rich && <span className="player-scene__petal" />}
+      <Figures>
+        <span className="player-scene__ring player-scene__ring--1" />
+        <span className="player-scene__ring player-scene__ring--2" />
+        <span className="player-scene__ring player-scene__ring--3" />
+        {rich && <span className="player-scene__ring player-scene__ring--4" />}
+      </Figures>
     </>
   ),
 
@@ -143,7 +167,10 @@ const LAYERS: Record<BackgroundModeId, (rich: boolean) => ReactNode> = {
       <span className="player-scene__water player-scene__water--far" />
       <span className="player-scene__water player-scene__water--mid" />
       <span className="player-scene__water player-scene__water--near" />
-      <span className="player-scene__surface" />
+      {/* The surface is the one line in this room with an edge. */}
+      <Figures>
+        <span className="player-scene__surface" />
+      </Figures>
       {rich && <span className="player-scene__shimmer" />}
     </>
   ),
@@ -160,11 +187,13 @@ const LAYERS: Record<BackgroundModeId, (rich: boolean) => ReactNode> = {
   curtains: (rich) => (
     <>
       <span className="player-scene__sky" />
-      <span className="player-scene__curtain player-scene__curtain--a" />
-      <span className="player-scene__curtain player-scene__curtain--b" />
-      <span className="player-scene__curtain player-scene__curtain--c" />
-      {rich && <span className="player-scene__curtain player-scene__curtain--d" />}
-      {rich && <span className="player-scene__curtain player-scene__curtain--e" />}
+      <Figures>
+        <span className="player-scene__curtain player-scene__curtain--a" />
+        <span className="player-scene__curtain player-scene__curtain--b" />
+        <span className="player-scene__curtain player-scene__curtain--c" />
+        {rich && <span className="player-scene__curtain player-scene__curtain--d" />}
+        {rich && <span className="player-scene__curtain player-scene__curtain--e" />}
+      </Figures>
       <span className="player-scene__ground" />
     </>
   ),
@@ -178,27 +207,29 @@ const LAYERS: Record<BackgroundModeId, (rich: boolean) => ReactNode> = {
   starfield: (rich) => (
     <>
       <span className="player-scene__night" />
-      <span className="player-scene__orbit player-scene__orbit--near" />
-      <span className="player-scene__orbit player-scene__orbit--far" />
-      <span className="player-scene__stars">
-        {MOTE_FIELD.map((mote) => (
-          <span
-            key={`${mote.angle}-${mote.distance}`}
-            className="player-scene__star"
-            style={
-              {
-                '--angle': `${mote.angle}deg`,
-                '--distance': mote.distance,
-                '--depth': mote.depth,
-                '--dot': `${mote.size + 0.6}px`,
-                '--delay': `${mote.delay}s`,
-                '--twinkle': `${mote.period}s`,
-              } as CSSProperties
-            }
-          />
-        ))}
-      </span>
       {rich && <span className="player-scene__dust" />}
+      <Figures>
+        <span className="player-scene__orbit player-scene__orbit--near" />
+        <span className="player-scene__orbit player-scene__orbit--far" />
+        <span className="player-scene__stars">
+          {MOTE_FIELD.map((mote) => (
+            <span
+              key={`${mote.angle}-${mote.distance}`}
+              className="player-scene__star"
+              style={
+                {
+                  '--angle': `${mote.angle}deg`,
+                  '--distance': mote.distance,
+                  '--depth': mote.depth,
+                  '--dot': `${mote.size + 0.6}px`,
+                  '--delay': `${mote.delay}s`,
+                  '--twinkle': `${mote.period}s`,
+                } as CSSProperties
+              }
+            />
+          ))}
+        </span>
+      </Figures>
     </>
   ),
 
