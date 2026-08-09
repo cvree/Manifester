@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type RefObject,
 } from 'react'
 import { useNavigate } from 'react-router'
 import { BreathingVisualizer } from '../components/BreathingVisualizer'
@@ -42,6 +43,7 @@ import {
   breathingSummary,
   feelSummary,
 } from '../lib/summaries'
+import { useBackgroundMix } from '../lib/useBackgroundMix'
 import { useBreathing } from '../lib/useBreathing'
 import { useStageExpansion } from '../lib/useStageExpansion'
 import { usePreferences } from '../state/PreferencesProvider'
@@ -69,10 +71,15 @@ const QUIET_AFTER_MS = 4200
  *
  * Around all of it is `PlayerAtmosphere`, and the one thing worth knowing
  * about it is that it is not a separate animation. The breathing hook writes
- * `--e` and `--p` onto the orb, the stage and the atmosphere on the same
- * frame, from the same clock — so the light beyond the glass fills as the orb
- * fills, to the millisecond, because it is the same number. There is exactly
- * one breath in this room and everything in it is following that one.
+ * the breath onto the orb, the stage and the atmosphere on the same frame,
+ * from the same clock — so the light beyond the glass fills as the orb fills,
+ * to the millisecond, because it is the same number. There is exactly one
+ * breath in this room and everything in it is following that one.
+ *
+ * How much of that room is on show is a second, entirely separate number: the
+ * mix, in `useBackgroundMix`. Everything environmental is the product of the
+ * two, which is what lets the Background visualiser setting be switched on
+ * halfway through an in-breath without the breath ever learning that it was.
  */
 export function PlayerRoute() {
   const navigate = useNavigate()
@@ -128,23 +135,40 @@ export function PlayerRoute() {
   })
 
   /*
-   * Whether the environment is currently following the breath.
+   * ── The two numbers behind the room, and why they are two ──
    *
-   * All three have to hold. The preference is the person's choice; the guide
-   * being on is what there is to follow; and a session actually playing is
-   * what makes it a breath rather than a screensaver. With any of them false
-   * the atmosphere stays — lit, coloured, deep — and simply holds still.
+   * `fieldAmplitude` is *is there a live breath to follow*: the guide is on, a
+   * session is actually playing, and motion is wanted. It is a registered,
+   * eased custom property (`--field` in `theme.css`), so pausing settles the
+   * room over a second instead of stopping it dead.
+   *
+   * The mix is *how much of the environment is on show*, and it is deliberately
+   * not part of that condition. Keeping them apart is what makes the setting
+   * safe to change mid-session: turning the visualiser on halfway through an
+   * in-breath animates the mix from 0 to 1 while the breath carries straight on
+   * at whatever value it was already at, so the room fades in *already* at 63%
+   * of an inhale rather than starting one of its own. Every environmental
+   * calculation in the stylesheet is the product of the two — see `--drive`.
    */
-  const environmentBreathing =
-    preferences.backgroundBreathing && preferences.breathingEnabled && playing
+  const backgroundOn = preferences.backgroundVisualizer
+
+  const fieldAmplitude =
+    preferences.breathingEnabled && playing && !reducedMotion ? 1 : 0
 
   /*
-   * The amplitude every breath-driven layer multiplies itself by, set on both
-   * the stage and the atmosphere. It is a registered, eased custom property
-   * (`--field` in `theme.css`), so pausing settles the room over a second
-   * instead of stopping it dead.
+   * The stage as well as the atmosphere, because the stage is not a descendant
+   * of it and its own pool of light has to agree with the light beyond the
+   * glass.
    */
-  const fieldAmplitude = environmentBreathing && !reducedMotion ? 1 : 0
+  const mixTargets = useMemo<Array<RefObject<HTMLElement | null>>>(
+    () => [fieldRef, stageRef],
+    [fieldRef, stageRef],
+  )
+  useBackgroundMix({
+    enabled: backgroundOn,
+    targets: mixTargets,
+    reducedMotion,
+  })
 
   // Bloom the orb once, as the session comes to life.
   const [awaken, setAwaken] = useState(false)
@@ -287,10 +311,24 @@ export function PlayerRoute() {
         timeline.fromTo(meter, { y: 10 }, { y: 0, duration: 0.5 }, 0.46)
       }
 
-      const motes = field?.querySelector('.player-field__motes')
-      if (motes) {
-        timeline.fromTo(motes, { opacity: 0 }, { opacity: 1, duration: 0.6 }, 0.5)
+      /*
+       * The far half of the room arrives last, once everything else has come
+       * to rest: the colour and haze band, then the points of light, then the
+       * depth at the edges. Each of these is a wrapper carrying nothing but a
+       * plain opacity, which is the only reason they can be tweened at all —
+       * the layers inside them are recomputing opacity from the breath every
+       * frame, and a tween on the same property would be a tug of war.
+       */
+      const reveal = (selector: string, at: number, duration: number) => {
+        const target = field?.querySelector(selector)
+        if (target) {
+          timeline.fromTo(target, { opacity: 0.3 }, { opacity: 1, duration }, at)
+        }
       }
+
+      reveal('.player-field__clouds', 0.4, 0.6)
+      reveal('.player-field__motes', 0.5, 0.6)
+      reveal('.player-field__depth', 0.58, 0.62)
     },
     { dependencies: [expanded, instant], revertOnUpdate: true },
   )
@@ -385,6 +423,8 @@ export function PlayerRoute() {
         fieldRef={fieldRef}
         amplitude={fieldAmplitude}
         immersive={expanded}
+        settled={complete}
+        utterance={playing ? (currentLine ?? undefined) : undefined}
       />
 
       <div className="mx-auto grid max-w-xl grid-cols-[minmax(0,1fr)] gap-6 lg:max-w-none lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8 xl:grid-cols-[minmax(0,1fr)_26rem]">
@@ -454,6 +494,10 @@ export function PlayerRoute() {
               className={cx(
                 'surface-stage stage relative flex flex-col items-center px-5 py-8 sm:px-8 lg:py-10',
                 expanded && 'stage--immersive',
+                // The card grows and its edge softens once the room around it
+                // is awake, so the player is immersive before Expand is ever
+                // pressed. Expanded mode has its own sizing and wins outright.
+                backgroundOn && 'stage--roomy',
                 instant && 'stage--instant',
               )}
             >
@@ -700,12 +744,13 @@ export function PlayerRoute() {
                 preferences.breathPattern,
                 preferences.breathStyle,
                 preferences.breathSound,
+                preferences.backgroundVisualizer,
               )}
               onClick={() => {
                 cue('tap')
                 setSheet('breathing')
               }}
-              accent={preferences.breathingEnabled}
+              accent={preferences.breathingEnabled || backgroundOn}
             />
             <SettingRow
               icon={<TuneIcon />}

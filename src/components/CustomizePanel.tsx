@@ -290,9 +290,10 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
               preferences.breathPattern,
               preferences.breathStyle,
               preferences.breathSound,
+              preferences.backgroundVisualizer,
             )}
             onClick={() => openPanel('breathing')}
-            accent={preferences.breathingEnabled}
+            accent={preferences.breathingEnabled || preferences.backgroundVisualizer}
           />
           <SettingRow
             icon={<PulseIcon />}

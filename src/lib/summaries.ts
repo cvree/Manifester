@@ -72,8 +72,14 @@ export function breathingSummary(
   pattern: BreathPattern,
   style?: BreathStyleId,
   sound?: BreathSound,
+  background?: boolean,
 ): string {
-  if (!enabled) return 'Off'
+  /*
+   * The background visualiser has its own switch inside this panel and does
+   * not need the guide, so "Off" on its own would be a lie the one time the
+   * room is on and the guide is not.
+   */
+  if (!enabled) return background ? 'Guide off · background visualiser on' : 'Off'
   const preset = findPreset(pattern)
   const shape = `${formatSeconds(pattern.inhale)} in / ${formatSeconds(pattern.exhale)} out`
   return [

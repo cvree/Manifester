@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   breathStateAt,
   cycleSeconds,
+  expansionAt,
   isPatternValid,
   PHASE_LABEL,
   type BreathPattern,
@@ -13,13 +14,29 @@ import {
   primeBreathAudio,
   type BreathSound,
 } from './breathAudio'
+import { BREATH_LAG_SECONDS } from './environment'
 import { haptic } from './feedback'
 import { useReducedMotion } from './motion'
 
+/** What one frame of breath looks like, in the numbers the stylesheet reads. */
+interface BreathFrame {
+  /** `--e`: expansion here and now, 0 → 1 → 0. */
+  e: number
+  /** `--p`: progress through the current phase. */
+  p: number
+  /** `--m`: how much of this phase's movement is happening right now. */
+  m: number
+  /** `--e-mid`: the same expansion curve, a quarter-second back. */
+  mid: number
+  /** `--e-far`: and two thirds of a second back. */
+  far: number
+}
+
 export interface BreathingRuntime {
   /**
-   * Attach to the element the orb scales inside. It receives two custom
-   * properties every frame: `--e` (expansion) and `--p` (phase progress).
+   * Attach to the element the orb scales inside. It receives the breath as
+   * custom properties every frame — `--e` (expansion) and `--p` (phase
+   * progress) chief among them.
    */
   stageRef: React.RefObject<HTMLDivElement | null>
   phase: BreathPhase
@@ -39,8 +56,8 @@ interface Options {
   soundVolume: number
   hapticCues: boolean
   /**
-   * Anything else that should receive `--e` and `--p` on the very same frame
-   * as the orb — the player's stage and the atmosphere behind it.
+   * Anything else that should receive the breath on the very same frame as the
+   * orb — the player's stage and the atmosphere behind it.
    *
    * This exists so that "the room breathes too" can never become a second
    * clock. There is one loop, one `breathStateAt` call and one pair of values,
@@ -53,6 +70,15 @@ interface Options {
    */
   mirrors?: ReadonlyArray<React.RefObject<HTMLElement | null>>
 }
+
+/**
+ * Half-open and perfectly still. Every value the same, because a pose has no
+ * front and back — nothing is travelling outward through the room.
+ */
+const RESTING_POSE: BreathFrame = { e: 0.35, p: 0, m: 0, mid: 0.35, far: 0.35 }
+
+/** The same idea a little more open, for a guide someone has asked to hold still. */
+const REDUCED_POSE: BreathFrame = { e: 0.55, p: 0, m: 0, mid: 0.55, far: 0.55 }
 
 /**
  * Drives the breathing guide.
@@ -113,29 +139,36 @@ export function useBreathing({
    * amplitude it is multiplied by (`--field`, in `theme.css`) eases to nothing
    * instead. Same destination, and nothing lurches to get there.
    */
-  const write = useCallback((expansion: number, progress = 0, mirror = true) => {
-    const e = expansion.toFixed(4)
-    const p = progress.toFixed(4)
+  const write = useCallback((frame: BreathFrame, mirror = true) => {
+    const e = frame.e.toFixed(4)
+    const p = frame.p.toFixed(4)
+    const m = frame.m.toFixed(4)
+    const mid = frame.mid.toFixed(4)
+    const far = frame.far.toFixed(4)
 
-    const stage = stageRef.current
-    if (stage) {
-      stage.style.setProperty('--e', e)
-      stage.style.setProperty('--p', p)
+    const apply = (node: HTMLElement) => {
+      node.style.setProperty('--e', e)
+      node.style.setProperty('--p', p)
+      node.style.setProperty('--m', m)
+      node.style.setProperty('--e-mid', mid)
+      node.style.setProperty('--e-far', far)
     }
 
+    const stage = stageRef.current
+    if (stage) apply(stage)
+
     /*
-     * Two more `setProperty` calls per mirror per frame, and no more than
+     * A handful of `setProperty` calls per mirror per frame, and no more than
      * that: every element written to here is one the stylesheet has already
      * promoted to its own layer, so the browser answers a change with a
-     * composite rather than a layout.
+     * composite rather than a layout. The style recalculation is one pass
+     * whether it is asked two questions or five.
      */
     const extra = mirror ? mirrorsRef.current : null
     if (!extra) return
     for (const target of extra) {
       const node = target.current
-      if (!node) continue
-      node.style.setProperty('--e', e)
-      node.style.setProperty('--p', p)
+      if (node) apply(node)
     }
   }, [])
 
@@ -184,7 +217,27 @@ export function useBreathing({
 
       // Reduced motion keeps the phase ring, which conveys progress without
       // anything moving fast, but not the scaling.
-      write(reducedMotion ? 0.55 : state.expansion, state.phaseProgress)
+      if (reducedMotion) {
+        // The phase ring still turns: it reports progress without anything
+        // moving fast, which is the one piece of motion worth keeping here.
+        write({ ...REDUCED_POSE, p: state.phaseProgress })
+      } else {
+        /*
+         * The two extra samples are the room's sense of distance: the same
+         * curve, read a fraction of a second earlier, so an in-breath appears
+         * to travel outward from the orb rather than land everywhere at once.
+         * Two more passes over four numbers — cheaper than the `toFixed` calls
+         * below it — and, because they are samples rather than a delay line,
+         * there is nothing here that can fall out of step.
+         */
+        write({
+          e: state.expansion,
+          p: state.phaseProgress,
+          m: state.motion,
+          mid: expansionAt(pattern, elapsed - BREATH_LAG_SECONDS.mid),
+          far: expansionAt(pattern, elapsed - BREATH_LAG_SECONDS.far),
+        })
+      }
 
       if (state.phase !== lastPhaseRef.current) {
         const previous = lastPhaseRef.current
@@ -242,7 +295,7 @@ export function useBreathing({
      * three, and no animation frame is ever requested.
      */
     if (reducedMotion) {
-      write(0.55, 0)
+      write(REDUCED_POSE)
       tick()
       const interval = window.setInterval(tick, 250)
       return () => {
@@ -268,7 +321,7 @@ export function useBreathing({
   // Settle the orb to a resting half-open pose when the guide is switched off,
   // rather than collapsing it to nothing — a closed orb reads as broken.
   useEffect(() => {
-    if (!active && !reducedMotion) write(0.35, 0, false)
+    if (!active && !reducedMotion) write(RESTING_POSE, false)
   }, [active, reducedMotion, write])
 
   return {

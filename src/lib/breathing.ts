@@ -264,6 +264,19 @@ export interface BreathState {
    * a triangle wave.
    */
   expansion: number
+  /**
+   * How much of this phase's own movement is happening right now: 1 in the
+   * middle of an in- or out-breath, 0 through a hold, and 0 at the exact turn
+   * between the two.
+   *
+   * It is the eased curve's own slope, normalised — so it is not a second
+   * opinion about the breath, it is the same curve differentiated. The room
+   * uses it to let its *secondary* motion — the slow drifts that run on their
+   * own clocks — fall away as the breath comes to its turn, which is what
+   * makes the top of an inhale feel like time suspending rather than like one
+   * layer stopping while the others carry on.
+   */
+  motion: number
   completedBreaths: number
 }
 
@@ -272,6 +285,46 @@ const ORDER: BreathPhase[] = ['inhale', 'holdIn', 'exhale', 'holdOut']
 /** Smooth acceleration and settle — the shape a real breath has. */
 export function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
+}
+
+/**
+ * `easeInOut`'s slope, scaled so its peak is 1.
+ *
+ * The derivative is `4t` up to the midpoint and `4(1 - t)` after it, so
+ * halving it gives a triangle from 0 up to 1 and back — zero at both ends of
+ * the phase, which is exactly where a breath comes to rest.
+ */
+export function easeInOutSlope(t: number): number {
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t
+  return clamped < 0.5 ? 2 * clamped : 2 * (1 - clamped)
+}
+
+/** Where in the cycle `elapsedSeconds` lands. Negative time wraps backwards. */
+function locate(
+  pattern: BreathPattern,
+  elapsedSeconds: number,
+  total: number,
+): { phase: BreathPhase; progress: number; remaining: number; breaths: number } {
+  const breaths = Math.floor(elapsedSeconds / total)
+  let offset = elapsedSeconds - breaths * total
+
+  for (const phase of ORDER) {
+    const duration = pattern[phase]
+    if (duration <= 0) continue
+
+    if (offset < duration) {
+      return {
+        phase,
+        progress: offset / duration,
+        remaining: Math.max(1, Math.ceil(duration - offset)),
+        breaths,
+      }
+    }
+    offset -= duration
+  }
+
+  // Floating point can land a hair past the end of the last phase.
+  return { phase: 'holdOut', progress: 1, remaining: 1, breaths }
 }
 
 /**
@@ -289,38 +342,48 @@ export function breathStateAt(
       phaseProgress: 0,
       phaseRemaining: 0,
       expansion: 0,
+      motion: 0,
       completedBreaths: 0,
     }
   }
 
-  const completedBreaths = Math.floor(elapsedSeconds / total)
-  let offset = elapsedSeconds - completedBreaths * total
+  const { phase, progress, remaining, breaths } = locate(
+    pattern,
+    elapsedSeconds,
+    total,
+  )
 
-  for (const phase of ORDER) {
-    const duration = pattern[phase]
-    if (duration <= 0) continue
-
-    if (offset < duration) {
-      const phaseProgress = offset / duration
-      return {
-        phase,
-        phaseProgress,
-        phaseRemaining: Math.max(1, Math.ceil(duration - offset)),
-        expansion: expansionFor(phase, phaseProgress),
-        completedBreaths,
-      }
-    }
-    offset -= duration
-  }
-
-  // Floating point can land a hair past the end of the last phase.
   return {
-    phase: 'holdOut',
-    phaseProgress: 1,
-    phaseRemaining: 1,
-    expansion: 0,
-    completedBreaths,
+    phase,
+    phaseProgress: progress,
+    phaseRemaining: remaining,
+    expansion: expansionFor(phase, progress),
+    motion: motionFor(phase, progress),
+    completedBreaths: breaths,
   }
+}
+
+/**
+ * The expansion alone, at some other moment in the same cycle.
+ *
+ * This is how the room gets its sense of distance. Light nearer the orb is
+ * drawn at `breathStateAt(now)`; light further out is drawn at
+ * `expansionAt(now - a fraction of a second)`, so an in-breath appears to
+ * travel outward from the centre instead of the whole screen changing at once.
+ *
+ * It is deliberately a *sample of the same curve* rather than a delayed copy
+ * of the value: there is no buffer to fill, nothing to keep in sync and
+ * nothing to restart, and a negative time simply wraps into the previous
+ * cycle — which is the correct answer half a second into the first breath.
+ */
+export function expansionAt(
+  pattern: BreathPattern,
+  elapsedSeconds: number,
+): number {
+  const total = cycleSeconds(pattern)
+  if (total <= 0) return 0
+  const { phase, progress } = locate(pattern, elapsedSeconds, total)
+  return expansionFor(phase, progress)
 }
 
 function expansionFor(phase: BreathPhase, progress: number): number {
@@ -331,6 +394,17 @@ function expansionFor(phase: BreathPhase, progress: number): number {
       return 1
     case 'exhale':
       return 1 - easeInOut(progress)
+    case 'holdOut':
+      return 0
+  }
+}
+
+function motionFor(phase: BreathPhase, progress: number): number {
+  switch (phase) {
+    case 'inhale':
+    case 'exhale':
+      return easeInOutSlope(progress)
+    case 'holdIn':
     case 'holdOut':
       return 0
   }

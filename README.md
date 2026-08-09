@@ -154,10 +154,12 @@ app.
   through the phase, the phase name and a countdown in the centre. Ten patterns,
   five breath voices, and custom timing for every phase — it has a section of
   its own below. It pauses and resumes with the session.
-- **Background breathing**: the atmosphere around the guide expands and settles
-  with it, on the same clock, at a percent or two of scale. On by default and
-  quiet enough that most people feel it before they notice it. It can be turned
-  off under **Breathing**, and it is written up below.
+- **A background visualiser**: the whole player becomes a room that expands and
+  settles with the guide — light gathering behind the orb, colour and haze at
+  three depths, a scattering of pollen, a horizon that opens on the in-breath.
+  It runs on the guide's own clock, at a percent or two of scale, and it is on
+  by default because at that depth most people feel it before they notice it.
+  It can be turned off under **Breathing**, and it is written up below.
 - **Delay between loops**, 0–60 seconds, counted down on screen (*"Next loop in
   6s"*) and frozen exactly where it was if you pause.
 - Time remaining, or elapsed time when there is no timer.
@@ -319,21 +321,36 @@ let web apps vibrate, and the app says so rather than showing a dead switch.
 
 ### The room breathes too
 
-**Background breathing** — the fourth switch under Breathing, on by default —
-lets the atmosphere around the guide expand and settle with it. On the in-breath
-the light behind the orb opens, the vignette relaxes, the haze widens and a few
-motes of pollen drift outward; on the out-breath all of it gathers back in. It
-is deliberately small: a percent or two of scale and a few percent of light,
-which is enough to feel and not enough to watch.
+**Background visualiser** — the second switch under Breathing, on by default —
+turns the whole player into a room that answers to your breath. On the in-breath
+the light behind the orb opens, the far field follows a moment later, the haze
+separates, the vignette relaxes, the horizon descends a few pixels and the
+pollen drifts outward; on the out-breath all of it gathers back in and the
+colour goes fractionally warmer. It is deliberately small — a percent or two of
+scale and a few percent of light, which is enough to feel and not enough to
+watch — and the intended order is that you notice how calm it is well before you
+notice that the screen is moving at all.
 
-It rides on the guide's own clock rather than having one of its own, which is
-why it sits under the guide's switch rather than beside it: with the guide off
-there is no breath for the room to follow, and a four-second pulse pretending to
-be your breathing would be worse than nothing. The same goes for pausing — the
-room settles rather than stopping — and for `prefers-reduced-motion`, which
-keeps the atmosphere and drops the movement. How that is wired, and why it can
-never drift out of step with the orb, is under
-[Decisions worth explaining](#decisions-worth-explaining).
+The one thing worth knowing about it is that the breath does not arrive
+everywhere at once. Light near the orb is drawn at *now*; light further out is
+drawn from the same curve a quarter and then two thirds of a second earlier, so
+an in-breath reads as something travelling outward through the room rather than
+as the whole screen changing on one frame. That is also where the echo comes
+from: at the top of a full inhale the near light begins contracting while the
+lagged one is still open, and the difference between the two is a faint halo
+that dissolves over the next second. Nothing is triggered, so nothing can
+accumulate.
+
+It rides on the guide's own clock rather than having one of its own, so with the
+guide switched off the room is simply still — lit, coloured and deep, but not
+moving, because a four-second pulse pretending to be your breathing would be
+worse than nothing. Pausing settles it rather than stopping it. Turning the
+switch off mid-session settles it too, over about a second, without the breath
+underneath ever changing; turning it on wakes it over about 1.2 seconds,
+entering *already* at whatever point of the breath you happen to be at.
+`prefers-reduced-motion` keeps the whole composition and drops only the
+movement. How all of that is wired, and why it can never drift out of step with
+the orb, is under [Decisions worth explaining](#decisions-worth-explaining).
 
 ---
 
@@ -705,39 +722,91 @@ loop saved under the old ceiling is brought back to 100% by `normaliseSettings`
 — the level it had actually been playing at all along.
 
 **The room breathes on the player's clock, not on one of its own.** The player
-is wrapped in an atmosphere ([`PlayerAtmosphere.tsx`](src/components/PlayerAtmosphere.tsx)):
-a breathing field of light behind the orb, two aurora veils on slow
-incommensurable orbits, a haze that gathers inward as you empty, seven motes
-that draw outward as you fill, and a vignette that relaxes and deepens with the
-breath.
+is wrapped in an atmosphere ([`PlayerAtmosphere.tsx`](src/components/PlayerAtmosphere.tsx))
+of seven bands: a warm ground wash, a breathing field of light behind the orb
+with a far field trailing it, an echo, three aurora clouds on slow
+incommensurable orbits, two haze planes at different depths, eighteen motes with
+depth values, and a horizon and vignette that open and deepen with the breath.
 
 The tempting way to build that is a keyframe or an interval — and it is wrong,
 because it would agree with the orb for about a minute and then spend the rest
 of the session visibly disagreeing with it. Instead `useBreathing` takes a list
-of `mirrors`, and writes `--e` and `--p` onto the orb, the stage and the
-atmosphere in the same pass of the same `requestAnimationFrame` loop, from the
-same `breathStateAt` call. There is one breath in the room and everything in it
-is following that one, to the millisecond, because it is the same number.
+of `mirrors`, and writes the breath onto the orb, the stage and the atmosphere
+in the same pass of the same `requestAnimationFrame` loop, from the same
+`breathStateAt` call. There is one breath in the room and everything in it is
+following that one, to the millisecond, because it is the same number.
 
-Two details make it survivable rather than merely correct:
+Four details make it survivable rather than merely correct:
 
-- **`--field`**, a registered custom property every layer multiplies its
-  movement by. `--e` is rewritten sixty times a second and so can never be
-  transitioned, but this one is only ever *read* alongside it — so pausing a
-  session eases it to zero over a second and the whole room glides back to its
-  resting pose while the breath simply stops. Turning Background breathing off
-  does the same thing, and leaves the atmosphere lit, coloured and deep.
-- **Nothing viewport-sized goes behind a `filter: blur()`**, and every gradient
-  reaches full transparency inside its own element — the same two rules the
-  Cosmic Garden was already built on. A frame costs the compositor a transform
-  and an opacity on a handful of already-promoted layers, and the main thread
-  nothing at all.
+- **Two numbers, kept apart.** `--field` is *is there a live breath* and
+  `--mix` is *how much of the room is on show*; every environmental
+  calculation is the product of the two. `--e` is rewritten sixty times a
+  second and so can never be transitioned, but it is only ever *read*
+  multiplied by these, and these change twice a session. Pausing eases
+  `--field` to zero over a second and the room glides back to its resting pose
+  while the breath simply stops. Switching the visualiser off tweens `--mix` to
+  zero and the room fades out of a breath it never stopped following — no
+  restart, no jump, no desynchronisation, because the mix has no idea where the
+  start of a breath is. That separation is the whole reason the setting is safe
+  to touch mid-session, and it is why the mix is four numbers rather than one:
+  ground light, colour, points, depth, so the room wakes in the order a room
+  wakes in and settles in the reverse.
+- **The breath wave is a second sample, not a second animation.** The far
+  layers read `expansionAt(now − 0.62s)` — the same pure function, a moment
+  earlier. There is no delay line to fill, nothing to keep in sync and nothing
+  to restart, and negative time simply wraps into the previous cycle. The echo
+  falls straight out of it as `max(0, far − near)`, which is zero for the whole
+  in-breath by construction, so it cannot be triggered twice and cannot
+  accumulate.
+- **Stillness is the derivative, not a special case.** `--m` is the eased
+  curve's own slope, so it is exactly zero through a hold and at every turn.
+  The breath-driven layers therefore come to rest on their own; `--m` is used
+  only to damp the *self-running* drifts to a quarter of their amplitude, so a
+  hold does not stop the breath and leave the slow orbits sliding on
+  underneath it.
+- **Nothing viewport-sized goes behind a `filter: blur()`**, every gradient
+  reaches full transparency inside its own element, and no gradient is ever
+  *recomputed* per frame — colour temperature is two layers cross-fading rather
+  than one layer's stops being re-interpolated, because the first costs a
+  composite and the second costs a full-viewport repaint sixty times a second.
+  A frame costs the compositor a transform and an opacity on a dozen
+  already-promoted layers, and the main thread nothing at all.
 
 The richer layers are dropped on the hardware that cannot afford them, by the
-same [`isLowPowerDevice`](src/lib/motion.ts) check the pollen canvas uses, and
-`prefers-reduced-motion` holds `--field` at zero and stops the two self-running
-drifts — leaving the full composition, still lit, holding a pose. Reduced motion
-should still look designed.
+same [`isLowPowerDevice`](src/lib/motion.ts) check the pollen canvas uses, the
+motes are drawn only where there is room for them to travel that is not on top
+of the words, and `prefers-reduced-motion` holds `--field` at zero — which
+stills every breath-driven half at once, including the lagged samples, the echo
+and the horizon, since all of them are multiplied by it — and stops the
+self-running drifts, leaving the full composition, still lit, holding a pose.
+The switch still fades rather than snapping. Reduced motion should still look
+designed.
+
+**The field is a place, so it is seeded rather than random.** The eighteen motes
+in [`environment.ts`](src/lib/environment.ts) are generated once at module load
+from a fixed seed, with their angles stratified — one per equal sector, jittered
+inside it — because free placement clumps and a clump of three lights touching
+reads as a mistake rather than as a scattering. Depth is drawn cubed, so most of
+the field sits well back and only a few points are near enough to have real
+presence; a screen where every point is a foreground point has no depth at all.
+`Math.random()` would have meant a point of light jumping across the screen
+because some unrelated piece of UI state changed, and the room has to be the
+same room you left.
+
+**Making the card's orb bigger was not the obvious number.** With the visualiser
+on, the player should already feel immersive before anyone presses Expand — so
+the orb's *ceiling* goes from 27rem to 34rem while the viewport-height
+coefficient stays exactly where it was. That is deliberate. The expanded stage
+can offer `95dvh` minus the measured height of the rest of the composition,
+which on an ordinary 900px laptop window is a shade under 400px — almost exactly
+what `44vh` already comes to. Taking more height for the card there would have
+bought a bigger orb in the card at the cost of *shrinking* it on Expand, which
+is the one thing expanding must never do. Raising the ceiling instead does
+nothing at all on the laptop and a quarter more orb on a tall or large display,
+which is precisely where the room to do it actually is. On the screens with no
+height to spare, the immersion comes from the light and the softened card edge
+instead — and that is what "where available" has to mean when the constraint is
+real.
 
 **The orb is measured against the room it has to fit in.** Making the visualiser
 bigger is one number; making it bigger *without* pushing the words it introduces
@@ -771,15 +840,27 @@ entirely under reduced motion or on low-memory / low-core devices, and the
 pointer parallax only ever binds on a device that reports a fine pointer, so it
 never competes with touch scrolling.
 
-Re-evaluated when the player gained its own atmosphere, and the answer did not
-change. FOG and CLOUDS are the two effects close enough to Cosmic Garden to be
-worth prototyping, and turning either of them down far enough to be tasteful
-here — slow, abstract, low-contrast, brand-coloured, and not following the
-mouse — leaves an effect doing less than the six CSS layers already in place,
-for half a megabyte of `three.js` and a WebGL context held open for the length
-of a thirty-minute session on a phone. The whole point of this app is to run
-quietly in a pocket. Vanta earns its place in a hero section; it does not earn
-it here.
+Re-evaluated when the player gained its own atmosphere, and again when that
+atmosphere became the background visualiser, and the answer did not change.
+FOG and CLOUDS are the two effects close enough to Cosmic Garden to be worth
+prototyping, and turning either of them down far enough to be tasteful here —
+slow, abstract, low-contrast, brand-coloured, and not following the mouse —
+leaves an effect doing less than the CSS layers already in place, for half a
+megabyte of `three.js` and a WebGL context held open for the length of a
+thirty-minute session on a phone. There is also a harder objection now: a Vanta
+layer would be running on its own render loop, and the one rule the whole
+feature rests on is that there is exactly one clock in this room. The whole
+point of this app is to run quietly in a pocket. Vanta earns its place in a hero
+section; it does not earn it here.
+
+**Room for other rooms.** `BACKGROUND_MODES` in
+[`environment.ts`](src/lib/environment.ts) has one entry, and the type union
+names four more that are not built. That is not aspiration left in the code — it
+is the shape the thing has to keep. A mode is an id in that list, an entry in
+the registry, and a `.player-field--<id>` block in `theme.css` that re-tints or
+re-weights the layers already there. It is not a second component, a second
+clock or a second set of geometry, and keeping it that way is what makes "one
+day, an Aurora mode" a morning's work rather than a rewrite.
 
 **A decorative gradient must reach transparency inside its own element.** This
 is the rule the atmosphere is built on, and it is worth stating because
@@ -1040,7 +1121,8 @@ src/
   components/     design system + composed UI
     Sheet.tsx             the one modal surface: bottom sheet / centred dialog
     BreathingVisualizer   all six guide forms, plus the phase ring
-    PlayerAtmosphere      the room the player breathes in, on the orb's clock
+    PlayerAtmosphere      the room the player breathes in, on the orb's clock —
+                          seven bands of light, colour, haze, pollen and depth
     CosmicBackground      the twilight garden behind every screen
     RitualPreview.tsx     the live picture of the finished ritual
     CustomizePanel.tsx    the advanced settings, as summarised rows + sheets
@@ -1056,6 +1138,10 @@ src/
     breathAudio.ts  the breath's own synthesised voices
     useBreathing.ts drives the orb — and everything mirroring it — from the
                     wall clock
+    environment.ts  the room itself: background modes, how far the breath lags
+                    at distance, and the seeded field of motes
+    useBackgroundMix.ts   wakes and settles the room, without ever touching
+                          the breath underneath it
     useStageExpansion.ts  grows the player into the screen, and back
     smoothScroll.tsx  Lenis on the two screens that genuinely scroll
     feedback.ts     haptics and generated interface tones
