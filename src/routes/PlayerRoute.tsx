@@ -45,6 +45,7 @@ import {
 } from '../lib/summaries'
 import { useBackgroundMix } from '../lib/useBackgroundMix'
 import { useBreathing } from '../lib/useBreathing'
+import { useFittedLine } from '../lib/useFittedLine'
 import { useStageExpansion } from '../lib/useStageExpansion'
 import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
@@ -115,6 +116,7 @@ export function PlayerRoute() {
   })
 
   const fieldRef = useRef<HTMLDivElement>(null)
+  const lineRef = useRef<HTMLParagraphElement>(null)
 
   /*
    * The guide follows the session: it breathes while you listen and holds
@@ -352,6 +354,13 @@ export function PlayerRoute() {
    */
   const currentLine = session.chunkText || draft.text.trim() || lines[0]
 
+  /*
+   * The words are set to fit a box that never changes size, rather than the box
+   * being sized to fit the words. That is the whole of what keeps the orb still
+   * while the lines change length underneath it.
+   */
+  useFittedLine(lineRef, currentLine, expanded)
+
   if (idle && !hasText) {
     return (
       <Card data-rise level="stage" className="mx-auto mt-6 max-w-xl">
@@ -566,8 +575,17 @@ export function PlayerRoute() {
                   carries on transitioning undisturbed. Keying the paragraph
                   itself would remount it, and a remount mid-expansion is a
                   jump in type size rather than a change of words.
+
+                  The box is a fixed height and the type shrinks to meet it —
+                  see `useFittedLine`. That is what stops a two-line
+                  affirmation moving the orb, and it is why none of the
+                  typography is set here any more: the size has to be one
+                  number the fit can multiply.
                 */}
-                <p className="stage__line min-h-[4rem] max-w-[32ch] text-center font-display text-[1.25rem] leading-snug whitespace-pre-line text-ink sm:text-[1.4rem]">
+                <p
+                  ref={lineRef}
+                  className="stage__line text-center font-display whitespace-pre-line text-ink"
+                >
                   <span
                     key={currentLine ?? ''}
                     className="stage__line-text animate-line-in"
@@ -608,6 +626,15 @@ export function PlayerRoute() {
                   {playing ? <PauseIcon /> : <PlayIcon className="translate-x-[3px]" />}
                 </button>
 
+                {/*
+                  The clock, and nothing beside it.
+
+                  The pass counter used to sit here. It was the one number on
+                  this screen that answered a question nobody listening is
+                  asking — how many times round have I been — and it changed
+                  under the eye every few minutes for no reason anyone acts on.
+                  The time left is the whole of what is worth knowing here.
+                */}
                 <div className="flex items-center gap-3">
                   <span
                     className="type-numeral text-[1.05rem] text-ink"
@@ -616,16 +643,6 @@ export function PlayerRoute() {
                     {timeLabel}
                   </span>
                   <span className="type-meta">{timeCaption}</span>
-                  {!idle && (
-                    <>
-                      <span aria-hidden="true" className="text-ink-faint">
-                        ·
-                      </span>
-                      <span className="type-meta">
-                        Pass {session.cycles + 1}
-                      </span>
-                    </>
-                  )}
                 </div>
 
                 <button
@@ -642,8 +659,18 @@ export function PlayerRoute() {
                 </button>
               </div>
 
-              {/* Progress through this pass. */}
-              {!idle && (
+              {/*
+                Progress through this pass — in the card only.
+
+                Expanded, this is the last piece of technical information left
+                on a screen whose whole job is to have none, and it is saying
+                what the state label at the top already says: the countdown to
+                the next pass is up there as "Resting · 6s". Its height is not
+                free either — the words' box below the orb has to come out of
+                the same budget, and this is the part of the composition that
+                is easiest to lose and hardest to miss.
+              */}
+              {!idle && !expanded && (
                 <div className="stage__meter mt-8 w-full max-w-sm">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <span className="type-meta">

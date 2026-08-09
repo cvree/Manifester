@@ -675,6 +675,41 @@ way a podcast does. It is claimed when someone asks for sound, never on load,
 and it is never widened out of `play-and-record` while the voice recorder holds
 the microphone.
 
+*And the supported answer was not enough*, which is where the first attempt at
+this stopped and why the report came back a second time. `navigator.audioSession`
+is implemented by Safari alone; it arrived in 16.4 with only part of it enabled
+and the rest behind an experimental feature flag. On a phone where it is missing
+or inert, that assignment sets a property, changes nothing, and leaves the mix
+on the ringer channel exactly as before — with no error and nothing to see.
+
+So there is a second mechanism underneath it, and on iOS it always runs rather
+than being skipped when the API *claims* to have worked: a silent `<audio>`
+element, playing on a loop for as long as the app means to make a sound. An
+`HTMLMediaElement` is categorised as media playback rather than as ambient
+noise, and while one is playing the page's Web Audio goes out over the same
+route. It is a hack; it is the hack every audio library on the web has
+converged on; and the honest reason it is here is that the standard answer does
+not yet work on the phones people have. Three details are load-bearing:
+
+- **The element is in the document**, not merely constructed. A detached media
+  element plays perfectly well on a desktop, which is exactly what makes this
+  easy to leave out and never notice — but iOS chooses the route from the media
+  a page is *presenting*, and an element outside the document presents nothing.
+- **The file is real.** The silent track is built byte by byte rather than
+  shipped as base64, and it is decoded by a real decoder in the tests, because
+  a header written big-endian or a chunk length off by 44 produces a file the
+  browser declines, an element that never plays, and a phone that behaves
+  exactly as it did before the fix.
+- **The recovery arms on success, not on the request.** The breath's own voice
+  builds its context the moment the player mounts, long before anyone presses
+  anything, so the claim is reached without a gesture and refused. Arming on
+  the request would mean the first stray tap anywhere started a silent track
+  and put a lock-screen widget on a session nobody had begun.
+
+The visible cost is a lock-screen media widget while a session runs, which for
+a thirty-minute spoken loop is arguably where it belongs. It is handed back the
+moment the session pauses or ends.
+
 *The state the specification does not have.* `AudioContextState` is
 `suspended | running | closed`. iOS has a fourth, `interrupted`, which a call,
 an alarm, another app taking the audio route or the screen locking can all leave
@@ -819,6 +854,45 @@ measured share. The two are tuned against each other: from about 780px of
 viewport height upward — where the great majority of windows are — the orb is
 about a quarter larger than it was in the card, and half again as large as that
 when the stage opens.
+
+**The words are fitted to their box, not the other way round.** The orb is the
+anchor of the whole screen, and it was moving: expanded, the orb and the line it
+is speaking are centred together in whatever height is left over, so a line that
+wrapped to two instead of one pushed the orb up by about thirty pixels — every
+few seconds, on the one screen someone is looking at while trying to be still.
+In the card the orb held its place but the stage grew and shrank underneath it,
+so everything below the words shifted instead. Measured, not guessed: 30px and
+32px of drift, and 46–59px of stage height.
+
+Making the box a fixed height is the obvious half. The interesting half is what
+to do with a line too long for it, and there are only three answers: clamp it
+and put an ellipsis on the entire point of the app; reserve enough height for
+the longest line anyone could write, and charge the orb for it on every screen
+including the great majority where the lines are short; or set the long line
+slightly smaller, which is what a person laying this out by hand would do
+without thinking about it. [`useFittedLine`](src/lib/useFittedLine.ts) does the
+third. Two details make it work rather than merely run:
+
+- **The column has to be measured in a real length.** It was `32ch`, and `ch` is
+  a multiple of the font size — so shrinking the type shrank the column with it
+  and the line wrapped in exactly the same places, forever. That one unit is the
+  difference between this converging and it not working at all.
+- **The step is a square root.** Halving the type roughly halves the height of a
+  line *and* roughly halves the number of lines, so the block's height goes with
+  the square of the scale. Stepping by `available / natural` overshoots badly —
+  it lands at 0.5 where 0.7 would have done, and the words end up needlessly
+  small.
+
+The height it does reserve is *derived* — lines × leading × size — rather than a
+hand-tuned constant, so the room the orb gives up is exactly the room the words
+are using at that viewport, and the two cannot drift apart when one of them is
+tuned. It is paid for by the pass meter, which no longer appears in fullscreen:
+it was the last piece of technical information left on a screen whose whole job
+is to have none, and it was repeating what the state label at the top already
+said. The pass counter beside the clock went at the same time and for the same
+reason — it was the one number there that answered a question nobody listening
+is asking. Measured after: zero drift at any line length, constant orb size,
+constant box height, nothing clipped, and no scrollbar, at four viewport sizes.
 
 One thing that cost an afternoon and is worth writing down: **a transformed
 child contributes its transformed box to its parent's scrollable overflow.** The
@@ -1213,10 +1287,11 @@ them go away:
 - **The first tap matters.** Browsers require a genuine user gesture before any
   audio starts. If nothing happens, tap play once more.
 - **A phone's silent switch mutes Web Audio, but not speech.** Which is why "the
-  words play and nothing else does" is the classic mobile report, and why
-  Manifester declares its audio session as `playback` — see below. On an iOS
-  version without the Audio Session API, the silent switch still wins and the
-  ring/silent switch is the fix.
+  words play and nothing else does" is the classic mobile report. Manifester
+  declares its audio session as `playback` *and* holds a silent looping media
+  element for the length of a session, because the first of those is Safari-only
+  and still largely behind a feature flag while the second works everywhere —
+  see below.
 - **Long single utterances get truncated** in several engines, which is exactly
   why the text is chunked and re-queued rather than sent in one piece.
 - **Private browsing blocks storage.** Saving is disabled and the app says so

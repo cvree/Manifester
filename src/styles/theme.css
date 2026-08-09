@@ -2380,6 +2380,32 @@ html:not(.dark) .breath-aurora__veil {
   --stage-orb: clamp(min(16rem, 74vw), min(64vw, 44vh), 27rem);
 
   /*
+   * ── The line the voice is speaking ──
+   *
+   * All four numbers live here rather than on the paragraph, because two other
+   * things need them: the fit (`useFittedLine`) multiplies `--line-size` by a
+   * scale, and the expanded orb has to subtract the box's height from the room
+   * it may take. A font size written straight onto the element could do
+   * neither.
+   *
+   * `--stage-line` is therefore *derived* — lines × leading × size — rather
+   * than a hand-tuned constant, so the height the orb gives up is exactly the
+   * height the words are using at this viewport, and the two can never drift
+   * apart when one of them is tuned.
+   *
+   * The width is in `rem` and emphatically not in `ch`. `ch` is a multiple of
+   * the font size, so a column measured in it shrinks in step with the type and
+   * a line wraps in exactly the same places however small it is set — which
+   * makes fitting mathematically impossible. This is the one unit in the file
+   * that has to be what it is.
+   */
+  --line-size: 1.25rem;
+  --line-leading: 1.38;
+  --line-lines: 3;
+  --line-width: 22rem;
+  --stage-line: calc(var(--line-lines) * var(--line-leading) * var(--line-size));
+
+  /*
    * The stage answers to the same two numbers the room outside it does — see
    * "The two numbers" above. It is not a descendant of `.player-field`, so
    * both are written onto it directly: `--field` inline by the player,
@@ -2460,6 +2486,14 @@ html:not(.dark) .breath-aurora__veil {
  * easing into their new sizes is the animation, minus only the part that
  * made it readable.
  */
+/* The card's own type opens a little once there is width for it to open into. */
+@media (min-width: 640px) {
+  .stage {
+    --line-size: 1.4rem;
+    --line-width: 23rem;
+  }
+}
+
 .stage--instant {
   --stage-travel: 0.001ms;
 }
@@ -2522,11 +2556,62 @@ html:not(.dark) .breath-aurora__veil {
    * the safety valve above is there to make survivable rather than normal.
    */
   --stage-room: 100dvh;
-  --stage-orb: clamp(11rem, min(78vw, var(--stage-room) - 28.5rem), 44rem);
+  /*
+   * 21.75rem is the rest of the composition — the title block, the transport
+   * and the spacing between them — and `--stage-line` is the words' own box,
+   * derived from the type rather than guessed at. Splitting the reserve in two
+   * is what lets the line's height be tuned without silently putting a
+   * scrollbar on the most carefully composed screen in the app.
+   *
+   * It came down from 24.5rem when the pass meter stopped being drawn here:
+   * that is real height handed back, and it is what pays for the words having
+   * a box that never changes size. Without it the orb would have had to, and
+   * an expanded orb smaller than the card's is the one thing expanding must
+   * never produce.
+   */
+  --stage-orb: clamp(
+    11rem,
+    min(78vw, var(--stage-room) - 21.75rem - var(--stage-line)),
+    44rem
+  );
   --stage-gap: 1rem;
   --stage-stack: 0.75rem;
   --stage-play: 4.75rem;
-  --stage-line: 4rem;
+
+  /*
+   * Two lines rather than three, and the reason is arithmetic: every rem of
+   * the words' box comes straight off the orb above it, and at this type size
+   * a third line costs over five of them — a quarter of the orb on an ordinary
+   * laptop window, reserved for space that the great majority of affirmations
+   * never use. A tall screen has the room and gets the third line; everything
+   * shorter sets a long line slightly smaller instead, which is by far the
+   * cheaper of the two. See `useFittedLine`.
+   */
+  --line-size: clamp(1.5rem, 1rem + 1.7vw, 2.45rem);
+  --line-leading: 1.32;
+  --line-lines: 2;
+  --line-width: 38rem;
+}
+
+@media (min-height: 1000px) {
+  .stage--immersive {
+    --line-lines: 3;
+  }
+}
+
+/*
+ * A phone gets the third line for nothing.
+ *
+ * The orb is limited by the *width* of a narrow screen long before it runs out
+ * of height, so the words' box there is not competing with it at all — and the
+ * type is at its floor, which makes a line cheap. Two lines of 24px is where
+ * the clipping actually starts to bite, and this is the one place it can be
+ * bought off without the orb noticing.
+ */
+@media (max-width: 640px) {
+  .stage--immersive {
+    --line-lines: 3;
+  }
 }
 
 .stage--immersive::-webkit-scrollbar {
@@ -2563,21 +2648,30 @@ html:not(.dark) .breath-aurora__veil {
  */
 @media (max-height: 800px) {
   .stage--immersive {
-    --stage-orb: clamp(11rem, min(74vw, var(--stage-room) - 25.5rem), 30rem);
+    --stage-orb: clamp(
+      11rem,
+      min(74vw, var(--stage-room) - 20.5rem - var(--stage-line)),
+      30rem
+    );
     --stage-gap: 0.8rem;
     --stage-stack: 0.6rem;
     --stage-play: 4.35rem;
-    --stage-line: 3.25rem;
+    /* Shallow screens buy the words' box back out of the type, not the orb. */
+    --line-size: clamp(1.35rem, 0.9rem + 1.1vw, 1.9rem);
   }
 }
 
 @media (max-height: 620px) {
   .stage--immersive {
-    --stage-orb: clamp(8rem, min(56vw, var(--stage-room) - 22rem), 22rem);
+    --stage-orb: clamp(
+      8rem,
+      min(56vw, var(--stage-room) - 16rem - var(--stage-line)),
+      22rem
+    );
     --stage-gap: 0.55rem;
     --stage-stack: 0.5rem;
     --stage-play: 3.9rem;
-    --stage-line: 2.75rem;
+    --line-size: clamp(1.2rem, 0.85rem + 0.8vw, 1.55rem);
   }
 }
 
@@ -2673,8 +2767,30 @@ html:not(.dark) .breath-aurora__veil {
   transition-property: margin;
 }
 
+/*
+ * A box of fixed height, with the words centred in it.
+ *
+ * `height`, not `min-height`, is the whole point: this box is the same size
+ * whether the line is three words or thirty, so the orb above it cannot be
+ * moved by a change of words and the controls below it cannot be pushed down.
+ * `useFittedLine` sets `--line-fit` so that long lines are set a little smaller
+ * rather than clipped; `overflow: hidden` is only the backstop for the case
+ * where even the minimum scale is not enough.
+ *
+ * Note that `--line-fit` multiplies the *font size* while the height is derived
+ * from the unscaled `--line-size`. If the box shrank along with the type there
+ * would be nothing to converge on.
+ */
 .stage__line {
-  transition-property: font-size, max-width, min-height, line-height, margin;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--stage-line);
+  max-width: min(var(--line-width), 100%);
+  font-size: calc(var(--line-size) * var(--line-fit, 1));
+  line-height: var(--line-leading);
+  overflow: hidden;
+  transition-property: font-size, max-width, height, line-height, margin;
 }
 
 /*
@@ -2688,12 +2804,17 @@ html:not(.dark) .breath-aurora__veil {
  * transitioning its size and its reserved height while the words change
  * inside it.
  */
+/*
+ * Deliberately unclamped.
+ *
+ * It used to carry `-webkit-line-clamp`, and it cannot any more: `scrollHeight`
+ * on a clamped box reports the clamp rather than the text, so the fit would
+ * measure its own answer and conclude that everything already fits. Containment
+ * is the box's job now — it has a fixed height and `overflow: hidden` — and the
+ * type is scaled to land inside it rather than cut to.
+ */
 .stage__line-text {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: var(--line-clamp, 5);
-  line-clamp: var(--line-clamp, 5);
-  overflow: hidden;
+  display: block;
 }
 
 /*
@@ -2770,24 +2891,24 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 /*
- * The words grow with the room, but not without limit: past about 32
+ * The words grow with the room, but not without limit: past about forty
  * characters a line stops being one thing the eye takes in and becomes
- * something to read across. The reserved height keeps the orb from shifting
- * as a one-line affirmation gives way to a two-line one, and shrinks on
- * screens that cannot spare it.
+ * something to read across.
  *
  * The leading opens with the size. At 2.4rem the `leading-snug` a 1.25rem line
  * wants would set the words as a block; a little over 1.3 is what makes them
  * read as a thought suspended in the room rather than as a paragraph in it.
+ *
+ * Two lines rather than three, and the reason is arithmetic: every rem of this
+ * box comes straight off the orb, and at this type size a third line costs
+ * over five of them — a quarter of the orb on an ordinary laptop window, to
+ * reserve space that the great majority of affirmations never use. A tall
+ * screen has the room, so it gets the third line; everything shorter sets a
+ * long line slightly smaller instead, which is the cheaper of the two.
  */
 .stage--immersive .stage__line {
-  font-size: clamp(1.5rem, 1rem + 1.7vw, 2.45rem);
-  line-height: 1.32;
   letter-spacing: -0.005em;
-  max-width: min(32ch, 100%);
-  min-height: var(--stage-line);
   margin-top: var(--stage-stack);
-  --line-clamp: 5;
 }
 
 .stage--immersive .stage__transport {
@@ -2958,11 +3079,11 @@ html:not(.dark) .breath-aurora__veil {
     font-size: clamp(1.25rem, 1rem + 0.7vw, 1.6rem);
   }
 
-  .stage--immersive .stage__line {
-    font-size: clamp(1.1rem, 0.95rem + 0.5vw, 1.4rem);
-    line-height: 1.25;
-    max-width: 100%;
-    --line-clamp: 2;
+  .stage--immersive {
+    --line-size: clamp(1.1rem, 0.95rem + 0.5vw, 1.4rem);
+    --line-leading: 1.25;
+    --line-lines: 2;
+    --line-width: 100%;
   }
 
   .stage--immersive .stage__focus {
@@ -2981,7 +3102,6 @@ html:not(.dark) .breath-aurora__veil {
 
   .stage--immersive .stage__line {
     grid-area: line;
-    min-height: 0;
     margin-top: var(--stage-stack);
   }
 

@@ -25,7 +25,12 @@
  * by the ambience, or suspended along with the music.
  */
 
-import { claimPlaybackSession, keepAwake, wake } from './audioSession'
+import {
+  claimMediaChannel,
+  claimPlaybackSession,
+  keepAwake,
+  wake,
+} from './audioSession'
 import { easeInOut, type BreathPhase } from './breathing'
 
 export type BreathVoiceId = 'chime' | 'bowl' | 'ocean' | 'breath' | 'drone'
@@ -111,6 +116,13 @@ function context(): AudioContext | null {
   // The guide's voice is media too, and on iOS it is muted by the silent
   // switch unless the page says so. See `audioSession.ts`.
   claimPlaybackSession()
+  /*
+   * The breath has a voice of its own on a context of its own, and someone can
+   * be listening to it with no ambience and no rhythm behind it — so it has to
+   * ask for the media route itself rather than rely on the session bus having
+   * asked first. Idempotent: there is one element for the page.
+   */
+  claimMediaChannel()
 
   if (!sharedContext) {
     const Ctor =

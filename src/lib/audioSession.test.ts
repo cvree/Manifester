@@ -1,8 +1,10 @@
+import { OfflineAudioContext } from 'node-web-audio-api'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   claimPlaybackSession,
   keepAwake,
   releaseRecordingSession,
+  silentWavBytes,
   wake,
 } from './audioSession'
 
@@ -225,5 +227,73 @@ describe('keeping a context awake', () => {
     expect(() => keepAwake(ctx)()).not.toThrow()
     listeners.statechange()
     expect(resume).toHaveBeenCalledOnce()
+  })
+})
+
+/**
+ * The silent track is the second half of the silent-switch fix, and the half
+ * that does the work on the phones people actually have: the Audio Session API
+ * is Safari-only and largely still behind a feature flag, so on most iPhones
+ * `claimPlaybackSession()` above sets a property and changes nothing. While an
+ * `HTMLMediaElement` is playing, though, the page's audio goes out over the
+ * media route rather than the ringer channel — which is what finally makes the
+ * ambience, the rhythm and the breath cues as audible as a podcast.
+ *
+ * That makes these bytes load-bearing, and it makes them the easiest thing
+ * here to get silently wrong. A header written big-endian, a chunk length off
+ * by the size of the header, a sample count that disagrees with the data
+ * chunk: every one of those produces a file the browser declines to decode, an
+ * element that never plays, and a phone that behaves *exactly* as it did
+ * before the fix. No error, nothing to see, and the bug reported a third time.
+ *
+ * So the assertion is the one that cannot be fooled — hand it to a real
+ * decoder and ask what came out.
+ */
+describe('the silent track', () => {
+  it('decodes as real audio of the length it claims', async () => {
+    // Offline, like the rest of the suite: a live context needs an output
+    // device, and a decoder does not.
+    const ctx = new OfflineAudioContext(1, 128, 44100)
+    const buffer = await ctx.decodeAudioData(silentWavBytes(0.4))
+
+    expect(buffer.numberOfChannels).toBe(1)
+    expect(buffer.sampleRate).toBe(44100)
+    expect(buffer.duration).toBeCloseTo(0.4, 2)
+  })
+
+  it('is genuinely silent, so nothing can ever be heard through it', async () => {
+    const ctx = new OfflineAudioContext(1, 128, 44100)
+    const buffer = await ctx.decodeAudioData(silentWavBytes(0.1))
+
+    let peak = 0
+    for (const sample of buffer.getChannelData(0)) {
+      peak = Math.max(peak, Math.abs(sample))
+    }
+    expect(peak).toBe(0)
+  })
+
+  it('writes a RIFF/WAVE header whose lengths agree with the data', () => {
+    const bytes = silentWavBytes(0.25)
+    const view = new DataView(bytes)
+    const tag = (offset: number) =>
+      String.fromCharCode(
+        view.getUint8(offset),
+        view.getUint8(offset + 1),
+        view.getUint8(offset + 2),
+        view.getUint8(offset + 3),
+      )
+
+    expect(tag(0)).toBe('RIFF')
+    expect(tag(8)).toBe('WAVE')
+    expect(tag(12)).toBe('fmt ')
+    expect(tag(36)).toBe('data')
+
+    // Little-endian, which is the half of this a decoder would reject.
+    expect(view.getUint32(40, true)).toBe(bytes.byteLength - 44)
+    expect(view.getUint32(4, true)).toBe(bytes.byteLength - 8)
+    expect(view.getUint16(20, true)).toBe(1) // PCM
+    expect(view.getUint16(22, true)).toBe(1) // mono
+    expect(view.getUint32(24, true)).toBe(44100)
+    expect(view.getUint16(34, true)).toBe(16) // bits per sample
   })
 })

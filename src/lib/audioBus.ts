@@ -21,7 +21,13 @@
  */
 
 import { createSoftCeiling, rampParam } from './audioParams'
-import { claimPlaybackSession, keepAwake, wake } from './audioSession'
+import {
+  claimMediaChannel,
+  claimPlaybackSession,
+  keepAwake,
+  releaseMediaChannel,
+  wake,
+} from './audioSession'
 
 /** Short enough to feel immediate on a slider, long enough not to step. */
 const RAMP_SECONDS = 0.12
@@ -150,12 +156,19 @@ export class AudioBus {
     if (typeof window === 'undefined') return null
 
     /*
-     * Before anything else, and every time: on iOS this is what stops the
+     * Before anything else, and every time: on iOS these two are what stop the
      * hardware silent switch muting the entire generated mix while the spoken
-     * voice — which never touches this graph — carries on regardless. See
-     * `audioSession.ts`; it is a no-op everywhere it is not needed.
+     * voice — which never touches this graph — carries on regardless.
+     *
+     * Two of them rather than one, and not as a belt-and-braces flourish: the
+     * first is the standards answer and is a no-op on every phone where Safari
+     * has not enabled it, which is most of them. The second is what actually
+     * moves the page onto the media route. Both are reached from the press
+     * that starts the sound, because a media element needs a gesture for the
+     * same reason an `AudioContext` does. See `audioSession.ts`.
      */
     claimPlaybackSession()
+    claimMediaChannel()
 
     if (!this.ctx) {
       const Ctor =
@@ -201,16 +214,21 @@ export class AudioBus {
    */
   suspend(): void {
     this.parked = true
+    // And let the media route go with it, so a paused session does not leave a
+    // lock-screen widget behind insisting that something is still playing.
+    releaseMediaChannel()
     if (this.ctx && this.ctx.state === 'running') void this.ctx.suspend()
   }
 
   resume(): void {
     this.parked = false
     claimPlaybackSession()
+    claimMediaChannel()
     wake(this.ctx)
   }
 
   close(): void {
+    releaseMediaChannel()
     if (!this.ctx) return
     this.release?.()
     this.release = null

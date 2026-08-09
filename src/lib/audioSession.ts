@@ -24,6 +24,28 @@
  * switch the same way a podcast does. It is only claimed when someone has
  * actually asked for sound — never on load.
  *
+ * It is also, on its own, not enough, and this is where the first attempt at
+ * this fix stopped. `navigator.audioSession` is implemented by Safari alone,
+ * it arrived in 16.4 with only *part* of it enabled and the rest behind an
+ * experimental feature flag, and on a phone where it is missing or inert the
+ * assignment above is a silent no-op — the property is set, nothing changes,
+ * and the mix stays on the ringer channel exactly as before. Which is the bug
+ * being reported for the second time.
+ *
+ * So there is a second, older mechanism underneath it, and on iOS it always
+ * runs rather than being skipped when the API *claims* to have worked:
+ * `claimMediaChannel()` keeps a silent `<audio>` element playing for as long
+ * as the app means to make a sound. An `HTMLMediaElement` is categorised as
+ * media playback rather than as ambient noise, and while one is playing the
+ * page's Web Audio goes out over the same route — so the ambience, the rhythm
+ * and the breath cues become as audible as a podcast is, silent switch or not.
+ * It is a hack, it is the hack every audio library on the web has converged
+ * on, and the honest reason it is here is that the standard answer does not
+ * yet work on the phones people actually have.
+ *
+ * The visible cost is a lock-screen media widget while a session is running,
+ * which for a thirty-minute spoken loop is arguably where it belongs.
+ *
  * ── 2. The interrupted context ──
  *
  * iOS has a fourth `AudioContext.state` that the specification does not:
@@ -96,6 +118,168 @@ export function releaseRecordingSession(): void {
   } catch {
     /* Read-only in some builds. */
   }
+}
+
+/* ── The media channel ──────────────────────────────────────── */
+
+/**
+ * Only iOS files Web Audio under a category the silent switch can mute, so
+ * only iOS pays for the workaround. Everywhere else a permanently-playing
+ * media element would buy nothing and cost a lock-screen widget and the
+ * hardware media keys.
+ *
+ * iPadOS reports itself as a Mac, hence the touch-points test — the same one
+ * `detectPlatform` uses, kept local so this module stays free of imports it
+ * would only need for one line.
+ */
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  if (/iP(hone|ad|od)/.test(navigator.userAgent)) return true
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+}
+
+let channel: HTMLAudioElement | null = null
+let channelWanted = false
+
+/**
+ * A fraction of a second of digital silence, built rather than shipped.
+ *
+ * It has to be a real, decodable file: iOS decides how to route a page's audio
+ * from what an element is actually playing, and an element with no source is
+ * an element playing nothing. Constructing forty-four bytes of header and a
+ * run of zero samples is smaller than the base64 of the same thing and far
+ * easier to read than either.
+ *
+ * Full rate and full bit depth on purpose. The route is chosen from the media
+ * being played, and there is no reason to hand the platform something that
+ * looks like a notification blip.
+ */
+export function silentWavBytes(seconds = 0.4): ArrayBuffer {
+  const rate = 44100
+  const frames = Math.round(rate * seconds)
+  const dataBytes = frames * 2
+  const buffer = new ArrayBuffer(44 + dataBytes)
+  const view = new DataView(buffer)
+
+  const ascii = (offset: number, text: string) => {
+    for (let i = 0; i < text.length; i += 1) {
+      view.setUint8(offset + i, text.charCodeAt(i))
+    }
+  }
+
+  ascii(0, 'RIFF')
+  view.setUint32(4, 36 + dataBytes, true)
+  ascii(8, 'WAVE')
+  ascii(12, 'fmt ')
+  view.setUint32(16, 16, true) // PCM header length
+  view.setUint16(20, 1, true) // PCM
+  view.setUint16(22, 1, true) // mono
+  view.setUint32(24, rate, true)
+  view.setUint32(28, rate * 2, true) // byte rate
+  view.setUint16(32, 2, true) // block align
+  view.setUint16(34, 16, true) // bits per sample
+  ascii(36, 'data')
+  view.setUint32(40, dataBytes, true)
+  // The samples themselves are already zero, which is what silence is.
+
+  return buffer
+}
+
+/**
+ * Split from the bytes above so the file itself can be handed to a decoder in
+ * a test. A silent track that is silent because the browser could not parse it
+ * would look exactly like one that works, right up until the phone.
+ */
+function silentTrackUrl(): string {
+  return URL.createObjectURL(
+    new Blob([silentWavBytes()], { type: 'audio/wav' }),
+  )
+}
+
+/**
+ * Hold the page on the media audio route.
+ *
+ * Must be reached from a user gesture the first time, exactly like starting an
+ * `AudioContext` — which it is, because both are called from the same press.
+ */
+export function claimMediaChannel(): void {
+  if (!isIOS() || typeof document === 'undefined') return
+
+  if (!channel) {
+    const element = document.createElement('audio')
+    element.src = silentTrackUrl()
+    element.loop = true
+    element.preload = 'auto'
+    // Never full-screen this, and never let it near the accessibility tree.
+    element.setAttribute('playsinline', '')
+    element.setAttribute('aria-hidden', 'true')
+    element.volume = 1
+
+    /*
+     * In the document, not merely constructed.
+     *
+     * A detached media element plays perfectly well on a desktop, which is
+     * exactly what makes this an easy thing to leave out and never notice.
+     * iOS decides a page's audio route from the media it is actually
+     * presenting, and an element that is not in the document is not
+     * presenting anything — so the route never moves and the whole workaround
+     * silently buys nothing. Kept out of layout rather than `display: none`,
+     * because a hidden media element is a media element some browsers feel
+     * entitled to stop.
+     */
+    element.style.cssText =
+      'position:fixed;width:0;height:0;opacity:0;pointer-events:none;left:-1px;top:-1px'
+    document.body.appendChild(element)
+
+    /*
+     * iOS pauses the element when a call arrives or the app goes away, and it
+     * does not start it again. The same three signals `keepAwake` watches for
+     * the context serve here — and they have to, because a context that is
+     * running on the ringer channel is not much better than one that is not
+     * running at all.
+     */
+    const recover = () => {
+      if (channelWanted && channel?.paused) {
+        void channel.play().catch(() => undefined)
+      }
+    }
+    element.addEventListener('pause', recover)
+    document.addEventListener('visibilitychange', recover)
+    window.addEventListener('pointerdown', recover, { passive: true })
+    window.addEventListener('touchstart', recover, { passive: true })
+
+    channel = element
+  }
+
+  /*
+   * The flag is set by *success*, not by the request, and that ordering is
+   * what keeps this honest.
+   *
+   * The breath's voice builds its context the moment the player mounts — long
+   * before anyone has pressed anything — so this is reached without a gesture
+   * behind it, and `play()` is refused. Arming the recovery on the request
+   * would then mean the first stray tap anywhere on the page started a silent
+   * track, and put a lock-screen widget on a session nobody had begun. Setting
+   * it here means recovery is only ever armed by a play that actually
+   * happened, which is only ever one a gesture allowed.
+   */
+  channel
+    .play()
+    .then(() => {
+      channelWanted = true
+    })
+    .catch(() => undefined)
+}
+
+/**
+ * Let the route go.
+ *
+ * Called when the app stops meaning to make a sound, so a paused or finished
+ * session does not leave a lock-screen widget behind claiming otherwise.
+ */
+export function releaseMediaChannel(): void {
+  channelWanted = false
+  channel?.pause()
 }
 
 /** Resume a context that is suspended, interrupted, or otherwise not running. */
