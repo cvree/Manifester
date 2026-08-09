@@ -165,7 +165,7 @@ export function Sheet({
         */}
         <div
           data-lenis-prevent
-          className="min-h-0 grow overflow-y-auto overscroll-contain px-6 pb-6"
+          className="scroll-quiet min-h-0 grow overflow-y-auto overscroll-contain px-6 pb-6"
         >
           {children}
         </div>

@@ -48,3 +48,11 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # The default is ten minutes, and a deploy has already been lost to
+          # it: the build was fine and the upload was fine, but GitHub's own
+          # CDN sat in `purging_cdn` past the deadline, so the action cancelled
+          # a perfectly good deployment and the site silently stayed on the
+          # previous build. Nothing here can make the purge faster; twenty
+          # minutes just means waiting it out instead of throwing it away.
+          timeout: 1200000
