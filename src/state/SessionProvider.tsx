@@ -27,6 +27,7 @@ import { loopToDraft, normaliseSettings, type Draft } from '../lib/loops'
 import {
   LIVE_VOICE_VOLUME_CAP,
   SpeechLooper,
+  clampVoiceVolume,
   isSpeechSupported,
   loadVoices,
 } from '../lib/speech'
@@ -283,8 +284,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       utterance.rate = settings.rate
       utterance.pitch = settings.pitch
-      // The setting can go above 1 for exported recordings; the live preview
-      // still speaks at the browser's own hard ceiling.
+      // Belt and braces: the setting cannot exceed this any more, but the
+      // engine's own ceiling is the thing that must never be exceeded.
       utterance.volume = Math.min(LIVE_VOICE_VOLUME_CAP, settings.voiceVolume)
       utterance.onend = () => setPreviewState('idle')
       utterance.onerror = () => setPreviewState('idle')
@@ -498,8 +499,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const setLiveVoiceVolume = useCallback(
     (value: number) => {
-      updateSettings({ voiceVolume: value })
-      speechRef.current?.updateOptions({ volume: value })
+      const level = clampVoiceVolume(value)
+      updateSettings({ voiceVolume: level })
+      speechRef.current?.updateOptions({ volume: level })
     },
     [updateSettings],
   )

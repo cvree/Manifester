@@ -50,6 +50,26 @@ describe('older saved rituals', () => {
     expect(settings.brainwave.enabled).toBe(false)
   })
 
+  /*
+   * The voice slider used to run to 200%, on the theory that an exported
+   * recording could use the headroom the spoken voice never could. It never
+   * sounded louder than 100% either way, so a loop saved up there comes back
+   * at the level it was actually playing at — and, crucially, at a value the
+   * slider can now represent.
+   */
+  it('brings a voice level saved above the old ceiling back to 100%', () => {
+    expect(normaliseSettings({ voiceVolume: 2 }).voiceVolume).toBe(1)
+    expect(normaliseSettings({ voiceVolume: 1.4 }).voiceVolume).toBe(1)
+
+    const draft = loopToDraft({ ...LEGACY_LOOP, voiceVolume: 1.8 })
+    expect(draft.settings.voiceVolume).toBe(1)
+  })
+
+  it('leaves a voice level inside the ceiling exactly as it was', () => {
+    expect(normaliseSettings({ voiceVolume: 0.55 }).voiceVolume).toBeCloseTo(0.55)
+    expect(normaliseSettings({ voiceVolume: 0 }).voiceVolume).toBe(0)
+  })
+
   it('survives a partially written record', () => {
     const settings = normaliseSettings({
       musicVolume: 0.2,

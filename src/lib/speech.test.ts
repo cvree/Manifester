@@ -1,17 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import { chunkText, LIVE_VOICE_VOLUME_CAP, MAX_VOICE_VOLUME } from './speech'
+import {
+  chunkText,
+  clampVoiceVolume,
+  LIVE_VOICE_VOLUME_CAP,
+  MAX_VOICE_VOLUME,
+} from './speech'
 import { affirmationLines } from './summaries'
 
 describe('voice volume ceilings', () => {
-  it('lets the setting go above what the live voice can actually reach', () => {
-    // `MAX_VOICE_VOLUME` bounds the setting (and so the slider, and an
-    // exported recording's gain). `LIVE_VOICE_VOLUME_CAP` is the browser's own
-    // hard limit on `SpeechSynthesisUtterance.volume` — nothing in this app can
-    // raise that ceiling, because speech synthesis never touches a Web Audio
-    // node this app controls.
+  it('never offers a level the live voice cannot actually reach', () => {
+    // `MAX_VOICE_VOLUME` bounds the setting, and so the slider and its
+    // readout. `LIVE_VOICE_VOLUME_CAP` is the browser's own hard limit on
+    // `SpeechSynthesisUtterance.volume` — nothing in this app can raise it,
+    // because speech synthesis never touches a Web Audio node this app owns.
+    // The two agree, which is the whole point: 100% on screen is 1 in the
+    // engine, and there is no way to ask for more.
     expect(LIVE_VOICE_VOLUME_CAP).toBe(1)
-    expect(MAX_VOICE_VOLUME).toBeGreaterThan(LIVE_VOICE_VOLUME_CAP)
-    expect(MAX_VOICE_VOLUME).toBeCloseTo(2)
+    expect(MAX_VOICE_VOLUME).toBe(LIVE_VOICE_VOLUME_CAP)
+    expect(Math.round(MAX_VOICE_VOLUME * 100)).toBe(100)
+  })
+
+  it('brings a level saved under the old ceiling back into range', () => {
+    expect(clampVoiceVolume(2)).toBe(1)
+    expect(clampVoiceVolume(1.35)).toBe(1)
+    expect(clampVoiceVolume(0.65)).toBeCloseTo(0.65)
+    expect(clampVoiceVolume(-1)).toBe(0)
+    expect(clampVoiceVolume(Number.NaN)).toBe(1)
   })
 })
 

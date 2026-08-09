@@ -38,6 +38,20 @@ interface Options {
   sound: BreathSound
   soundVolume: number
   hapticCues: boolean
+  /**
+   * Anything else that should receive `--e` and `--p` on the very same frame
+   * as the orb — the player's stage and the atmosphere behind it.
+   *
+   * This exists so that "the room breathes too" can never become a second
+   * clock. There is one loop, one `breathStateAt` call and one pair of values,
+   * written to every element that answers to them; a `setInterval`, a keyframe
+   * or a second `requestAnimationFrame` for the background would drift against
+   * the orb within a minute and look exactly like what it was.
+   *
+   * Read through a ref each frame rather than closed over, so passing a fresh
+   * array on every render costs nothing and never restarts the breath.
+   */
+  mirrors?: ReadonlyArray<React.RefObject<HTMLElement | null>>
 }
 
 /**
@@ -58,6 +72,7 @@ export function useBreathing({
   sound,
   soundVolume,
   hapticCues,
+  mirrors,
 }: Options): BreathingRuntime {
   const stageRef = useRef<HTMLDivElement | null>(null)
   const reducedMotion = useReducedMotion()
@@ -74,8 +89,10 @@ export function useBreathing({
    */
   const volumeRef = useRef(soundVolume)
   const hapticsRef = useRef(hapticCues)
+  const mirrorsRef = useRef(mirrors)
   volumeRef.current = soundVolume
   hapticsRef.current = hapticCues
+  mirrorsRef.current = mirrors
 
   const [display, setDisplay] = useState({
     phase: 'inhale' as BreathPhase,
@@ -86,11 +103,40 @@ export function useBreathing({
   const valid = isPatternValid(pattern)
   const audible = sound !== 'off'
 
-  const write = useCallback((expansion: number, progress = 0) => {
+  /**
+   * `mirror: false` writes the orb alone.
+   *
+   * Used for the resting pose, which is a jump rather than a movement — the
+   * breath stops and the guide settles half-open at once. On a 15rem orb that
+   * reads as settling; across a whole viewport of atmosphere it would read as
+   * a flinch. So the environment is left holding the value it had, and the
+   * amplitude it is multiplied by (`--field`, in `theme.css`) eases to nothing
+   * instead. Same destination, and nothing lurches to get there.
+   */
+  const write = useCallback((expansion: number, progress = 0, mirror = true) => {
+    const e = expansion.toFixed(4)
+    const p = progress.toFixed(4)
+
     const stage = stageRef.current
-    if (!stage) return
-    stage.style.setProperty('--e', expansion.toFixed(4))
-    stage.style.setProperty('--p', progress.toFixed(4))
+    if (stage) {
+      stage.style.setProperty('--e', e)
+      stage.style.setProperty('--p', p)
+    }
+
+    /*
+     * Two more `setProperty` calls per mirror per frame, and no more than
+     * that: every element written to here is one the stylesheet has already
+     * promoted to its own layer, so the browser answers a change with a
+     * composite rather than a layout.
+     */
+    const extra = mirror ? mirrorsRef.current : null
+    if (!extra) return
+    for (const target of extra) {
+      const node = target.current
+      if (!node) continue
+      node.style.setProperty('--e', e)
+      node.style.setProperty('--p', p)
+    }
   }, [])
 
   // Restart the cycle whenever the pattern itself changes.
@@ -222,7 +268,7 @@ export function useBreathing({
   // Settle the orb to a resting half-open pose when the guide is switched off,
   // rather than collapsing it to nothing — a closed orb reads as broken.
   useEffect(() => {
-    if (!active && !reducedMotion) write(0.35, 0)
+    if (!active && !reducedMotion) write(0.35, 0, false)
   }, [active, reducedMotion, write])
 
   return {
