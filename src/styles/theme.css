@@ -910,6 +910,101 @@
   }
 }
 
+/* ── Scrollbars ─────────────────────────────────────────────── */
+
+/*
+ * The one piece of chrome the app does not draw itself.
+ *
+ * Left alone, a panel scroller arrives as the operating system's own grey
+ * trough with stepper arrows on it — a Windows control sitting inside a
+ * twilight garden, and the only hard-edged, unrounded, untinted thing on the
+ * screen. It reads as a seam in the app rather than as part of it.
+ *
+ * So it is brought into the palette, and deliberately not hidden. Hiding it
+ * would be the easy answer and the wrong one: in a long sheet the scrollbar is
+ * the only thing that says *there is more below this*, and it has to stay wide
+ * enough to be grabbed with a mouse. The compromise is a thin rail with no
+ * trough and no arrows, a rose thumb at about a third strength that firms up
+ * when the pointer is over the pane it belongs to, and its own rounded ends.
+ *
+ * Both syntaxes, because they cover different browsers and neither covers all
+ * of them: `scrollbar-width` / `scrollbar-color` is the standard one, and the
+ * `::-webkit-` pseudo-elements are what Safari and older Chromium still read.
+ * Modern Chromium honours the standard properties and ignores the pseudos when
+ * both are present, so they can never both be in effect at once.
+ *
+ * The colours are `color-mix` over the theme's own tokens rather than fixed
+ * values, so this follows the day/night switch and the hue dial with nothing
+ * further to maintain.
+ */
+.scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--rose) 34%, transparent) transparent;
+}
+
+.scroll-quiet:hover,
+.scroll-quiet:focus-within {
+  scrollbar-color: color-mix(in srgb, var(--rose) 62%, transparent) transparent;
+}
+
+.scroll-quiet::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+.scroll-quiet::-webkit-scrollbar-track,
+.scroll-quiet::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/*
+ * A transparent border with `background-clip: padding-box` is what insets the
+ * thumb inside the rail: it leaves the pointer target the full eleven pixels
+ * the platform wants while the mark that is actually drawn is five, which is
+ * the width that reads as a hairline rather than as a control.
+ */
+.scroll-quiet::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--rose) 34%, transparent);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  transition: background-color 200ms var(--ease-calm);
+}
+
+.scroll-quiet::-webkit-scrollbar-thumb:hover,
+.scroll-quiet::-webkit-scrollbar-thumb:active {
+  background-color: color-mix(in srgb, var(--rose) 62%, transparent);
+}
+
+/*
+ * The page's own scrollbar, brought into the same palette. The stage hides its
+ * scrollbar outright while it has the screen (see "The immersive stage"), and
+ * that stays as it is — there it is a safety valve rather than a control.
+ */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--rose) 26%, transparent) transparent;
+}
+
+html::-webkit-scrollbar {
+  width: 12px;
+}
+
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--rose) 26%, transparent);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--rose) 50%, transparent);
+}
+
 /* ── Breathing visualiser ───────────────────────────────────── */
 
 /*

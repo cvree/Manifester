@@ -43,7 +43,7 @@ export function TextArea({
       data-lenis-prevent
       {...props}
       className={cx(
-        'w-full resize-none rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-3.5',
+        'scroll-quiet w-full resize-none rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-3.5',
         'text-[1.02rem] leading-relaxed text-ink placeholder:text-ink-faint',
         'transition-colors duration-200 focus:border-[var(--border-strong)] focus:bg-[var(--surface-strong)]',
         className,
