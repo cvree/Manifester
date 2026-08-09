@@ -1,10 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useGSAP } from '@gsap/react'
+import gsap from 'gsap'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { useNavigate } from 'react-router'
 import { BreathingVisualizer } from '../components/BreathingVisualizer'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
 import { EmptyState } from '../components/EmptyState'
+import { PlayerAtmosphere } from '../components/PlayerAtmosphere'
 import {
   BreathIcon,
   CloseIcon,
@@ -25,6 +34,7 @@ import { cx } from '../lib/cx'
 import { primeBreathAudio } from '../lib/breathAudio'
 import { cue, primeFeedback } from '../lib/feedback'
 import { countWords, formatClock } from '../lib/format'
+import { useReducedMotion } from '../lib/motion'
 import { MAX_VOICE_VOLUME } from '../lib/speech'
 import {
   affirmationLines,
@@ -39,6 +49,13 @@ import { useSession } from '../state/SessionProvider'
 import { useStage } from '../state/StageProvider'
 
 /**
+ * How long the room waits before letting the parts of it that are only
+ * information step back. Long enough that reading the pass counter is never a
+ * race; short enough that settling in is answered within one breath.
+ */
+const QUIET_AFTER_MS = 4200
+
+/**
  * The player.
  *
  * A calm ritual space rather than a media dashboard: one large breathing
@@ -49,6 +66,13 @@ import { useStage } from '../state/StageProvider'
  * on this same markup — see `useStageExpansion` — rather than a second player:
  * the words, the pass, the clock, the breath and the audio are the same ones,
  * still running, and the only thing that changes is how much room they have.
+ *
+ * Around all of it is `PlayerAtmosphere`, and the one thing worth knowing
+ * about it is that it is not a separate animation. The breathing hook writes
+ * `--e` and `--p` onto the orb, the stage and the atmosphere on the same
+ * frame, from the same clock — so the light beyond the glass fills as the orb
+ * fills, to the millisecond, because it is the same number. There is exactly
+ * one breath in this room and everything in it is following that one.
  */
 export function PlayerRoute() {
   const navigate = useNavigate()
@@ -67,6 +91,7 @@ export function PlayerRoute() {
   const { preferences } = usePreferences()
   const { expanded, setExpanded } = useStage()
   const [sheet, setSheet] = useState<PanelKey | null>(null)
+  const reducedMotion = useReducedMotion()
 
   const hasText = countWords(draft.text) > 0
   const idle = session.status === 'idle'
@@ -82,15 +107,44 @@ export function PlayerRoute() {
     available: !complete,
   })
 
-  // The guide follows the session: it breathes while you listen and holds
-  // still the moment you pause.
+  const fieldRef = useRef<HTMLDivElement>(null)
+
+  /*
+   * The guide follows the session: it breathes while you listen and holds
+   * still the moment you pause.
+   *
+   * `mirrors` is what makes the room breathe with it. Both the stage and the
+   * atmosphere behind it receive the same `--e` and `--p` the orb does, on the
+   * same frame, from this one clock — which is the only arrangement in which
+   * "everything inhales together" is a fact rather than a hope.
+   */
   const breathing = useBreathing({
     pattern: preferences.breathPattern,
     active: preferences.breathingEnabled && playing,
     sound: preferences.breathSound,
     soundVolume: preferences.breathSoundVolume,
     hapticCues: preferences.breathHapticCues,
+    mirrors: [stageRef, fieldRef],
   })
+
+  /*
+   * Whether the environment is currently following the breath.
+   *
+   * All three have to hold. The preference is the person's choice; the guide
+   * being on is what there is to follow; and a session actually playing is
+   * what makes it a breath rather than a screensaver. With any of them false
+   * the atmosphere stays — lit, coloured, deep — and simply holds still.
+   */
+  const environmentBreathing =
+    preferences.backgroundBreathing && preferences.breathingEnabled && playing
+
+  /*
+   * The amplitude every breath-driven layer multiplies itself by, set on both
+   * the stage and the atmosphere. It is a registered, eased custom property
+   * (`--field` in `theme.css`), so pausing settles the room over a second
+   * instead of stopping it dead.
+   */
+  const fieldAmplitude = environmentBreathing && !reducedMotion ? 1 : 0
 
   // Bloom the orb once, as the session comes to life.
   const [awaken, setAwaken] = useState(false)
@@ -100,6 +154,146 @@ export function PlayerRoute() {
     const timeout = window.setTimeout(() => setAwaken(false), 1600)
     return () => window.clearTimeout(timeout)
   }, [playing])
+
+  /*
+   * ── Letting the room go quiet ──
+   *
+   * With the stage on the screen and nothing happening for a few seconds, the
+   * parts of it that are only information step back and leave the words, the
+   * orb, play/pause, the clock and the way out. Any sign of life brings them
+   * straight back.
+   *
+   * The flag is mirrored in a ref so that waking is free: a pointer crossing
+   * the screen restarts a timer and nothing else — it only ever reaches React
+   * on the one move that actually changes the state. Sixty re-renders a second
+   * to keep a control at the opacity it already had would be a strange way to
+   * pay for stillness.
+   */
+  const [quiet, setQuiet] = useState(false)
+  const quietRef = useRef(false)
+
+  useEffect(() => {
+    if (!expanded || !playing) {
+      quietRef.current = false
+      setQuiet(false)
+      return
+    }
+
+    let timer = 0
+    const settle = () => {
+      quietRef.current = true
+      setQuiet(true)
+    }
+    const wake = () => {
+      if (quietRef.current) {
+        quietRef.current = false
+        setQuiet(false)
+      }
+      window.clearTimeout(timer)
+      timer = window.setTimeout(settle, QUIET_AFTER_MS)
+    }
+
+    wake()
+
+    const events = [
+      'pointermove',
+      'pointerdown',
+      'keydown',
+      'touchstart',
+      'wheel',
+      'focusin',
+    ] as const
+    for (const event of events) {
+      window.addEventListener(event, wake, { passive: true })
+    }
+
+    return () => {
+      window.clearTimeout(timer)
+      for (const event of events) window.removeEventListener(event, wake)
+      quietRef.current = false
+    }
+  }, [expanded, playing])
+
+  /*
+   * ── Entering the room ──
+   *
+   * The rectangle's own journey belongs to `useStageExpansion`, and everything
+   * measured in the stylesheet — the padding, the radius, the orb's size, the
+   * type — travels on the CSS clock beside it. What is left for GSAP is the
+   * part neither of those can express: the order things arrive in.
+   *
+   * The atmosphere opens first and slowest, because it is the room; the title
+   * settles, then the words, then the controls, each a little after the last;
+   * and the fine detail — the motes — is the last thing to appear, once
+   * everything else has come to rest. About 900ms end to end, all of it eased
+   * out and none of it overshooting, so it reads as walking into a space
+   * rather than as a modal being enlarged.
+   *
+   * Only transforms and opacities, and only on properties the stylesheet is
+   * not already transitioning — a GSAP tween and a CSS transition on the same
+   * property is a tug of war that the transition wins slowly and visibly.
+   */
+  useGSAP(
+    () => {
+      const stage = stageRef.current
+      const field = fieldRef.current
+      if (!stage || instant) return
+
+      const find = (selector: string) => stage.querySelector(selector)
+      const top = find('.stage__top')
+      const line = find('.stage__line')
+      const transport = find('.stage__transport')
+      const meter = find('.stage__meter')
+
+      const timeline = gsap.timeline({ defaults: { ease: 'power2.out' } })
+
+      if (!expanded) {
+        // Coming back is the same movement, briefer: the room closes around
+        // you rather than being taken away.
+        if (field) {
+          timeline.fromTo(
+            field,
+            { opacity: 0.55 },
+            { opacity: 1, duration: 0.45 },
+            0,
+          )
+        }
+        return
+      }
+
+      if (field) {
+        timeline.fromTo(
+          field,
+          { opacity: 0.2, scale: 1.06 },
+          { opacity: 1, scale: 1, duration: 0.9, ease: 'power2.inOut' },
+          0.1,
+        )
+      }
+      if (top) {
+        timeline.fromTo(top, { y: 12 }, { y: 0, duration: 0.5 }, 0.28)
+      }
+      if (line) {
+        timeline.fromTo(
+          line,
+          { y: 10, opacity: 0.45 },
+          { y: 0, opacity: 1, duration: 0.55 },
+          0.34,
+        )
+      }
+      if (transport) {
+        timeline.fromTo(transport, { y: 14 }, { y: 0, duration: 0.5 }, 0.42)
+      }
+      if (meter) {
+        timeline.fromTo(meter, { y: 10 }, { y: 0, duration: 0.5 }, 0.46)
+      }
+
+      const motes = field?.querySelector('.player-field__motes')
+      if (motes) {
+        timeline.fromTo(motes, { opacity: 0 }, { opacity: 1, duration: 0.6 }, 0.5)
+      }
+    },
+    { dependencies: [expanded, instant], revertOnUpdate: true },
+  )
 
   const lines = useMemo(() => affirmationLines(draft.text), [draft.text])
 
@@ -182,6 +376,17 @@ export function PlayerRoute() {
 
   return (
     <>
+      {/*
+        The room. It sits behind the page rather than inside the stage, so the
+        light is not something the card is wearing — it is the air the card is
+        in, and expanding the stage does not have to hand it over to anything.
+      */}
+      <PlayerAtmosphere
+        fieldRef={fieldRef}
+        amplitude={fieldAmplitude}
+        immersive={expanded}
+      />
+
       <div className="mx-auto grid max-w-xl grid-cols-[minmax(0,1fr)] gap-6 lg:max-w-none lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8 xl:grid-cols-[minmax(0,1fr)_26rem]">
         {session.notice && (
           <div
@@ -244,6 +449,8 @@ export function PlayerRoute() {
             <section
               ref={stageRef}
               data-rise
+              data-quiet={quiet ? 'true' : undefined}
+              style={{ '--field': fieldAmplitude } as CSSProperties}
               className={cx(
                 'surface-stage stage relative flex flex-col items-center px-5 py-8 sm:px-8 lg:py-10',
                 expanded && 'stage--immersive',
@@ -289,24 +496,52 @@ export function PlayerRoute() {
                 in it.
               */}
               <div className="stage__focus flex w-full flex-col items-center">
-                <div className="stage__orb relative my-8 flex items-center justify-center">
+                {/*
+                  One size in both states, and deliberately so. `stage` reads
+                  `--stage-orb`, which the stylesheet gives a value in the card
+                  as well as on the expanded stage — and because `--size` is a
+                  registered property, the orb *grows* between the two rather
+                  than being swapped for a bigger one.
+                */}
+                <div className="stage__orb relative my-6 flex items-center justify-center">
                   <BreathingVisualizer
                     runtime={breathing}
                     style={preferences.breathStyle}
-                    size={expanded ? 'stage' : 'lg'}
+                    size="stage"
                     showPhase={preferences.breathingEnabled && playing}
                     awaken={awaken}
                   />
                 </div>
 
-                {/* The line you are hearing. */}
-                <p className="stage__line line-clamp-5 min-h-[4rem] max-w-[32ch] text-center font-display text-[1.25rem] leading-snug whitespace-pre-line text-ink sm:text-[1.4rem]">
-                  {currentLine ?? 'Ready when you are.'}
+                {/*
+                  The line you are hearing.
+
+                  The paragraph holds the space and the span holds the words,
+                  so a new line can arrive with a fade of its own while the
+                  block around it — its size, its width, its reserved height —
+                  carries on transitioning undisturbed. Keying the paragraph
+                  itself would remount it, and a remount mid-expansion is a
+                  jump in type size rather than a change of words.
+                */}
+                <p className="stage__line min-h-[4rem] max-w-[32ch] text-center font-display text-[1.25rem] leading-snug whitespace-pre-line text-ink sm:text-[1.4rem]">
+                  <span
+                    key={currentLine ?? ''}
+                    className="stage__line-text animate-line-in"
+                  >
+                    {currentLine ?? 'Ready when you are.'}
+                  </span>
                 </p>
               </div>
 
-              {/* Transport: one large control, one small one. */}
-              <div className="stage__transport mt-8 flex flex-col items-center gap-5">
+              {/*
+                Transport: one large control, one small one.
+
+                The air around it is tighter than it was, and deliberately: the
+                orb took the room, which is the point. Play, the clock and the
+                words all still land above the fold on an ordinary laptop
+                window — that is the bar this spacing is set against.
+              */}
+              <div className="stage__transport mt-6 flex flex-col items-center gap-5">
                 <button
                   type="button"
                   onClick={primaryAction}
@@ -356,7 +591,7 @@ export function PlayerRoute() {
                     stop()
                   }}
                   disabled={idle}
-                  className="interactive inline-flex min-h-11 items-center gap-2 rounded-pill border border-[var(--control-border)] px-5 text-[0.92rem] font-medium text-ink-muted hover:bg-[var(--quiet)] hover:text-ink disabled:opacity-35"
+                  className="stage__leave interactive inline-flex min-h-11 items-center gap-2 rounded-pill border border-[var(--control-border)] px-5 text-[0.92rem] font-medium text-ink-muted hover:bg-[var(--quiet)] hover:text-ink disabled:opacity-35"
                 >
                   <StopIcon className="text-[0.85rem]" />
                   End session
@@ -427,11 +662,6 @@ export function PlayerRoute() {
                 step={0.05}
                 value={draft.settings.voiceVolume}
                 display={`${Math.round(draft.settings.voiceVolume * 100)}%`}
-                hint={
-                  draft.settings.voiceVolume > 1
-                    ? 'The spoken voice itself is capped at 100% by your device.'
-                    : undefined
-                }
                 onChange={setLiveVoiceVolume}
               />
               <Slider

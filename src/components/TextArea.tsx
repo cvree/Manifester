@@ -35,6 +35,12 @@ export function TextArea({
       ref={ref}
       rows={minRows}
       value={value}
+      /*
+       * Past `maxHeight` this box scrolls its own text. On a route that has
+       * opted into smooth scrolling, the wheel over it belongs to the words
+       * being written rather than to the page they are on.
+       */
+      data-lenis-prevent
       {...props}
       className={cx(
         'w-full resize-none rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-3.5',

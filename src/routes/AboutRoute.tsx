@@ -1,4 +1,3 @@
-import { ReactLenis, useLenis } from 'lenis/react'
 import {
   useCallback,
   useEffect,
@@ -30,7 +29,7 @@ import { setStoredCredentials, useCredentials } from '../lib/ai/useCredentials'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
 import { BRAINWAVE_LIST, formatHz, supportsBinaural } from '../lib/brainwaveAudio'
-import { prefersReducedMotion, useReducedMotion } from '../lib/motion'
+import { SmoothScroll, scrollToSection, scrollToTop } from '../lib/smoothScroll'
 import { usePreferences } from '../state/PreferencesProvider'
 
 /** Air between the top of the window and the section it just landed on. */
@@ -48,9 +47,8 @@ const READING_LINE = 140
  *
  * Not a plain `#id` link, however much it wants to be one: the app is on a
  * hash router, so a second fragment in the URL is read as a route and takes
- * you to the Create screen instead. So the rail asks the scroller directly —
- * Lenis when it is running the page, and the window itself when reduced
- * motion has left Lenis unmounted.
+ * you to the Create screen instead. So the rail asks the scroller directly,
+ * through the one helper that knows whether Lenis is running the page.
  *
  * Focus follows the scroll, because a control that moves the viewport and
  * leaves the keyboard behind has only moved the picture. The section is made
@@ -58,21 +56,12 @@ const READING_LINE = 140
  * the page grows a permanent tab stop.
  */
 function useJumpToSection() {
-  const lenis = useLenis()
-
   return useCallback(
     (id: string) => {
       const target = document.getElementById(id)
       if (!target) return
 
-      if (lenis) {
-        lenis.scrollTo(target, { offset: -JUMP_GAP })
-      } else {
-        window.scrollTo({
-          top: Math.max(0, target.getBoundingClientRect().top + window.scrollY - JUMP_GAP),
-          behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-        })
-      }
+      scrollToSection(target, JUMP_GAP)
 
       target.setAttribute('tabindex', '-1')
       target.focus({ preventScroll: true })
@@ -80,7 +69,7 @@ function useJumpToSection() {
         once: true,
       })
     },
-    [lenis],
+    [],
   )
 }
 
@@ -305,11 +294,11 @@ const TROUBLE: Array<{ question: string; answer: ReactNode }> = [
 ]
 
 /**
- * The one long-scrolling screen in the app, so it is the only place Lenis is
- * mounted. The player and its controls are never wrapped by it.
+ * The longest reading screen in the app, and one of the two that opt into
+ * smooth scrolling. The player and its controls are never wrapped by it — see
+ * `smoothScroll.tsx`.
  */
 export function AboutRoute() {
-  const reducedMotion = useReducedMotion()
   const credentials = useCredentials()
   const { preferences, update: updatePreferences } = usePreferences()
 
@@ -609,13 +598,7 @@ export function AboutRoute() {
     </div>
   )
 
-  if (reducedMotion) return content
-
-  return (
-    <ReactLenis root options={{ duration: 1.1, smoothWheel: true }}>
-      {content}
-    </ReactLenis>
-  )
+  return <SmoothScroll>{content}</SmoothScroll>
 }
 
 /**
@@ -688,21 +671,12 @@ function Contents() {
  * a thumb-flick marathon to get anywhere else.
  */
 function BackToTop() {
-  const lenis = useLenis()
-
   return (
     <button
       type="button"
       onClick={() => {
         cue('tap')
-        if (lenis) {
-          lenis.scrollTo(0)
-        } else {
-          window.scrollTo({
-            top: 0,
-            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-          })
-        }
+        scrollToTop()
       }}
       className="interactive pressable flex min-h-11 items-center gap-2 rounded-pill border border-[var(--control-border)] bg-[var(--panel)] px-4 text-[0.9rem] text-ink-muted hover:text-ink"
     >

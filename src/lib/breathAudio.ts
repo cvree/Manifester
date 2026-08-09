@@ -25,6 +25,7 @@
  * by the ambience, or suspended along with the music.
  */
 
+import { claimPlaybackSession, keepAwake, wake } from './audioSession'
 import { easeInOut, type BreathPhase } from './breathing'
 
 export type BreathVoiceId = 'chime' | 'bowl' | 'ocean' | 'breath' | 'drone'
@@ -102,9 +103,15 @@ const RELEASE_SECONDS = 0.5
 /* ── Context and noise ──────────────────────────────────────── */
 
 let sharedContext: AudioContext | null = null
+let releaseContext: (() => void) | null = null
 
 function context(): AudioContext | null {
   if (typeof window === 'undefined') return null
+
+  // The guide's voice is media too, and on iOS it is muted by the silent
+  // switch unless the page says so. See `audioSession.ts`.
+  claimPlaybackSession()
+
   if (!sharedContext) {
     const Ctor =
       window.AudioContext ??
@@ -112,8 +119,13 @@ function context(): AudioContext | null {
         .webkitAudioContext
     if (!Ctor) return null
     sharedContext = new Ctor()
+    releaseContext = keepAwake(sharedContext)
   }
-  if (sharedContext.state === 'suspended') void sharedContext.resume()
+
+  // Not `state === 'suspended'`: iOS parks an interrupted context in a state
+  // of its own, and this loop is exactly the kind of long-running audio that
+  // gets interrupted — a call, an alarm, the screen locking.
+  wake(sharedContext)
   return sharedContext
 }
 
@@ -677,6 +689,8 @@ export function disposeBreathAudio(): void {
   live = null
   audition = null
   if (sharedContext) {
+    releaseContext?.()
+    releaseContext = null
     void sharedContext.close().catch(() => undefined)
     sharedContext = null
   }

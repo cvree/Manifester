@@ -158,7 +158,15 @@ export function Sheet({
           </button>
         </header>
 
-        <div className="min-h-0 grow overflow-y-auto overscroll-contain px-6 pb-6">
+        {/*
+          `data-lenis-prevent`: a sheet has its own scroller, and on a route
+          that has opted into smooth scrolling the wheel would otherwise be
+          taken by the page behind this one.
+        */}
+        <div
+          data-lenis-prevent
+          className="min-h-0 grow overflow-y-auto overscroll-contain px-6 pb-6"
+        >
           {children}
         </div>
 

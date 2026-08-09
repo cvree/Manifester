@@ -158,6 +158,22 @@ export function BreathingSettings({
 
       {preferences.breathingEnabled && (
         <>
+          {/*
+            Placed here, under the guide's own switch, because it is not a
+            separate feature — it is how far the guide reaches. The atmosphere
+            rides on the same clock as the orb, so with the guide off there is
+            nothing for it to follow and this has nothing to say.
+          */}
+          <Toggle
+            label="Background breathing"
+            description="Let the surrounding atmosphere expand and settle with your breathing guide."
+            checked={preferences.backgroundBreathing}
+            onChange={(backgroundBreathing) => {
+              onChange({ backgroundBreathing })
+              if (backgroundBreathing) cue('tap')
+            }}
+          />
+
           {/* ── The live picture of every choice below ── */}
           <div className="flex flex-col items-center rounded-[1.5rem] border border-[var(--quiet-border)] bg-[var(--quiet)] py-5">
             <BreathingVisualizer

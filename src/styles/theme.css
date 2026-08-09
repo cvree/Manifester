@@ -549,13 +549,41 @@
     /* No grey flash on iOS, and no 300ms wait before :active paints. */
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+
+    /*
+     * The ring is always here, and it is transparent and flush until focus
+     * lands — which is what lets it bloom outward rather than appear. An
+     * outline takes no space at any width, so carrying one costs nothing but
+     * the two properties below being animatable when they are needed.
+     */
+    outline: 2px solid transparent;
+    outline-offset: 0;
+
     transition:
       background-color 200ms var(--ease-calm),
       border-color 200ms var(--ease-calm),
       color 200ms var(--ease-calm),
       transform 220ms var(--ease-spring),
       box-shadow 220ms var(--ease-calm),
+      outline-color 180ms var(--ease-calm),
+      outline-offset 240ms var(--ease-calm),
       filter 200ms var(--ease-calm);
+  }
+
+  .interactive:focus-visible {
+    outline-color: var(--rose-deep);
+    outline-offset: 3px;
+  }
+
+  /*
+   * Reduced motion still gets the ring; it simply arrives rather than opening.
+   * A focus indicator is not decoration, so it is never the thing that is
+   * dropped — only the way it makes its entrance.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .interactive {
+      transition-duration: 0ms;
+    }
   }
 
   /*
@@ -1477,6 +1505,52 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 /*
+ * A new spoken line arriving.
+ *
+ * Short, small and soft — a fifth of a second, four pixels of travel and a
+ * blur that resolves rather than one that draws attention to itself. The voice
+ * has already started saying these words by the time this finishes, and that
+ * is the constraint the whole thing is designed around: anything longer, or
+ * anything that animated the words individually, would put the screen behind
+ * the voice and break the one synchronisation that actually matters here.
+ *
+ * The blur is on a single short text node for 220ms, which is the one shape of
+ * filter animation that is not worth worrying about.
+ */
+@keyframes line-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes line-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-line-in {
+  animation: line-in 220ms var(--ease-calm) both;
+}
+
+/* Reduced motion keeps the change legible and drops the travel and the blur. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-line-in {
+    animation: line-fade 200ms var(--ease-calm) both;
+  }
+}
+
+/*
  * With reduced motion the guide holds a comfortable half-open pose and the
  * words, the countdown and the breath's own voice do all the guiding. Every
  * self-running animation inside the orb stops too — a ripple that keeps
@@ -1496,6 +1570,306 @@ html:not(.dark) .breath-aurora__veil {
 
   .breath--awaken {
     animation: none;
+  }
+}
+
+/* ── The player's atmosphere ────────────────────────────────── */
+
+/*
+ * The room the orb is breathing in.
+ *
+ * The Cosmic Garden behind every screen is the weather. This is the air in one
+ * particular room, and the difference is that this one answers to you: the
+ * breathing hook writes `--e` and `--p` onto `.player-field` on the very same
+ * frame it writes them onto the orb — literally the same two numbers, from the
+ * same `breathStateAt` call. See `mirrors` in `useBreathing.ts`. There is no
+ * second clock here, and there must never be one: a keyframed four-second
+ * pulse would agree with the breath for about a minute and then spend the rest
+ * of the session visibly disagreeing with it.
+ *
+ * Two house rules, both inherited from "The atmosphere" above and both load-
+ * bearing:
+ *
+ *   - every gradient reaches full transparency well inside its own element, so
+ *     no transform can ever walk an element's edge into view;
+ *   - nothing viewport-sized goes behind a `filter: blur()`. A large blurred
+ *     layer is the classic way to melt a phone, and a soft enough gradient
+ *     does not need one.
+ *
+ * The result is that a frame of this costs the compositor a transform and an
+ * opacity on a handful of already-promoted layers, and the main thread nothing.
+ */
+
+/*
+ * The amplitude every layer multiplies its movement by, and the only reason
+ * the room can stop breathing without lurching.
+ *
+ * `--e` is rewritten every frame and so can never be transitioned — a
+ * transition would be fighting the clock. But it is only ever *used* here
+ * multiplied by this, and this one is registered, inherited and eased. Pausing
+ * a session takes it to 0 over a second and a bit, so every layer glides back
+ * to its resting pose while the breath itself simply stops. Same destination,
+ * nothing flinches on the way.
+ */
+@property --field {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.player-field {
+  /* The pose the room holds before the first frame of breath arrives. */
+  --e: 0.35;
+  --p: 0;
+
+  /*
+   * Where the orb is, and so where the room gathers. In the card the stage is
+   * the left column of a two-column grid on a desktop, which is why this is
+   * not simply the middle of the screen.
+   */
+  --heart-x: 50%;
+  --heart-y: 44%;
+  /* How far the motes may travel from it. */
+  --reach: min(34vw, 30vh);
+
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  transition: --field 1200ms var(--ease-calm);
+}
+
+@media (min-width: 1024px) {
+  .player-field {
+    --heart-x: 38%;
+  }
+}
+
+.player-field--immersive {
+  --heart-x: 50%;
+  --heart-y: 46%;
+  --reach: min(42vw, 38vh);
+}
+
+/*
+ * 1 · The breathing field.
+ *
+ * One broad pool of rose light centred on the orb — the layer that actually
+ * reads as the room filling. Two and a half percent of scale, and about a
+ * tenth of its own brightness: at this depth most people feel it a good while
+ * before they notice it, which is exactly the intended order.
+ */
+.player-field__glow {
+  position: absolute;
+  left: calc(var(--heart-x) - 85%);
+  top: calc(var(--heart-y) - 80%);
+  width: 170%;
+  height: 160%;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--rose) 15%, transparent) 0%,
+    color-mix(in oklab, var(--gold) 5%, transparent) 34%,
+    transparent 62%
+  );
+  transform: scale(calc(1 + (var(--e) - 0.5) * 0.05 * var(--field)));
+  opacity: calc(0.5 + (var(--e) - 0.5) * 0.2 * var(--field));
+  will-change: transform, opacity;
+}
+
+.player-field--immersive .player-field__glow {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--rose) 20%, transparent) 0%,
+    color-mix(in oklab, var(--gold) 7%, transparent) 32%,
+    transparent 64%
+  );
+}
+
+/*
+ * 2 · Aurora.
+ *
+ * Colour passing through the room rather than colour applied to it: dusty rose
+ * and lavender gathering high, sage settling low. The drift owns `transform`
+ * and the breath owns `opacity`, so the two never fight over a property — the
+ * same split the garden's own pools use, for the same reason.
+ *
+ * The two periods are deliberately not multiples of each other, so the pair
+ * never returns to a pose it has held before and the movement never resolves
+ * into a loop you can start counting.
+ */
+.player-field__aurora {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform, opacity;
+  animation: field-drift var(--drift, 79s) ease-in-out infinite;
+  animation-delay: var(--drift-delay, 0s);
+}
+
+.player-field__aurora--a {
+  --drift: 79s;
+  --drift-x: 1.6%;
+  --drift-y: -1.2%;
+  left: -26%;
+  top: -46%;
+  width: 128%;
+  height: 104%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--twilight) 20%, transparent) 0%,
+    color-mix(in oklab, var(--rose) 7%, transparent) 40%,
+    transparent 66%
+  );
+  opacity: calc(0.46 + (var(--e) - 0.5) * 0.18 * var(--field));
+}
+
+.player-field__aurora--b {
+  --drift: 113s;
+  --drift-delay: -37s;
+  --drift-x: -1.4%;
+  --drift-y: 1.5%;
+  left: -34%;
+  top: 44%;
+  width: 148%;
+  height: 96%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--sage) 13%, transparent) 0%,
+    transparent 60%
+  );
+  opacity: calc(0.4 + (var(--e) - 0.5) * 0.14 * var(--field));
+}
+
+@keyframes field-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(0.98);
+  }
+  50% {
+    transform: translate3d(var(--drift-x, 0), var(--drift-y, 0), 0) scale(1.03);
+  }
+}
+
+/*
+ * 3 · Haze.
+ *
+ * One wide, almost invisible wash that opens as you fill and gathers back
+ * toward the orb as you empty. It is the layer that makes the other two read
+ * as depth rather than as two gradients at different opacities.
+ */
+.player-field__haze {
+  position: absolute;
+  left: calc(var(--heart-x) - 75%);
+  top: calc(var(--heart-y) - 65%);
+  width: 150%;
+  height: 130%;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    transparent 0%,
+    color-mix(in oklab, var(--moonlight) 8%, transparent) 46%,
+    transparent 70%
+  );
+  transform: scale(calc(0.97 + var(--e) * 0.06 * var(--field)));
+  opacity: calc(0.5 + (var(--e) - 0.5) * 0.3 * var(--field));
+  will-change: transform, opacity;
+}
+
+/*
+ * 4 · Motes.
+ *
+ * Seven points of pollen light drawing out from the orb as you fill and
+ * settling back in as you empty. Expanded only — in the card there is nowhere
+ * for them to travel that is not on top of the words, and a mote behind a
+ * paragraph is not atmosphere, it is a smudge.
+ *
+ * The twinkle owns `opacity` and the breath owns `transform`, which is the
+ * same division of labour as the aurora above.
+ */
+.player-field__motes {
+  position: absolute;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: 0;
+  height: 0;
+}
+
+.player-field__mote {
+  position: absolute;
+  width: var(--dot, 2px);
+  height: var(--dot, 2px);
+  margin: calc(var(--dot, 2px) / -2);
+  border-radius: 999px;
+  background: var(--pollen);
+  box-shadow: 0 0 8px 1px color-mix(in oklab, var(--pollen) 40%, transparent);
+  transform: rotate(var(--angle))
+    translateX(
+      calc(
+        var(--reach) * var(--distance) *
+          (0.84 + var(--e) * 0.16 * var(--field))
+      )
+    );
+  animation: mote-twinkle 17s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform, opacity;
+}
+
+@keyframes mote-twinkle {
+  0%,
+  100% {
+    opacity: 0.16;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/*
+ * 5 · The vignette.
+ *
+ * The quietest layer, and the one doing the most work: it relaxes as you fill
+ * and deepens as you empty, which is what keeps the eye on the words without
+ * ever asking it to move. Painted in the page's own ground colour, so it
+ * darkens the night palette and warms the day one without a second rule.
+ */
+.player-field__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    124% 104% at var(--heart-x) var(--heart-y),
+    transparent 38%,
+    color-mix(in srgb, var(--bg-0) 58%, transparent) 100%
+  );
+  opacity: calc(0.66 - (var(--e) - 0.5) * 0.22 * var(--field));
+  will-change: opacity;
+}
+
+.player-field--immersive .player-field__vignette {
+  background: radial-gradient(
+    118% 100% at var(--heart-x) var(--heart-y),
+    transparent 34%,
+    color-mix(in srgb, var(--bg-0) 72%, transparent) 100%
+  );
+}
+
+/*
+ * Reduced motion keeps every layer and loses only the movement.
+ *
+ * `--field` is already held at 0 by the component, which is what stills the
+ * breath-driven halves; this stops the two self-running drifts. What is left
+ * is the full composition — the light, the colour, the depth, the vignette —
+ * simply holding a pose. Reduced motion should still look designed.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .player-field__aurora,
+  .player-field__mote {
+    animation: none;
+    will-change: auto;
+  }
+
+  .player-field__mote {
+    opacity: 0.3;
   }
 }
 
@@ -1527,6 +1901,33 @@ html:not(.dark) .breath-aurora__veil {
 .stage {
   /* Kept in step with `STAGE_TRAVEL_SECONDS` in `useStageExpansion`. */
   --stage-travel: 620ms;
+
+  /*
+   * How big the orb is in the card, and the reason the player uses the `stage`
+   * size in both states rather than switching between two of them: one
+   * registered property, two values, and the orb *grows* between them instead
+   * of jumping. See `@property --size` above.
+   *
+   * Three limits, and each of them is doing something:
+   *
+   *   - `64vw` keeps it from crowding a narrow window;
+   *   - `44vh` keeps it from pushing the words it is meant to be introducing
+   *     off the bottom of a shallow one, and keeps it under what the expanded
+   *     stage can offer at the same height — expanding should not hand the orb
+   *     less room than it already had. That holds from about 780px of viewport
+   *     height upward, which is where the great majority of windows are. Below
+   *     it the expanded stage runs out of vertical budget first and the orb
+   *     does give a little back, exactly as it did before this was tuned;
+   *     the alternative is shrinking the card everywhere to match the
+   *     shortest window anyone might use, which helps nobody;
+   *   - `27rem` is where it stops reading as an object and starts reading as
+   *     a background.
+   *
+   * The floor is itself a `min()` so the smallest phones — where 16rem is
+   * wider than the card it has to sit in — get a floor they can actually hold.
+   */
+  --stage-orb: clamp(min(16rem, 74vw), min(64vw, 44vh), 27rem);
+
   isolation: isolate;
   transition:
     padding var(--stage-travel) var(--ease-breath),
@@ -1600,13 +2001,18 @@ html:not(.dark) .breath-aurora__veil {
    * question rather than a drawing one.
    *
    * `--stage-room` is the height of the stage itself, and the reserve is what
-   * the rest of the composition actually measures at this size — 27.5rem here,
+   * the rest of the composition actually measures at this size — 28.5rem here,
    * and less on shorter screens, where the spacing tightens before the orb
-   * gives anything up. The orb takes what is left, to a limit of 42rem: past
+   * gives anything up. The orb takes what is left, to a limit of 44rem: past
    * that it stops reading as an orb and starts reading as a background.
+   *
+   * The reserve is a measured number, not a guessed one, and it is worth
+   * keeping that way: too large and the orb gives up room it could have had,
+   * too small and the stage quietly starts to scroll — which is the one thing
+   * the safety valve above is there to make survivable rather than normal.
    */
   --stage-room: 100dvh;
-  --stage-orb: clamp(11rem, min(78vw, var(--stage-room) - 27.5rem), 42rem);
+  --stage-orb: clamp(11rem, min(78vw, var(--stage-room) - 28.5rem), 44rem);
   --stage-gap: 1rem;
   --stage-stack: 0.75rem;
   --stage-play: 4.75rem;
@@ -1647,7 +2053,7 @@ html:not(.dark) .breath-aurora__veil {
  */
 @media (max-height: 800px) {
   .stage--immersive {
-    --stage-orb: clamp(11rem, min(74vw, var(--stage-room) - 25rem), 30rem);
+    --stage-orb: clamp(11rem, min(74vw, var(--stage-room) - 25.5rem), 30rem);
     --stage-gap: 0.8rem;
     --stage-stack: 0.6rem;
     --stage-play: 4.35rem;
@@ -1657,7 +2063,7 @@ html:not(.dark) .breath-aurora__veil {
 
 @media (max-height: 620px) {
   .stage--immersive {
-    --stage-orb: clamp(8rem, min(56vw, var(--stage-room) - 21.5rem), 22rem);
+    --stage-orb: clamp(8rem, min(56vw, var(--stage-room) - 22rem), 22rem);
     --stage-gap: 0.55rem;
     --stage-stack: 0.5rem;
     --stage-play: 3.9rem;
@@ -1665,7 +2071,14 @@ html:not(.dark) .breath-aurora__veil {
   }
 }
 
-/* A pool of light under the orb, and the only thing added by expanding. */
+/*
+ * A pool of light under the orb, lit only while expanded.
+ *
+ * This is the innermost ring of the same weather `.player-field` is making
+ * outside the glass, and it is on the same clock: the stage is one of the
+ * elements the breathing hook mirrors `--e` onto, so the light inside the
+ * panel swells with the light beyond it rather than a beat behind it.
+ */
 .stage__aura {
   position: absolute;
   inset: 0;
@@ -1682,7 +2095,22 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 .stage--immersive .stage__aura {
-  opacity: 1;
+  /*
+   * Three percent of scale, and about a tenth of its own brightness. Under a
+   * 40rem orb that is a few pixels of light moving, which is all it should
+   * ever be — the orb is what breathes, and this is what it breathes into.
+   *
+   * The scale opens *up to* 1 rather than around it, and that is not a style
+   * choice. The stage scrolls when it has to, and a transformed child
+   * contributes its transformed box to the scrollable area — so an aura that
+   * spent any part of the breath above 1 grew the stage's scroll height by a
+   * percent of the viewport and put a scrollbar on the most carefully
+   * composed screen in the app, once per in-breath. Same rule the halo inside
+   * the orb already follows, for the same reason.
+   */
+  opacity: calc(0.92 + (var(--e) - 0.5) * 0.16 * var(--field));
+  transform: scale(calc(1 - (1 - var(--e)) * 0.03 * var(--field)));
+  will-change: transform, opacity;
 }
 
 /* Its own fixed 900ms isn't reached by overriding `--stage-travel`. */
@@ -1709,7 +2137,7 @@ html:not(.dark) .breath-aurora__veil {
  * two would meet, so the block gives way instead of the control moving.
  */
 .stage__top {
-  transition-property: padding-inline;
+  transition-property: padding-inline, opacity;
 }
 
 .stage__focus {
@@ -1722,7 +2150,41 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 .stage__line {
-  transition-property: font-size, max-width, min-height;
+  transition-property: font-size, max-width, min-height, line-height, margin;
+}
+
+/*
+ * The clamp lives on the span rather than on the paragraph, and that is not an
+ * arbitrary choice.
+ *
+ * A new spoken line arrives with a small fade and four pixels of travel, and
+ * `transform` does not apply to a non-replaced inline box — so the words need
+ * a block-level box of their own. Moving the clamp down to that box gives them
+ * one without adding an element, and leaves the paragraph free to go on
+ * transitioning its size and its reserved height while the words change
+ * inside it.
+ */
+.stage__line-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--line-clamp, 5);
+  line-clamp: var(--line-clamp, 5);
+  overflow: hidden;
+}
+
+/*
+ * "End session" is the one control that is genuinely optional while a session
+ * is running, so it is the one that steps furthest back when the room goes
+ * quiet. It restates the press transitions `.interactive` gave it, because a
+ * bare `transition-property` here would replace that shorthand wholesale.
+ */
+.stage__leave {
+  transition:
+    opacity var(--stage-travel) var(--ease-breath),
+    background-color 200ms var(--ease-calm),
+    border-color 200ms var(--ease-calm),
+    color 200ms var(--ease-calm),
+    transform 220ms var(--ease-spring);
 }
 
 .stage__transport {
@@ -1784,17 +2246,24 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 /*
- * The words grow with the room, but not without limit: past about 30
+ * The words grow with the room, but not without limit: past about 32
  * characters a line stops being one thing the eye takes in and becomes
  * something to read across. The reserved height keeps the orb from shifting
  * as a one-line affirmation gives way to a two-line one, and shrinks on
  * screens that cannot spare it.
+ *
+ * The leading opens with the size. At 2.4rem the `leading-snug` a 1.25rem line
+ * wants would set the words as a block; a little over 1.3 is what makes them
+ * read as a thought suspended in the room rather than as a paragraph in it.
  */
 .stage--immersive .stage__line {
-  font-size: clamp(1.35rem, 0.95rem + 1.4vw, 2rem);
-  max-width: min(30ch, 100%);
+  font-size: clamp(1.5rem, 1rem + 1.7vw, 2.45rem);
+  line-height: 1.32;
+  letter-spacing: -0.005em;
+  max-width: min(32ch, 100%);
   min-height: var(--stage-line);
-  -webkit-line-clamp: 5;
+  margin-top: var(--stage-stack);
+  --line-clamp: 5;
 }
 
 .stage--immersive .stage__transport {
@@ -1830,6 +2299,93 @@ html:not(.dark) .breath-aurora__veil {
 /* The phase word scales with the orb it sits inside. */
 .stage--immersive .breath-caption > :first-child {
   font-size: clamp(1.5rem, calc(var(--size) * 0.11), 2.4rem);
+}
+
+/*
+ * ── Two layers the orb only wears in the room ──
+ *
+ * Not a different visualiser — the same six forms, on the same clock, with two
+ * more of the cheapest possible layers behind them. At twice the diameter the
+ * orb needs more light around it or it reads as a flat disc pasted onto the
+ * screen, and it needs something at its rim or it reads as having no depth at
+ * all. That is the whole argument for these; there is no third one waiting.
+ *
+ * Both are sized so that layer plus scale never exceeds the visualiser's own
+ * box, because `.stage--immersive` scrolls — `overflow-y: auto` computes
+ * `overflow-x` to `auto` as well — and a bloom half a percent too wide is a
+ * horizontal scrollbar on the most carefully composed screen in the app.
+ */
+.stage--immersive .breath::before,
+.stage--immersive .breath::after {
+  content: '';
+  grid-area: 1 / 1;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+/* A distant orbit ring, barely there, drawing out as you fill. */
+.stage--immersive .breath::before {
+  width: calc(var(--size) * 0.99);
+  height: calc(var(--size) * 0.99);
+  border: 1px solid color-mix(in oklab, var(--rose) 30%, transparent);
+  transform: scale(calc(0.9 + var(--e) * 0.1));
+  opacity: calc(0.08 + var(--e) * 0.14);
+}
+
+/* The light the orb spills into the room around it. */
+.stage--immersive .breath::after {
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--glow) 60%, transparent) 0%,
+    color-mix(in oklab, var(--gold) 10%, transparent) 44%,
+    transparent 70%
+  );
+  transform: scale(calc(0.78 + var(--e) * 0.22));
+  opacity: calc(0.2 + var(--e) * 0.28);
+}
+
+/*
+ * ── When the room goes quiet ──
+ *
+ * After a while with no pointer, no key and no touch, the parts of the screen
+ * that are only *information* step back and leave the words, the orb and the
+ * two controls that matter.
+ *
+ * What stays at full strength is exactly what the player promises: play and
+ * pause, the clock, and the way out. What steps back is the title block, the
+ * pass meter and "End session" — and none of them steps back so far that it
+ * cannot be read, or so far that it stops being a target. Focus anywhere
+ * inside brings all of it straight back, so this can never strand a keyboard.
+ *
+ * Slow to leave and quick to return: the fade out is set here, and taking the
+ * attribute away drops the transition back to the stage's own duration.
+ */
+.stage--immersive[data-quiet='true'] .stage__top,
+.stage--immersive[data-quiet='true'] .stage__meter,
+.stage--immersive[data-quiet='true'] .stage__leave {
+  opacity: 0.34;
+  transition-duration: 1400ms;
+}
+
+/*
+ * `:has(:focus-visible)`, not `:focus-within`, and the difference is the whole
+ * behaviour.
+ *
+ * Expanding the stage is a click on a button inside it, so `:focus-within`
+ * holds from that moment until focus goes somewhere else — which is never,
+ * because there is nowhere else to click. The room could not go quiet at all
+ * with a mouse. `:focus-visible` is the browser's own answer to "is this
+ * person actually driving from the keyboard", so a keyboard user keeps every
+ * control lit and a mouse user gets the stillness they came for.
+ */
+.stage--immersive[data-quiet='true']:has(:focus-visible) .stage__top,
+.stage--immersive[data-quiet='true']:has(:focus-visible) .stage__meter,
+.stage--immersive[data-quiet='true']:has(:focus-visible) .stage__leave {
+  opacity: 1;
+  transition-duration: var(--stage-travel);
 }
 
 /*
@@ -1880,8 +2436,9 @@ html:not(.dark) .breath-aurora__veil {
 
   .stage--immersive .stage__line {
     font-size: clamp(1.1rem, 0.95rem + 0.5vw, 1.4rem);
+    line-height: 1.25;
     max-width: 100%;
-    -webkit-line-clamp: 2;
+    --line-clamp: 2;
   }
 
   .stage--immersive .stage__focus {
@@ -1963,7 +2520,9 @@ html:not(.dark) .breath-aurora__veil {
   background: var(--panel-solid);
   border: 2px solid var(--rose-deep);
   box-shadow: 0 2px 8px rgb(58 50 44 / 0.22);
-  transition: transform 160ms var(--ease-calm);
+  transition:
+    transform 160ms var(--ease-calm),
+    box-shadow 200ms var(--ease-calm);
 }
 
 .range-input::-moz-range-thumb {
@@ -1973,10 +2532,28 @@ html:not(.dark) .breath-aurora__veil {
   background: var(--panel-solid);
   border: 2px solid var(--rose-deep);
   box-shadow: 0 2px 8px rgb(58 50 44 / 0.22);
+  transition:
+    transform 160ms var(--ease-calm),
+    box-shadow 200ms var(--ease-calm);
 }
 
+/*
+ * A halo while you hold it. Dragging a slider on a touch screen puts a finger
+ * exactly where the feedback is, so the answer has to be visible around the
+ * thumb rather than under it.
+ */
 .range-input:active::-webkit-slider-thumb {
   transform: scale(1.14);
+  box-shadow:
+    0 2px 8px rgb(58 50 44 / 0.22),
+    0 0 0 7px color-mix(in oklab, var(--rose) 18%, transparent);
+}
+
+.range-input:active::-moz-range-thumb {
+  transform: scale(1.14);
+  box-shadow:
+    0 2px 8px rgb(58 50 44 / 0.22),
+    0 0 0 7px color-mix(in oklab, var(--rose) 18%, transparent);
 }
 
 /* Hide scrollbar on horizontal strips without losing the scroll. */

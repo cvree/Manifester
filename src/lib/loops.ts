@@ -1,6 +1,7 @@
 import { isRainCharacter } from './ambient'
 import { normaliseBrainwave } from './brainwaveAudio'
 import { createId } from './format'
+import { clampVoiceVolume } from './speech'
 import { DEFAULT_SETTINGS, type LoopSettings, type SavedLoop } from './types'
 
 /** The in-progress loop the Create tab edits. */
@@ -46,10 +47,17 @@ export function loopToDraft(loop: SavedLoop): Draft {
  * Fill in anything a loop saved by an older version is missing, so adding a
  * setting never breaks someone's existing library.
  *
- * Two values are rebuilt rather than merged. A rhythm's `targetHz` is derived
+ * Three values are rebuilt rather than merged. A rhythm's `targetHz` is derived
  * from its preset, because a stale or hand-edited frequency must never reach the
- * audio graph; and an unrecognised rain character falls back to the middle
- * setting rather than indexing a table with `undefined`.
+ * audio graph; an unrecognised rain character falls back to the middle setting
+ * rather than indexing a table with `undefined`; and the voice level is brought
+ * back inside its ceiling.
+ *
+ * That last one is a migration. The voice setting used to run to 2, on the
+ * theory that an exported recording could use the headroom even though the
+ * spoken voice never could — so a loop saved then can carry a level no control
+ * in the app is able to show any more. It comes back at 100%, which is what it
+ * always sounded like.
  */
 export function normaliseSettings(settings: Partial<LoopSettings>): LoopSettings {
   const sound = { ...DEFAULT_SETTINGS.sound, ...settings.sound }
@@ -57,6 +65,9 @@ export function normaliseSettings(settings: Partial<LoopSettings>): LoopSettings
   return {
     ...DEFAULT_SETTINGS,
     ...settings,
+    voiceVolume: clampVoiceVolume(
+      settings.voiceVolume ?? DEFAULT_SETTINGS.voiceVolume,
+    ),
     sound: {
       ...sound,
       rainCharacter: isRainCharacter(sound.rainCharacter)

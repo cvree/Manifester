@@ -38,6 +38,15 @@ export interface Preferences {
   breathSound: BreathSound
   breathSoundVolume: number
   breathHapticCues: boolean
+  /**
+   * Whether the player's atmosphere breathes with the guide.
+   *
+   * It rides on the same clock rather than having one of its own, so this can
+   * only ever be true *as well as* `breathingEnabled` — with the guide off
+   * there is no breath for the room to follow, and inventing one would be a
+   * four-second pulse pretending to be your breathing.
+   */
+  backgroundBreathing: boolean
   /** Interface taps and confirmations. */
   uiSounds: boolean
   uiHaptics: boolean
@@ -66,6 +75,13 @@ const DEFAULTS: Preferences = {
   breathSound: 'chime',
   breathSoundVolume: DEFAULT_BREATH_VOLUME,
   breathHapticCues: true,
+  /*
+   * On, because at the depth it is drawn at most people feel it before they
+   * notice it — which is the whole design. A percent or two of scale and a few
+   * percent of light is not an effect anyone has to opt into; it is what stops
+   * the orb reading as a widget sitting on a page.
+   */
+  backgroundBreathing: true,
   uiSounds: true,
   uiHaptics: true,
   aiEnabled: true,

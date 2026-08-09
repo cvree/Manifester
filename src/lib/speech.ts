@@ -23,21 +23,42 @@ const KEEPALIVE_INTERVAL_MS = 9000
 const ANNOUNCE_FALLBACK_MS = 300
 
 /**
- * The ceiling for the `voiceVolume` setting.
+ * The ceiling for the `voiceVolume` setting, and the browser's own ceiling for
+ * the voice itself.
  *
- * The live spoken voice cannot actually get louder than 1: `volume` on
- * `SpeechSynthesisUtterance` is spec'd to `[0, 1]`, and browsers clamp it there
- * regardless of what this app does, because speech synthesis renders entirely
- * outside the page — there is no Web Audio node to put a gain on. `LIVE_VOICE_VOLUME_CAP`
- * below is that hard limit, applied to every utterance.
+ * They are deliberately the same number now. `volume` on
+ * `SpeechSynthesisUtterance` is spec'd to `[0, 1]` and every browser clamps it
+ * there regardless of what this app does, because speech synthesis renders
+ * entirely outside the page — there is no Web Audio node to put a gain on. So a
+ * setting that ran to 2 could only ever be a promise the live voice was unable
+ * to keep: the slider read "200%", the readout agreed, and the voice stayed
+ * exactly where it had been at 100%.
  *
- * Anything this setting does above 1 only reaches a recorded voice blended into
- * an exported file, which *is* fully inside this app's own mixing — see
- * `exportAudio.ts` and `encode.worker.ts`. `MAX_VOICE_VOLUME` is the ceiling for
- * that path, used as the slider's maximum.
+ * The export path is the one place a gain above 1 would mean anything, since a
+ * recorded voice really is mixed inside this app — and it already has a better
+ * answer. `masterGainFor` in `exportAudio.ts` normalises the finished mix, so
+ * pushing the voice past 1 there changes nothing but its *balance* against the
+ * bed, which is what the Sound slider is for: `MAX_MUSIC_VOLUME` is still 2.
+ * Nothing needs a voice setting above 1, so nothing offers one.
+ *
+ * `LIVE_VOICE_VOLUME_CAP` stays as its own name because it means something
+ * different — it is the browser's limit rather than this app's choice — and it
+ * is still applied to every utterance as belt and braces.
  */
-export const MAX_VOICE_VOLUME = 2
+export const MAX_VOICE_VOLUME = 1
 export const LIVE_VOICE_VOLUME_CAP = 1
+
+/**
+ * Bring a voice level into range.
+ *
+ * Used on the way in from storage and on the way out of the slider, so a loop
+ * saved when the ceiling was 2 comes back at 100% rather than as a value no
+ * control in the app can now represent.
+ */
+export function clampVoiceVolume(value: number): number {
+  if (!Number.isFinite(value)) return MAX_VOICE_VOLUME
+  return Math.min(MAX_VOICE_VOLUME, Math.max(0, value))
+}
 
 export function isSpeechSupported(): boolean {
   return (
