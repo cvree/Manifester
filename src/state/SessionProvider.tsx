@@ -555,6 +555,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
+        /*
+         * The media element was the only thing being recovered here, which
+         * left the whole generated mix behind: every ambience and the
+         * brainwave rhythm live on the bus's `AudioContext`, and a phone that
+         * has been locked, taken a call, or simply let another app have the
+         * audio route hands that context back suspended — or, on iOS,
+         * interrupted. The session would come back with a running clock, a
+         * moving orb and a spoken voice, and no sound underneath any of it.
+         */
+        if (session.status === 'playing') busRef.current?.resume()
         musicRef.current?.resumeIfSuspended()
         if (wakeLockRef.current === null && session.status === 'playing') {
           void requestWakeLock()

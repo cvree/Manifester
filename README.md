@@ -638,6 +638,53 @@ real document, deep links survive a reload, and the service worker only ever has
 one HTML file to cache. A `404.html` fallback is included as a belt-and-braces
 redirect for any stray path.
 
+**Everything but the voice was silent on a phone, and the two reasons were
+invisible from a desktop.** The report was exact: the affirmation is spoken
+perfectly, and the ambience, the brainwave rhythm and the breath cues are not
+there at all. That split is itself the diagnosis — the voice is the one sound in
+the app that does *not* go through Web Audio, because speech synthesis renders
+outside the page. When only the voice survives, the `AudioContext` is what has
+failed. [`audioSession.ts`](src/lib/audioSession.ts) answers both causes.
+
+*The silent switch.* iOS files a page's Web Audio under the `ambient` audio
+session category, which the hardware ring/silent switch mutes. `SpeechSynthesis`
+goes out over the system speech route and ignores the switch entirely. So a
+phone on silent plays the words and nothing around them, and turning the Sound
+slider up cannot help, because the mix is being muted after this app is finished
+with it. The Audio Session API is the supported answer: declaring `playback`
+says this is primary media rather than interface noise — which is what a
+thirty-minute affirmation loop honestly is — and it plays through the switch the
+way a podcast does. It is claimed when someone asks for sound, never on load,
+and it is never widened out of `play-and-record` while the voice recorder holds
+the microphone.
+
+*The state the specification does not have.* `AudioContextState` is
+`suspended | running | closed`. iOS has a fourth, `interrupted`, which a call,
+an alarm, another app taking the audio route or the screen locking can all leave
+a context in, and it does not recover on its own. Every resume in this app used
+to read `if (state === 'suspended')`, which steps straight past it — so a
+session came back from a lock screen with a running clock, a moving orb, a
+spoken voice and no sound underneath any of it. Waking now means "not running
+and not closed", which covers the states that exist and the one that is not
+written down; and the bus is watched by `statechange`, by returning to the page,
+and by the next touch, because some interruptions are only clearable from inside
+a gesture. Returning to a backgrounded session used to resume the media element
+alone, which left every *generated* sound — that is, all five ambiences and the
+rhythm — behind on a context nobody had woken.
+
+The one subtlety in that, and it is worth stating because getting it wrong is
+silent in the other direction: **pausing a session suspends the bus on
+purpose.** A suspended context stops advancing `currentTime`, which is exactly
+what lets a paused rhythm resume on the phase it held rather than restart. A
+recovery watcher that cannot tell a deliberate pause from an interruption sees
+the `statechange` the pause itself caused, helpfully resumes, and the ambience
+plays straight through a paused session under a button that says *resume*. So
+`keepAwake` takes a predicate saying when the context is *meant* to be running,
+and never second-guesses it. Interface tap sounds are woken the same way but
+deliberately do **not** claim the playback category — a tap confirmation really
+is interface noise, and a phone switched to silent should not be answered with
+a beep.
+
 **The voice slider stops at 100%, because that is where the voice stops.**
 `SpeechSynthesisUtterance.volume` is spec'd to `[0, 1]` and every browser clamps
 it there, because speech synthesis renders outside the page entirely — there is
@@ -1079,6 +1126,11 @@ them go away:
   reliable route.
 - **The first tap matters.** Browsers require a genuine user gesture before any
   audio starts. If nothing happens, tap play once more.
+- **A phone's silent switch mutes Web Audio, but not speech.** Which is why "the
+  words play and nothing else does" is the classic mobile report, and why
+  Manifester declares its audio session as `playback` — see below. On an iOS
+  version without the Audio Session API, the silent switch still wins and the
+  ring/silent switch is the fix.
 - **Long single utterances get truncated** in several engines, which is exactly
   why the text is chunked and re-queued rather than sent in one piece.
 - **Private browsing blocks storage.** Saving is disabled and the app says so

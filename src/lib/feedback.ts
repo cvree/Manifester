@@ -10,6 +10,8 @@
  * can never be caught by a session fade or suspended along with the music.
  */
 
+import { keepAwake, wake } from './audioSession'
+
 export type Cue =
   | 'tap'
   | 'select'
@@ -119,8 +121,19 @@ function context(): AudioContext | null {
         .webkitAudioContext
     if (!Ctor) return null
     ctx = new Ctor()
+    keepAwake(ctx)
   }
-  if (ctx.state === 'suspended') void ctx.resume()
+
+  /*
+   * Woken like the others — an interrupted context here means the interface
+   * goes quiet after a phone call and never comes back — but deliberately
+   * *not* claiming the playback audio session the way the bus and the breath
+   * voices do. A tap confirmation genuinely is interface noise, and a phone
+   * switched to silent should not be answered with a beep. If a session is
+   * running, the page is already in the playback category and these ride along
+   * with it; that is the right way round.
+   */
+  wake(ctx)
   return ctx
 }
 

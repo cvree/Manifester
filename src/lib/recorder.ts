@@ -13,6 +13,8 @@
  * nicer than a synthesised one.
  */
 
+import { releaseRecordingSession } from './audioSession'
+
 export interface RecorderHandlers {
   /** 0 → 1, for the level meter. */
   onLevel?: (level: number) => void
@@ -162,6 +164,9 @@ export class VoiceRecorder {
     this.stream = null
     this.recorder = null
     this.startedAt = 0
+    // Give the audio route back, or iOS keeps playback in the recording
+    // category — quieter, and sometimes out of the earpiece.
+    releaseRecordingSession()
   }
 }
 

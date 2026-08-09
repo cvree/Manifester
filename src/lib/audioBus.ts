@@ -21,6 +21,7 @@
  */
 
 import { createSoftCeiling, rampParam } from './audioParams'
+import { claimPlaybackSession, keepAwake, wake } from './audioSession'
 
 /** Short enough to feel immediate on a slider, long enough not to step. */
 const RAMP_SECONDS = 0.12
@@ -107,6 +108,16 @@ export class AudioBus {
   private ctx: AudioContext | null = null
   private graph: BusGraph | null = null
   private musicLevel = 0.4
+  /** Removes the listeners that keep the context running. */
+  private release: (() => void) | null = null
+  /**
+   * True while the app has deliberately suspended the context — which is what
+   * pausing a session does, so that `currentTime` stops and every oscillator
+   * resumes on the phase it held. The recovery watcher reads this so it can
+   * tell a pause from an interruption; without it, pausing would be undone by
+   * the very `statechange` it causes.
+   */
+  private parked = false
 
   get context(): AudioContext | null {
     return this.ctx
@@ -138,6 +149,14 @@ export class AudioBus {
   ensure(): AudioContext | null {
     if (typeof window === 'undefined') return null
 
+    /*
+     * Before anything else, and every time: on iOS this is what stops the
+     * hardware silent switch muting the entire generated mix while the spoken
+     * voice — which never touches this graph — carries on regardless. See
+     * `audioSession.ts`; it is a no-op everywhere it is not needed.
+     */
+    claimPlaybackSession()
+
     if (!this.ctx) {
       const Ctor =
         window.AudioContext ??
@@ -147,9 +166,13 @@ export class AudioBus {
 
       this.ctx = new Ctor()
       this.graph = buildBusGraph(this.ctx, this.ctx.destination, this.musicLevel)
+      this.release = keepAwake(this.ctx, () => !this.parked)
     }
 
-    if (this.ctx.state === 'suspended') void this.ctx.resume()
+    // Not `state === 'suspended'`: iOS has an `interrupted` state as well, and
+    // a context left in it never comes back on its own.
+    this.parked = false
+    wake(this.ctx)
     return this.ctx
   }
 
@@ -177,15 +200,20 @@ export class AudioBus {
    * lets a paused session pick a rhythm back up rather than restart it.
    */
   suspend(): void {
+    this.parked = true
     if (this.ctx && this.ctx.state === 'running') void this.ctx.suspend()
   }
 
   resume(): void {
-    if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume()
+    this.parked = false
+    claimPlaybackSession()
+    wake(this.ctx)
   }
 
   close(): void {
     if (!this.ctx) return
+    this.release?.()
+    this.release = null
     void this.ctx.close().catch(() => undefined)
     this.ctx = null
     this.graph = null
