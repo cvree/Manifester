@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import { cx } from '../lib/cx'
 
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -6,6 +6,8 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string
   icon: ReactNode
   tone?: 'neutral' | 'danger'
+  /** For the callers that have to position something against this button. */
+  ref?: Ref<HTMLButtonElement>
 }
 
 /** A 44×44 tap target — the smallest comfortable size on a phone. */
@@ -14,10 +16,12 @@ export function IconButton({
   icon,
   tone = 'neutral',
   className,
+  ref,
   ...props
 }: IconButtonProps) {
   return (
     <button
+      ref={ref}
       type="button"
       aria-label={label}
       title={label}

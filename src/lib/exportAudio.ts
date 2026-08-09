@@ -48,6 +48,27 @@ export function estimateWavBytes(minutes: number): number {
   return Math.round(EXPORT_SAMPLE_RATE * 2 * minutes * 60) + 44
 }
 
+/**
+ * A filename the user can find again, from a title they wrote freely.
+ *
+ * Anything that is not a letter or a digit becomes a hyphen — a loop called
+ * "I am / becoming: calm" cannot go to a filesystem as it stands, and on iOS
+ * it is the share sheet rather than a downloads folder that receives this.
+ */
+export function exportFileName(
+  title: string,
+  minutes: number,
+  format: 'mp3' | 'wav',
+): string {
+  const safe = title
+    .trim()
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 60)
+    .replace(/-$/, '')
+  return `${safe || 'manifester-loop'}-${minutes}min.${format}`
+}
+
 export function formatEstimate(bytes: number): string {
   const megabytes = bytes / 1024 / 1024
   return megabytes < 1

@@ -9,6 +9,7 @@ import {
   decodeRecording,
   estimateMp3Bytes,
   estimateWavBytes,
+  exportFileName,
   formatEstimate,
   masterGainFor,
   renderBackgroundBed,
@@ -16,11 +17,12 @@ import {
 } from '../lib/exportAudio'
 import type { EncodeRequest, EncodeResponse } from '../lib/exportTypes'
 import { cue } from '../lib/feedback'
+import { canShareFiles, shareFile } from '../lib/share'
 import { brainwaveSummary } from '../lib/summaries'
 import type { LoopSettings } from '../lib/types'
 import { Button } from './Button'
 import { Chip } from './SegmentedControl'
-import { CheckIcon, DownloadIcon } from './Icons'
+import { CheckIcon, DownloadIcon, ShareIcon } from './Icons'
 import { TextField } from './TextArea'
 
 interface ExportPanelProps {
@@ -36,7 +38,14 @@ type Stage =
   | { kind: 'idle' }
   | { kind: 'preparing' }
   | { kind: 'encoding'; percent: number }
-  | { kind: 'done'; url: string; filename: string; bytes: number; format: 'mp3' | 'wav' }
+  | {
+      kind: 'done'
+      url: string
+      filename: string
+      /** Kept as well as the URL: the share sheet needs a `File`, not a link. */
+      file: File
+      format: 'mp3' | 'wav'
+    }
   | { kind: 'error'; message: string }
 
 export function ExportPanel({
@@ -51,6 +60,7 @@ export function ExportPanel({
   const [usingCustom, setUsingCustom] = useState(false)
   const [stage, setStage] = useState<Stage>({ kind: 'idle' })
   const [fallbackNote, setFallbackNote] = useState<string | null>(null)
+  const [shareNote, setShareNote] = useState<string | null>(null)
 
   const workerRef = useRef<Worker | null>(null)
   const urlRef = useRef<string | null>(null)
@@ -77,7 +87,18 @@ export function ExportPanel({
       urlRef.current = null
     }
     setFallbackNote(null)
+    setShareNote(null)
     setStage({ kind: 'idle' })
+  }, [])
+
+  /** Hand the finished file to the device's share sheet. */
+  const handOff = useCallback(async (file: File) => {
+    setShareNote(null)
+    const outcome = await shareFile(file, file.name)
+    if (outcome === 'shared') cue('save')
+    else if (outcome === 'failed') {
+      setShareNote('This browser would not take the file. Save it instead.')
+    }
   }, [])
 
   const cancel = useCallback(() => {
@@ -158,14 +179,14 @@ export function ExportPanel({
           case 'done': {
             const url = URL.createObjectURL(message.blob)
             urlRef.current = url
-            const safeTitle =
-              title.trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') ||
-              'manifester-loop'
+            const filename = exportFileName(title, minutes, message.format)
             setStage({
               kind: 'done',
               url,
-              filename: `${safeTitle}-${minutes}min.${message.format}`,
-              bytes: message.blob.size,
+              filename,
+              file: new File([message.blob], filename, {
+                type: message.blob.type,
+              }),
               format: message.format,
             })
             cue('complete')
@@ -373,7 +394,7 @@ export function ExportPanel({
             Your {minutes} minute {stage.format.toUpperCase()} is ready
           </p>
           <p className="mt-1 text-[0.85rem] text-ink-muted">
-            {formatEstimate(stage.bytes)} · {stage.filename}
+            {formatEstimate(stage.file.size)} · {stage.filename}
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <a
@@ -385,10 +406,29 @@ export function ExportPanel({
               <DownloadIcon className="text-[0.95rem]" />
               Save the file
             </a>
+            {/*
+              Only where the device will actually take an audio file. On iOS
+              this is the useful button of the two: a web app has no downloads
+              folder there, and the share sheet puts the MP3 straight into
+              Files, Voice Memos or a message.
+            */}
+            {canShareFiles([stage.file]) && (
+              <Button
+                variant="secondary"
+                size="lg"
+                onClick={() => void handOff(stage.file)}
+                leading={<ShareIcon className="text-[0.95rem]" />}
+              >
+                Share
+              </Button>
+            )}
             <Button variant="secondary" size="lg" onClick={reset}>
               Make another
             </Button>
           </div>
+          {shareNote && (
+            <p className="mt-3 text-[0.85rem] text-ink-muted">{shareNote}</p>
+          )}
         </div>
       ) : busy ? (
         <Button variant="secondary" block size="lg" onClick={cancel}>

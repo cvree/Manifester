@@ -110,6 +110,23 @@ export const CopyIcon = (props: IconProps) => (
   </Icon>
 )
 
+/** A clipboard — copying the words themselves, not the loop. */
+export const ClipboardIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M9.2 5H7.4A2.4 2.4 0 0 0 5 7.4v10.2A2.4 2.4 0 0 0 7.4 20h9.2a2.4 2.4 0 0 0 2.4-2.4V7.4A2.4 2.4 0 0 0 16.6 5h-1.8" />
+    <rect x="9.2" y="3.2" width="5.6" height="3.4" rx="1.5" />
+  </Icon>
+)
+
+/** Three quiet dots — everything else this thing can do. */
+export const MoreIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="5.6" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="18.4" cy="12" r="1.5" fill="currentColor" stroke="none" />
+  </Icon>
+)
+
 export const PencilIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M4.5 19.5h3.2L18.9 8.3a2.3 2.3 0 0 0-3.2-3.2L4.5 16.3Z" />

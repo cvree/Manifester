@@ -181,6 +181,12 @@ app.
   throughout; a WAV fallback if a browser cannot load the MP3 encoder.
 - Everything is rendered on your device in a Web Worker, so the app stays
   usable while it works, and nothing is ever uploaded.
+- Available from the loop you are writing *and* from any saved loop, through
+  the **⋯** menu on its card — a loop from a month ago is as downloadable as
+  the one in front of you, with nothing to load back into Create first.
+- **Share** the finished file where the device will take one, which on iOS is
+  the useful button of the two: a web app has no downloads folder there, and
+  the share sheet puts the MP3 straight into Files, Voice Memos or a message.
 
 **Library**
 
@@ -195,7 +201,14 @@ link to your sounds.
   sound selection, rain character, brainwave rhythm, playlist, repeat mode, and
   dates. A loop saved before a setting existed loads with it turned off rather
   than failing.
-- Play, edit, duplicate, or delete.
+- Play or edit from the card, and everything else from one **⋯** menu:
+  **Download audio** (the whole export panel, on this loop), **Share the
+  words**, **Copy the words**, **Duplicate**, and **Delete** — which still asks
+  before it does it.
+- The menu knows where it is: a small anchored menu with arrow-key navigation
+  on a desktop, and the app's own bottom sheet with thumb-height rows on a
+  phone. Sharing uses the device's share sheet, and falls back to the clipboard
+  in the browsers that have none.
 
 *Sounds*
 

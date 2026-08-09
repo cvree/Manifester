@@ -910,6 +910,46 @@
   }
 }
 
+/*
+ * The "…" menu, on the sizes where it is a menu rather than a sheet.
+ *
+ * It grows from the corner nearest the button it belongs to, so the menu reads
+ * as having come out of that button rather than as having been dropped on top
+ * of the page. Faster than a sheet on purpose: a menu is a glance, not a
+ * destination, and 340ms of travel for four rows feels like waiting.
+ */
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes menu-in-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-menu-in {
+  transform-origin: top right;
+  animation: menu-in 180ms var(--ease-calm) both;
+}
+
+.animate-menu-in-up {
+  transform-origin: bottom right;
+  animation: menu-in-up 180ms var(--ease-calm) both;
+}
+
 /* ── Scrollbars ─────────────────────────────────────────────── */
 
 /*
