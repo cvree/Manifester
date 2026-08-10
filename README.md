@@ -180,6 +180,16 @@ app.
   restarted, so each change lands on the next line and the loop never breaks
   step. Voice runs 0–100%, because 100% is as loud as a browser will ever speak
   — see [Decisions worth explaining](#decisions-worth-explaining).
+- **The background sound, one tap away and live.** A small control sits in the
+  corner of the stage opposite *Expand* — including expanded, where it is the
+  only thing on the screen besides the words, the breath and the transport. It
+  opens one list: silence, every built-in ambience, every sound you have
+  imported, and your playlist if you have one. Picking one **crossfades under
+  the running loop**: the voice, the clock, the breath and the timer carry
+  straight on, and nothing restarts. The same list is a row in the settings
+  column, and choosing a sound in the Library while a session runs now reaches
+  it the same way — the days of stopping a session to change what is behind it
+  are over.
 - A mini player follows you to the other tabs while a session is running.
 - When the timer ends everything fades out and the screen says *Your loop is
   complete.*
@@ -236,6 +246,10 @@ link to your sounds.
 - Import your own audio (MP3, M4A, WAV, OGG, FLAC — up to 40 MB each).
 - Rename, preview, and delete imported sounds.
 - Build an ordered playlist, reorder it, and choose repeat-one or repeat-all.
+- Every choice on this tab — the sound, the rain character, the playlist, the
+  repeat mode, on and off — applies to a session that is already playing,
+  crossfading rather than restarting it. Previews still run on a bus of their
+  own, so auditioning a sound never disturbs what you are listening to.
 
 **Everywhere**
 
@@ -1294,6 +1308,12 @@ the result.
 - **Lifecycle.** Each soundscape is asserted to hold sources open while playing,
   release every one on stop, ignore a second stop, and keep two concurrent
   instances independent.
+- **Choosing a sound.** What one tap on a sound means — which mode, which
+  track, and what it leaves alone — is a pure function with its own tests, and
+  so is the question the player asks before it disturbs live audio: rain's
+  character and a repeat mode with nothing to repeat are changes the running
+  engine is already following, and rebuilding the queue for them would restart
+  an ambience that only needed adjusting.
 - **Compatibility.** A loop record written by the previous version — no
   `brainwave` key, no `rainCharacter` — loads with the feature off and everything
   else intact. A tampered `targetHz` is rebuilt from its preset.
@@ -1366,6 +1386,8 @@ src/
     motion.ts       reduced motion, low-power, breakpoint and platform detection
     hue.ts          the palette dial's named stops, and the night light's maths
     summaries.ts    the one-line summary of every advanced setting
+    soundChoice.ts  what one tap on a sound means, and whether a change is one
+                    the running engine has to hear about
     engagement.ts   when the install suggestion has been earned
     wordcraft.ts    the offline writing helper: rewrite rules, no model
     ai/

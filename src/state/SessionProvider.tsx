@@ -24,6 +24,7 @@ import {
   type BrainwaveSettings,
 } from '../lib/brainwaveAudio'
 import { loopToDraft, normaliseSettings, type Draft } from '../lib/loops'
+import { soundPlaybackChanged } from '../lib/soundChoice'
 import {
   LIVE_VOICE_VOLUME_CAP,
   SpeechLooper,
@@ -38,6 +39,7 @@ import {
   type LoopSettings,
   type SavedLoop,
   type SessionStatus,
+  type SoundConfig,
 } from '../lib/types'
 import {
   pickBestVoice,
@@ -119,6 +121,15 @@ interface SessionContextValue {
   }) => void
   /** Change the brainwave rhythm, taking effect at once during a session. */
   setBrainwave: (patch: Partial<BrainwaveSettings>) => void
+  /**
+   * Change the background sound mid-session.
+   *
+   * The whole point of this one is that it does not restart anything: a
+   * different soundscape crossfades in under the words, and the voice, the
+   * clock, the breath and the pass counter carry straight on. Off is a fade
+   * out, not a stop.
+   */
+  setLiveSound: (patch: Partial<SoundConfig>) => void
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null)
@@ -173,6 +184,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * hardware outside a real tap — including on first load.
    */
   const liveRef = useRef(false)
+  /**
+   * Bumped on every live sound change, so a slow one cannot land after a
+   * later, faster one. An imported track is fetched from IndexedDB; a
+   * generated ambience is not.
+   */
+  const soundGenerationRef = useRef(0)
+  /**
+   * A sound chosen while the session was paused, waiting for the resume that
+   * is allowed to make a noise.
+   */
+  const pendingSoundRef = useRef(false)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
 
   const speechSupported = useMemo(isSpeechSupported, [])
@@ -359,6 +381,41 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /* ── The background sound, while a session is running ── */
+
+  /**
+   * Put a sound configuration through the engine without disturbing anything
+   * else.
+   *
+   * `play` fades the outgoing ambience out as the incoming one rises, so this
+   * is heard as a change of weather rather than as a restart: the voice, the
+   * clock, the breath and the timer never learn that it happened.
+   */
+  const applyLiveSound = useCallback((settings: LoopSettings) => {
+    const music = musicRef.current
+    if (!music) return
+
+    // Synchronously, while the tap that got us here is still a tap: iOS will
+    // not open a media element outside one.
+    music.unlock()
+
+    if (settings.sound.mode === 'off') {
+      music.stop()
+      return
+    }
+
+    const generation = soundGenerationRef.current + 1
+    soundGenerationRef.current = generation
+
+    void resolveTrackSources(settings).then((sources) => {
+      // A third choice made while the second was still being read out of
+      // IndexedDB must not arrive after it.
+      if (!liveRef.current || generation !== soundGenerationRef.current) return
+      if (sources.length > 0) void music.play(sources, settings.sound.repeat)
+      else music.stop()
+    })
+  }, [])
+
   /* ── Stop ── */
 
   const finish = useCallback(
@@ -368,6 +425,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       brainwaveRef.current?.stop()
       timerRef.current?.stop()
       liveRef.current = false
+      pendingSoundRef.current = false
       stopElapsed()
       releaseWakeLock()
       setSession((current) => ({
@@ -495,13 +553,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const resume = useCallback(() => {
     busRef.current?.ensure()
     musicRef.current?.unlock()
-    musicRef.current?.resumePlayback()
+
+    // A sound chosen while paused arrives now, in place of the one that was
+    // holding its position — rather than resuming the old one first and
+    // crossfading away from it a moment later.
+    if (pendingSoundRef.current) {
+      pendingSoundRef.current = false
+      applyLiveSound(draft.settings)
+    } else {
+      musicRef.current?.resumePlayback()
+    }
+
     speechRef.current?.resume()
     timerRef.current?.resume()
     setSession((current) => ({ ...current, status: 'playing' }))
     startElapsed()
     void requestWakeLock()
-  }, [requestWakeLock, startElapsed])
+  }, [applyLiveSound, draft.settings, requestWakeLock, startElapsed])
 
   const dismissNotice = useCallback(
     () => setSession((current) => ({ ...current, notice: null })),
@@ -577,6 +645,47 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       })
     },
     [],
+  )
+
+  /**
+   * Change the background sound while the words keep going.
+   *
+   * Choosing a sound used to mean leaving the player, and coming back to a
+   * session that had been stopped to get there. Nothing is torn down here: the
+   * engine's own `play` fades the outgoing ambience out as the incoming one
+   * rises, so a swap is heard as a change of weather rather than as a restart.
+   *
+   * Two things are deliberately *not* done. A change the engine is already
+   * following — rain's character, or repeat while a single sound plays — is
+   * left to it, because rebuilding the queue would restart an ambience that
+   * only needed adjusting. And nothing touches the audio graph unless a
+   * session is actually live, so editing a draft stays editing.
+   */
+  const setLiveSound = useCallback<SessionContextValue['setLiveSound']>(
+    (patch) => {
+      const previous = draft.settings.sound
+      const sound: SoundConfig = { ...previous, ...patch }
+      updateSettings({ sound })
+
+      if (!liveRef.current) return
+      if (!soundPlaybackChanged(previous, sound)) return
+
+      /*
+       * Paused is not a quiet kind of playing. A generated ambience would be
+       * silent either way — the whole context is suspended — but an imported
+       * file plays through a media element that the suspension never reaches,
+       * so starting one here would be sound coming out of a paused session.
+       * It waits for the resume instead, which is the moment sound is wanted
+       * and the moment a browser will allow it.
+       */
+      if (session.status === 'paused') {
+        pendingSoundRef.current = true
+        return
+      }
+
+      applyLiveSound({ ...draft.settings, sound })
+    },
+    [applyLiveSound, draft.settings, session.status, updateSettings],
   )
 
   /**
@@ -657,6 +766,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLivePitch,
       setLiveVoice,
       setBrainwave,
+      setLiveSound,
     }),
     [
       draft,
@@ -684,6 +794,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLivePitch,
       setLiveVoice,
       setBrainwave,
+      setLiveSound,
     ],
   )
 

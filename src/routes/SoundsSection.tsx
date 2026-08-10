@@ -57,7 +57,18 @@ export function SoundsSection() {
     renameTrack,
     removeTrack,
   } = useLibrary()
-  const { draft, updateSettings, setBrainwave } = useSession()
+  /*
+   * `setLiveSound` rather than `updateSettings`, everywhere the sound is
+   * chosen here.
+   *
+   * This tab is a perfectly good place to change what you are listening to —
+   * it is the one with every soundscape, the previews and the playlist in it —
+   * and until now a session running in the background carried on with the old
+   * sound regardless, so the only way to hear a change was to stop and start
+   * again. Each of these now crossfades under a running loop, and is an
+   * ordinary settings edit when nothing is playing.
+   */
+  const { draft, setLiveSound, setBrainwave } = useSession()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const previewRef = useRef<MusicEngine | null>(null)
   // Auditioning a sound runs on its own bus so it never disturbs a live session.
@@ -226,7 +237,7 @@ export function SoundsSection() {
     const playlist = inPlaylist(id)
       ? sound.playlist.filter((item) => item !== id)
       : [...sound.playlist, id]
-    updateSettings({ sound: { ...sound, playlist, mode: 'playlist' } })
+    setLiveSound({ playlist, mode: 'playlist' })
   }
 
   const movePlaylistItem = (index: number, direction: -1 | 1) => {
@@ -235,19 +246,16 @@ export function SoundsSection() {
     const playlist = [...sound.playlist]
     const [moved] = playlist.splice(index, 1)
     playlist.splice(target, 0, moved)
-    updateSettings({ sound: { ...sound, playlist } })
+    setLiveSound({ playlist })
   }
 
   const handleDelete = async (track: TrackMeta) => {
     if (previewId === track.id) stopPreview()
     await removeTrack(track.id)
     const playlist = sound.playlist.filter((id) => id !== track.id)
-    updateSettings({
-      sound: {
-        ...sound,
-        playlist,
-        trackId: sound.trackId === track.id ? 'moon-garden' : sound.trackId,
-      },
+    setLiveSound({
+      playlist,
+      trackId: sound.trackId === track.id ? 'moon-garden' : sound.trackId,
     })
   }
 
@@ -278,11 +286,7 @@ export function SoundsSection() {
                 selected={sound.mode === 'single' && sound.trackId === track.id}
                 inPlaylist={inPlaylist(track.id)}
                 onPreview={() => void togglePreview(track)}
-                onSelect={() =>
-                  updateSettings({
-                    sound: { ...sound, mode: 'single', trackId: track.id },
-                  })
-                }
+                onSelect={() => setLiveSound({ mode: 'single', trackId: track.id })}
                 onTogglePlaylist={() => togglePlaylist(track.id)}
               />
             ))}
@@ -294,9 +298,7 @@ export function SoundsSection() {
               <SegmentedControl
                 label="Rain character"
                 value={sound.rainCharacter}
-                onChange={(rainCharacter) =>
-                  updateSettings({ sound: { ...sound, rainCharacter } })
-                }
+                onChange={(rainCharacter) => setLiveSound({ rainCharacter })}
                 segments={RAIN_CHARACTERS.map((value) => ({
                   value,
                   label: RAIN_LABELS[value],
@@ -407,11 +409,7 @@ export function SoundsSection() {
                     selected={sound.mode === 'single' && sound.trackId === track.id}
                     inPlaylist={inPlaylist(track.id)}
                     onPreview={() => void togglePreview(track)}
-                    onSelect={() =>
-                      updateSettings({
-                        sound: { ...sound, mode: 'single', trackId: track.id },
-                      })
-                    }
+                    onSelect={() => setLiveSound({ mode: 'single', trackId: track.id })}
                     onTogglePlaylist={() => togglePlaylist(track.id)}
                     onRename={() => {
                       setRenamingId(track.id)
@@ -469,11 +467,8 @@ export function SoundsSection() {
                     label={`Remove ${track?.name ?? 'item'} from the playlist`}
                     icon={<CloseIcon />}
                     onClick={() =>
-                      updateSettings({
-                        sound: {
-                          ...sound,
-                          playlist: sound.playlist.filter((_, i) => i !== index),
-                        },
+                      setLiveSound({
+                        playlist: sound.playlist.filter((_, i) => i !== index),
                       })
                     }
                   />
@@ -489,7 +484,7 @@ export function SoundsSection() {
             <SegmentedControl
               label="Repeat behaviour"
               value={sound.repeat}
-              onChange={(repeat) => updateSettings({ sound: { ...sound, repeat } })}
+              onChange={(repeat) => setLiveSound({ repeat })}
               segments={[
                 { value: 'one', label: 'Repeat one' },
                 { value: 'all', label: 'Repeat all' },
@@ -507,7 +502,7 @@ export function SoundsSection() {
             <SegmentedControl
               label="Background sound mode"
               value={sound.mode}
-              onChange={(mode) => updateSettings({ sound: { ...sound, mode } })}
+              onChange={(mode) => setLiveSound({ mode })}
               segments={[
                 { value: 'off', label: 'No sound' },
                 { value: 'single', label: 'One sound' },

@@ -38,21 +38,34 @@ export function voiceSummary(
   return `${name} · ${settings.rate.toFixed(2)}×`
 }
 
-export function soundSummary(settings: LoopSettings, tracks: TrackMeta[]): string {
-  const { sound, musicVolume } = settings
+/**
+ * What is playing behind the words, without the level.
+ *
+ * The player's corner control is labelled with this rather than the full
+ * summary: a screen reader should not have to hear a percentage that changes
+ * every time the slider moves in order to find out which sound is on.
+ */
+export function soundName(settings: LoopSettings, tracks: TrackMeta[]): string {
+  const { sound } = settings
   if (sound.mode === 'off') return 'No background sound'
-
-  const level = `${Math.round(musicVolume * 100)}%`
 
   if (sound.mode === 'playlist') {
     const count = sound.playlist.length
     return count === 0
       ? 'Playlist · empty'
-      : `Playlist · ${count} sound${count === 1 ? '' : 's'} · ${level}`
+      : `Playlist · ${count} sound${count === 1 ? '' : 's'}`
   }
 
   const track = tracks.find((item) => item.id === sound.trackId)
-  return track ? `${track.name} · ${level}` : 'Choose a sound'
+  return track ? track.name : 'Choose a sound'
+}
+
+export function soundSummary(settings: LoopSettings, tracks: TrackMeta[]): string {
+  const { sound, musicVolume } = settings
+  const name = soundName(settings, tracks)
+  if (sound.mode === 'off' || name === 'Choose a sound') return name
+  if (sound.mode === 'playlist' && sound.playlist.length === 0) return name
+  return `${name} · ${Math.round(musicVolume * 100)}%`
 }
 
 /** e.g. `"Alpha Waves · 10 Hz · Rhythmic modulation"`. */

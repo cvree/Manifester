@@ -212,6 +212,14 @@ export const WaveIcon = (props: IconProps) => (
   </Icon>
 )
 
+/** The same wave, struck through — background sound turned off. */
+export const MuteIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M4 12c1.6-3.4 3.2-3.4 4.8 0s3.2 3.4 4.8 0 3.2-3.4 4.8 0" opacity=".55" />
+    <path d="M5 19 19 5" />
+  </Icon>
+)
+
 export const DownloadIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M12 4v11.5" />

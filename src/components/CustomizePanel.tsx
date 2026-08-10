@@ -103,8 +103,11 @@ interface SheetsProps {
 export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
   const {
     draft,
+    session,
     updateSettings,
     setBrainwave,
+    setLiveSound,
+    setLiveMusicVolume,
     voices,
     voicesReady,
     resolvedDeviceVoice,
@@ -133,10 +136,17 @@ export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
       </Sheet>
 
       <Sheet open={open === 'sound'} onClose={close} {...TITLES.sound}>
+        {/*
+          Both handlers are the live ones. Idle, they are ordinary setting
+          changes; mid-session they reach the engine, which is what makes this
+          the same panel the player can open over a running loop.
+        */}
         <SoundSettings
           settings={settings}
           tracks={allTracks}
-          onChange={updateSettings}
+          onSoundChange={setLiveSound}
+          onVolumeChange={setLiveMusicVolume}
+          live={session.status === 'playing' || session.status === 'paused'}
         />
       </Sheet>
 

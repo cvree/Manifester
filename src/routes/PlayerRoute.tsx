@@ -20,6 +20,7 @@ import {
   CloseIcon,
   CollapseIcon,
   ExpandIcon,
+  MuteIcon,
   PauseIcon,
   PlayIcon,
   PulseIcon,
@@ -27,6 +28,7 @@ import {
   SparkIcon,
   StopIcon,
   TuneIcon,
+  WaveIcon,
 } from '../components/Icons'
 import { SettingRow } from '../components/SettingRow'
 import { Slider } from '../components/Slider'
@@ -43,12 +45,15 @@ import {
   brainwaveSummary,
   breathingSummary,
   feelSummary,
+  soundName,
+  soundSummary,
 } from '../lib/summaries'
 import { useBackgroundMix } from '../lib/useBackgroundMix'
 import { useBreathing } from '../lib/useBreathing'
 import { useFittedLine } from '../lib/useFittedLine'
 import { useHeartAnchor } from '../lib/useHeartAnchor'
 import { useStageExpansion } from '../lib/useStageExpansion'
+import { useLibrary } from '../state/LibraryProvider'
 import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
 import { useStage } from '../state/StageProvider'
@@ -105,11 +110,13 @@ export function PlayerRoute() {
     resolvedDeviceVoice,
   } = useSession()
   const { preferences } = usePreferences()
+  const { allTracks } = useLibrary()
   const { expanded, setExpanded } = useStage()
   const [sheet, setSheet] = useState<PanelKey | null>(null)
   const reducedMotion = useReducedMotion()
 
   const hasText = countWords(draft.text) > 0
+  const soundOn = draft.settings.sound.mode !== 'off'
   const idle = session.status === 'idle'
   const playing = session.status === 'playing'
   const paused = session.status === 'paused'
@@ -540,6 +547,35 @@ export function PlayerRoute() {
               <span aria-hidden="true" className="stage__aura" />
 
               {/*
+                ── The sound, one tap away ──
+
+                Changing what plays behind your words used to mean leaving the
+                player for the library, which stopped the session to get there:
+                the one setting people reach for *while listening* was the one
+                you had to stop listening to change.
+
+                It is this button, in the corner opposite Expand, and it is
+                deliberately a corner button rather than a panel. Expanded, the
+                whole quiet column is gone and this is the only way to reach the
+                sound at all — a row somewhere down the page would simply not
+                exist at the moment it is most wanted. The sheet it opens
+                crossfades whatever you pick under the running loop; see
+                `setLiveSound`.
+              */}
+              <button
+                type="button"
+                onClick={() => {
+                  cue('tap')
+                  setSheet('sound')
+                }}
+                aria-label={`Background sound: ${soundName(draft.settings, allTracks)}. Change it.`}
+                title="Background sound"
+                className="stage__sound interactive flex h-11 w-11 items-center justify-center rounded-full border border-[var(--panel-border)] bg-[var(--panel)] text-[1.05rem] text-ink-faint hover:text-ink"
+              >
+                {soundOn ? <WaveIcon /> : <MuteIcon />}
+              </button>
+
+              {/*
                 One button for both directions, in one place. Keeping it the
                 same element means the focus ring never moves, so expanding and
                 collapsing from the keyboard leaves you exactly where you were.
@@ -800,6 +836,22 @@ export function PlayerRoute() {
           </Card>
 
           <div className="surface-panel overflow-hidden">
+            {/*
+              The same sheet the stage's corner button opens. It is worth
+              having in both places: the corner is where your hand is while
+              you listen, and this is where the eye looks when the player is a
+              page rather than a room.
+            */}
+            <SettingRow
+              icon={soundOn ? <WaveIcon /> : <MuteIcon />}
+              title="Background sound"
+              summary={soundSummary(draft.settings, allTracks)}
+              onClick={() => {
+                cue('tap')
+                setSheet('sound')
+              }}
+              accent={soundOn}
+            />
             <SettingRow
               icon={<PulseIcon />}
               title="Brainwave rhythm"
