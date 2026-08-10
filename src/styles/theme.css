@@ -1927,11 +1927,12 @@ html:not(.dark) .breath-aurora__veil {
  * feel like the light going warm rather than like the effect being removed.
  */
 .player-field__warm {
+  --reach: 2.6;
   position: absolute;
-  left: calc(var(--heart-x) - 95%);
-  top: calc(var(--heart-y) - 88%);
-  width: 190%;
-  height: 176%;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * var(--reach));
+  aspect-ratio: 1;
   border-radius: 50%;
   background: radial-gradient(
     closest-side,
@@ -1939,7 +1940,8 @@ html:not(.dark) .breath-aurora__veil {
     color-mix(in oklab, var(--gold) 6%, transparent) 38%,
     transparent 66%
   );
-  transform: scale(calc(1 - (var(--e) - 0.5) * 0.03 * var(--drive)));
+  transform: translate(-50%, -50%)
+    scale(calc(1 - (var(--e) - 0.5) * 0.03 * var(--drive)));
   opacity: calc(
     (0.28 + (0.5 - var(--e)) * 0.36 * var(--drive) + var(--settle) * 0.2) *
       var(--mix)
@@ -1965,11 +1967,12 @@ html:not(.dark) .breath-aurora__veil {
  * is not a second animation.
  */
 .player-field__glow {
+  --reach: 2.3;
   position: absolute;
-  left: calc(var(--heart-x) - 85%);
-  top: calc(var(--heart-y) - 80%);
-  width: 170%;
-  height: 160%;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * var(--reach));
+  aspect-ratio: 1;
   border-radius: 50%;
   background: radial-gradient(
     closest-side,
@@ -1977,7 +1980,8 @@ html:not(.dark) .breath-aurora__veil {
     color-mix(in oklab, var(--gold) 5%, transparent) 34%,
     transparent 62%
   );
-  transform: scale(calc(1 + (var(--e) - 0.5) * 0.055 * var(--drive)));
+  transform: translate(-50%, -50%)
+    scale(calc(1 + (var(--e) - 0.5) * 0.055 * var(--drive)));
   opacity: calc((0.5 + (var(--e) - 0.5) * 0.22 * var(--drive)) * var(--mix));
   will-change: transform, opacity;
 }
@@ -1992,11 +1996,12 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 .player-field__wave {
+  --reach: 3.4;
   position: absolute;
-  left: calc(var(--heart-x) - 128%);
-  top: calc(var(--heart-y) - 118%);
-  width: 256%;
-  height: 236%;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * var(--reach));
+  aspect-ratio: 1;
   border-radius: 50%;
   background: radial-gradient(
     closest-side,
@@ -2004,7 +2009,8 @@ html:not(.dark) .breath-aurora__veil {
     color-mix(in oklab, var(--rose) 5%, transparent) 42%,
     transparent 68%
   );
-  transform: scale(calc(1 + (var(--e-far) - 0.5) * 0.045 * var(--drive)));
+  transform: translate(-50%, -50%)
+    scale(calc(1 + (var(--e-far) - 0.5) * 0.045 * var(--drive)));
   opacity: calc((0.32 + (var(--e-far) - 0.5) * 0.26 * var(--drive)) * var(--mix));
   will-change: transform, opacity;
 }
@@ -2023,11 +2029,12 @@ html:not(.dark) .breath-aurora__veil {
  * difference is zero for the entire in-breath by construction.
  */
 .player-field__echo {
+  --reach: 1.7;
   position: absolute;
-  left: calc(var(--heart-x) - 62%);
-  top: calc(var(--heart-y) - 58%);
-  width: 124%;
-  height: 116%;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * var(--reach));
+  aspect-ratio: 1;
   border-radius: 50%;
   background: radial-gradient(
     closest-side,
@@ -2035,7 +2042,8 @@ html:not(.dark) .breath-aurora__veil {
     color-mix(in oklab, var(--moonlight) 14%, transparent) 54%,
     transparent 76%
   );
-  transform: scale(calc(0.94 + var(--e-far) * 0.12 * var(--drive)));
+  transform: translate(-50%, -50%)
+    scale(calc(0.94 + var(--e-far) * 0.12 * var(--drive)));
   opacity: calc(max(0, var(--e-far) - var(--e)) * 0.6 * var(--drive) * var(--mix));
   will-change: transform, opacity;
 }
@@ -2073,7 +2081,22 @@ html:not(.dark) .breath-aurora__veil {
  */
 .player-field__cloud {
   position: absolute;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * var(--w));
+  aspect-ratio: 1;
   border-radius: 50%;
+  /*
+   * Each cloud hangs at its own offset *from the orb*, in the same unit the
+   * rest of the room is measured in — not at a fixed corner of the viewport,
+   * which is where they used to sit and which meant the colour gathered
+   * wherever the window happened to be widest rather than around the thing
+   * doing the breathing.
+   */
+  transform: translate(
+    calc(-50% + var(--span) * var(--ox)),
+    calc(-50% + var(--span) * var(--oy))
+  );
   will-change: transform, opacity;
   animation: field-drift var(--drift, 79s) ease-in-out infinite;
   animation-delay: var(--drift-delay, 0s);
@@ -2083,10 +2106,9 @@ html:not(.dark) .breath-aurora__veil {
   --drift: 79s;
   --drift-x: 1.6%;
   --drift-y: -1.2%;
-  left: -26%;
-  top: -46%;
-  width: 128%;
-  height: 104%;
+  --w: 1.5;
+  --ox: -0.3;
+  --oy: -0.42;
   background: radial-gradient(
     closest-side,
     color-mix(in oklab, var(--twilight) 20%, transparent) 0%,
@@ -2103,10 +2125,9 @@ html:not(.dark) .breath-aurora__veil {
   --drift-delay: -37s;
   --drift-x: -1.4%;
   --drift-y: 1.5%;
-  left: -34%;
-  top: 44%;
-  width: 148%;
-  height: 96%;
+  --w: 1.72;
+  --ox: -0.12;
+  --oy: 0.46;
   background: radial-gradient(
     closest-side,
     color-mix(in oklab, var(--sage) 13%, transparent) 0%,
@@ -2122,10 +2143,9 @@ html:not(.dark) .breath-aurora__veil {
   --drift-delay: -63s;
   --drift-x: -1.8%;
   --drift-y: -1.1%;
-  left: 4%;
-  top: 22%;
-  width: 132%;
-  height: 118%;
+  --w: 1.44;
+  --ox: 0.36;
+  --oy: 0.08;
   background: radial-gradient(
     closest-side,
     color-mix(in oklab, var(--gold) 9%, transparent) 0%,
@@ -2146,13 +2166,16 @@ html:not(.dark) .breath-aurora__veil {
 @keyframes field-drift {
   0%,
   100% {
-    transform: translate3d(0, 0, 0) scale(0.98);
+    transform: translate(
+        calc(-50% + var(--span) * var(--ox)),
+        calc(-50% + var(--span) * var(--oy))
+      )
+      scale(0.98);
   }
   50% {
-    transform: translate3d(
-        calc(var(--drift-x, 0%) * var(--sway)),
-        calc(var(--drift-y, 0%) * var(--sway)),
-        0
+    transform: translate(
+        calc(-50% + var(--span) * var(--ox) + var(--drift-x, 0%) * var(--sway)),
+        calc(-50% + var(--span) * var(--oy) + var(--drift-y, 0%) * var(--sway))
       )
       scale(1.03);
   }
@@ -2174,25 +2197,28 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 .player-field__haze--near {
-  left: calc(var(--heart-x) - 75%);
-  top: calc(var(--heart-y) - 65%);
-  width: 150%;
-  height: 130%;
+  --reach: 2.05;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * var(--reach));
+  aspect-ratio: 1;
   background: radial-gradient(
     closest-side,
     transparent 0%,
     color-mix(in oklab, var(--moonlight) 8%, transparent) 46%,
     transparent 70%
   );
-  transform: scale(calc(0.97 + var(--e) * 0.06 * var(--drive)));
+  transform: translate(-50%, -50%)
+    scale(calc(0.97 + var(--e) * 0.06 * var(--drive)));
   opacity: calc((0.5 + (var(--e) - 0.5) * 0.3 * var(--drive)) * var(--mix-cloud));
 }
 
 .player-field__haze--far {
-  left: calc(var(--heart-x) - 52%);
-  top: calc(var(--heart-y) - 48%);
-  width: 104%;
-  height: 96%;
+  --reach: 1.42;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * var(--reach));
+  aspect-ratio: 1;
   background: radial-gradient(
     closest-side,
     transparent 22%,
@@ -2200,7 +2226,8 @@ html:not(.dark) .breath-aurora__veil {
     color-mix(in oklab, var(--rose) 4%, transparent) 64%,
     transparent 78%
   );
-  transform: scale(calc(0.99 + var(--e-far) * 0.09 * var(--drive)));
+  transform: translate(-50%, -50%)
+    scale(calc(0.99 + var(--e-far) * 0.09 * var(--drive)));
   opacity: calc(
     (0.42 + (var(--e-far) - 0.5) * 0.24 * var(--drive)) * var(--mix-cloud)
   );
@@ -2282,10 +2309,11 @@ html:not(.dark) .breath-aurora__veil {
  */
 .player-field__utter {
   position: absolute;
-  left: calc(var(--heart-x) - 44%);
-  top: calc(var(--heart-y) - 18%);
-  width: 88%;
-  height: 62%;
+  left: var(--heart-x);
+  top: calc(var(--heart-y) + var(--halo) * 0.9);
+  width: calc(var(--span) * 1.2);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
   border-radius: 50%;
   background: radial-gradient(
     closest-side,
@@ -2434,6 +2462,24 @@ html:not(.dark) .breath-aurora__veil {
  */
 
 .player-scene {
+  /**
+   * How open the room is right now, 0 to 1 — and the one number in this file
+   * that is *not* simply the breath.
+   *
+   * It is `--e` while there is a live breath to follow, and a half-open pose
+   * while there is not. Everything that now travels a long way between the
+   * bottom and the top of a breath reads this rather than `--e` directly, and
+   * the reason is the resting state: multiply a big travel by a breath that is
+   * being held at zero and the field does not come to rest, it collapses. A
+   * paused, finished or motion-reduced room should hold the pose the room
+   * looks best in, which is the middle of one.
+   *
+   * Written here rather than on the field so the picker's thumbnails — which
+   * are not inside a field, and carry their own frozen `--e` — get it for
+   * free.
+   */
+  --open: calc(var(--e) * var(--drive) + 0.5 * (1 - var(--drive)));
+
   position: absolute;
   inset: 0;
   will-change: opacity;
@@ -2641,95 +2687,440 @@ html:not(.dark) .breath-aurora__veil {
 /* ── Waterline ──────────────────────────────────────────────── */
 
 /*
- * The room fills as you breathe in, and draws back as you breathe out.
+ * An ocean, filling as you breathe in and draining as you breathe out.
  *
- * Three water planes rise from below the bottom edge — the near one on the
- * live breath, the two behind it on the lagged samples — so the surface
- * arrives in three unhurried steps and the water has a body rather than an
- * edge. Each plane's top is a shallow ellipse rather than a straight line,
- * which is the difference between water and a progress bar.
+ * The old room was three tinted planes sliding up the screen: correct, and
+ * unmistakably a progress bar lying on its side. What makes water read as
+ * water is not the level, it is everything that happens *at* the level — a
+ * surface that is never a straight line, a body of it with light moving
+ * through it, and a path of light lying on it.
  *
- * The bright line at the surface is the one thing in the app that keys off
- * `--m`, the breath's own slope: it is brightest halfway up and halfway down
- * and nearly gone at the turns, because water is most visible while it moves.
+ * So the level and the surface are now two different things. Each swell is a
+ * pair of elements: an outer one carrying the tide — the vertical rise, driven
+ * by its own sample of the breath — and an inner one carrying the water, which
+ * drifts sideways on a long period of its own. Nested transforms compose, so
+ * the crest travels across the screen while the sea it belongs to rises, and
+ * neither of them has to know about the other. Three swells at three lags,
+ * three widths and three drifts, and their domed tops slide past each other:
+ * the visible waterline is the union of the three, so it is never flat and
+ * never repeats.
+ *
+ * Everything else in here is light in water rather than more water: currents
+ * banked under the surface, shafts coming down through it, the foam that only
+ * exists while the sea is actually moving, and the path — a column of light on
+ * the water directly beneath the orb, which is where the light in this room
+ * has always been coming from.
+ *
+ * No blurs, no masks, no per-frame gradients. Every moving thing here is a
+ * transform or an opacity.
  */
-.player-scene__water {
-  position: absolute;
-  left: -12%;
-  right: -12%;
-  bottom: -46%;
-  height: 96%;
-  border-radius: 46% 54% 0 0 / 14% 12% 0 0;
-  transform: translate3d(0, calc((1 - var(--lag) * var(--drive)) * var(--rise)), 0);
-  opacity: calc(var(--base) * var(--mix));
-  will-change: transform, opacity;
-}
-
-.player-scene__water--far {
-  --lag: var(--e-far);
-  --rise: 46%;
-  --base: 0.6;
-  background: linear-gradient(
-    to top,
-    color-mix(in oklab, var(--twilight) 62%, transparent) 0%,
-    color-mix(in oklab, var(--twilight) 34%, transparent) 46%,
-    transparent 96%
-  );
-}
-
-.player-scene__water--mid {
-  --lag: var(--e-mid);
-  --rise: 41%;
-  --base: 0.66;
-  border-radius: 58% 42% 0 0 / 12% 15% 0 0;
-  background: linear-gradient(
-    to top,
-    color-mix(in oklab, var(--twilight) 54%, transparent) 0%,
-    color-mix(in oklab, var(--rose) 20%, transparent) 52%,
-    transparent 94%
-  );
-}
-
-.player-scene__water--near {
-  --lag: var(--e);
-  --rise: 36%;
-  --base: 0.76;
-  border-radius: 50% 50% 0 0 / 10% 10% 0 0;
-  background: linear-gradient(
-    to top,
-    color-mix(in oklab, var(--twilight) 68%, transparent) 0%,
-    color-mix(in oklab, var(--rose) 24%, transparent) 40%,
-    transparent 88%
-  );
-}
 
 /* The deep: everything below the water, holding the bottom of the screen. */
 .player-scene__deep {
   position: absolute;
   inset: auto 0 0 0;
-  height: 62%;
-  background: linear-gradient(
-    to top,
-    color-mix(in oklab, var(--twilight) 46%, transparent) 0%,
-    transparent 86%
-  );
-  opacity: calc(0.8 * var(--mix-depth));
+  height: 82%;
+  /*
+   * Two gradients, and the first one is the lesson.
+   *
+   * Painting the sea in `--twilight` alone made it *lighter* than the sky
+   * above it, because everything in this file is a transparent wash over the
+   * page and adding a navy to a near-black ground can only lift it. Water at
+   * night is the densest thing on the screen. So the darkening is drawn in the
+   * page's own ground colour — the same device the vignette uses — and the
+   * colour of the water is a second, weaker layer under it. Both turn with the
+   * theme, so the day palette gets a warm sea rather than an inverted one.
+   */
+  background:
+    linear-gradient(
+      to top,
+      color-mix(in srgb, var(--bg-0) 88%, transparent) 0%,
+      color-mix(in srgb, var(--bg-0) 58%, transparent) 42%,
+      color-mix(in srgb, var(--bg-0) 20%, transparent) 74%,
+      transparent 96%
+    ),
+    linear-gradient(
+      to top,
+      color-mix(in oklab, var(--twilight) 62%, transparent) 0%,
+      color-mix(in oklab, var(--twilight) 34%, transparent) 44%,
+      transparent 92%
+    );
+  opacity: calc(0.95 * var(--mix-depth));
 }
 
+/*
+ * Currents. Two very broad, very soft horizontal bands banked in the body of
+ * the water, drifting the opposite way to each other over a couple of minutes.
+ * They are what stops the deep from being a flat gradient: light in a body of
+ * water is never even, and the unevenness moves.
+ */
+.player-scene__current {
+  position: absolute;
+  left: -30%;
+  right: -30%;
+  bottom: var(--at);
+  height: calc(var(--span) * var(--thick));
+  border-radius: 50%;
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    color-mix(in oklab, var(--moonlight) var(--lit), transparent) 0%,
+    transparent 72%
+  );
+  opacity: calc(var(--base) * var(--mix-cloud));
+  animation: current-drift var(--period) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform;
+}
+
+.player-scene__current--a {
+  --at: 8%;
+  --thick: 0.34;
+  --lit: 13%;
+  --base: 0.6;
+  --swim: 6%;
+  --period: 127s;
+}
+
+.player-scene__current--b {
+  --at: 26%;
+  --thick: 0.22;
+  --lit: 9%;
+  --base: 0.44;
+  --swim: -8%;
+  --period: 173s;
+  --delay: -54s;
+}
+
+@keyframes current-drift {
+  0%,
+  100% {
+    transform: translate3d(calc(var(--swim) * var(--sway) * -1), 0, 0);
+  }
+  50% {
+    transform: translate3d(calc(var(--swim) * var(--sway)), 0, 0);
+  }
+}
+
+/*
+ * The tide. The outer half of a swell: it holds the level and nothing else,
+ * so the water's own drift below cannot disturb it and the rise stays a single
+ * compositor transform.
+ */
+.player-scene__swell {
+  position: absolute;
+  left: -18%;
+  right: -18%;
+  bottom: -52%;
+  height: 108%;
+  transform: translate3d(0, calc((1 - var(--lag) * var(--drive)) * var(--rise)), 0);
+  will-change: transform;
+}
+
+/*
+ * And the water itself, drifting inside it. The unequal corner radii are what
+ * give each swell an asymmetric dome rather than an arc, so three of them
+ * sliding past each other never line up into a shape you can name.
+ */
+.player-scene__swell-crest {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--crest);
+  /*
+   * The border *is* the waterline.
+   *
+   * A plain gradient gives a body of water with no surface — the level is
+   * somewhere in a soft ramp and the eye never finds it. One border on a
+   * shape with unequal corner radii draws a crisp curving edge that follows
+   * the dome exactly, and the left and right ends of it are off-screen by
+   * design. It is the same device the Tide breathing form has always used to
+   * draw a waterline out of one element and no measurement.
+   */
+  border-top: 1.5px solid var(--lip);
+  background: var(--water);
+  opacity: calc(var(--base) * var(--mix));
+  animation: swell-swim var(--period) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform;
+}
+
+@keyframes swell-swim {
+  0%,
+  100% {
+    transform: translate3d(calc(var(--swim) * var(--sway) * -1), 0, 0);
+  }
+  50% {
+    transform: translate3d(calc(var(--swim) * var(--sway)), 0, 0);
+  }
+}
+
+.player-scene__swell--far {
+  --lag: var(--e-far);
+  --rise: 50%;
+}
+
+.player-scene__swell--far .player-scene__swell-crest {
+  --lip: color-mix(in oklab, var(--moonlight) 48%, transparent);
+  --crest: 42% 58% 0 0 / 16% 13% 0 0;
+  --base: 0.62;
+  --swim: 3.4%;
+  --period: 79s;
+  --water: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--bg-0) 52%, transparent) 0%,
+      color-mix(in srgb, var(--bg-0) 22%, transparent) 52%,
+      transparent 94%
+    ),
+    linear-gradient(
+      to top,
+      color-mix(in oklab, var(--twilight) 52%, transparent) 0%,
+      color-mix(in oklab, var(--twilight) 26%, transparent) 46%,
+      transparent 96%
+    );
+}
+
+.player-scene__swell--mid {
+  --lag: var(--e-mid);
+  --rise: 44%;
+}
+
+.player-scene__swell--mid .player-scene__swell-crest {
+  --lip: color-mix(in oklab, var(--moonlight) 30%, transparent);
+  --crest: 61% 39% 0 0 / 12% 17% 0 0;
+  --base: 0.68;
+  --swim: -4.6%;
+  --period: 97s;
+  --delay: -31s;
+  --water: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--bg-0) 58%, transparent) 0%,
+      color-mix(in srgb, var(--bg-0) 24%, transparent) 54%,
+      transparent 92%
+    ),
+    linear-gradient(
+      to top,
+      color-mix(in oklab, var(--twilight) 46%, transparent) 0%,
+      color-mix(in oklab, var(--rose) 20%, transparent) 52%,
+      transparent 94%
+    );
+}
+
+.player-scene__swell--near {
+  --lag: var(--e);
+  --rise: 38%;
+}
+
+.player-scene__swell--near .player-scene__swell-crest {
+  --lip: color-mix(in oklab, var(--moonlight) 82%, transparent);
+  --crest: 52% 48% 0 0 / 11% 9% 0 0;
+  --base: 0.8;
+  --swim: 5.8%;
+  --period: 61s;
+  --delay: -17s;
+  --water: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--bg-0) 68%, transparent) 0%,
+      color-mix(in srgb, var(--bg-0) 30%, transparent) 46%,
+      transparent 88%
+    ),
+    linear-gradient(
+      to top,
+      color-mix(in oklab, var(--twilight) 54%, transparent) 0%,
+      color-mix(in oklab, var(--rose) 26%, transparent) 38%,
+      transparent 86%
+    );
+}
+
+/*
+ * Shafts of light coming down through the water, from where the light in this
+ * room comes from: the orb. Three narrow, softly-edged columns leaning at
+ * their own angles, brightest while the sea is actually moving — `--m` is the
+ * breath's own slope, so they fade to nothing through a hold, which is exactly
+ * what light through still water does.
+ */
+.player-scene__shaft {
+  position: absolute;
+  left: calc(var(--heart-x) + var(--span) * var(--ox));
+  top: var(--heart-y);
+  width: calc(var(--span) * var(--w));
+  height: 92%;
+  transform: translateX(-50%) rotate(var(--tilt));
+  transform-origin: top center;
+  /*
+   * Radial and not linear, and the reason is the house rule: a linear gradient
+   * running down an element reaches transparency at the bottom and nowhere
+   * else, so its two sides are hard edges — which is exactly what a straight
+   * vertical seam across the water looked like. A radial one fades out in
+   * every direction inside its own box, which is what the rest of this file
+   * has always done.
+   */
+  background: radial-gradient(
+    46% 58% at 50% 4%,
+    color-mix(in oklab, var(--moonlight) 22%, transparent) 0%,
+    color-mix(in oklab, var(--moonlight) 8%, transparent) 40%,
+    transparent 78%
+  );
+  opacity: calc(
+    (0.24 + var(--m) * 0.6 * var(--drive)) * var(--base) * var(--mix-cloud)
+  );
+  will-change: opacity;
+}
+
+.player-scene__shaft--a {
+  --ox: -0.26;
+  --w: 0.1;
+  --tilt: -7deg;
+  --base: 0.9;
+}
+
+.player-scene__shaft--b {
+  --ox: 0.02;
+  --w: 0.14;
+  --tilt: 2deg;
+  --base: 1;
+}
+
+.player-scene__shaft--c {
+  --ox: 0.3;
+  --w: 0.09;
+  --tilt: 8deg;
+  --base: 0.8;
+}
+
+/*
+ * ── Everything that lives *at* the surface ──
+ *
+ * The path, the waterline and the foam all have to be at the water's level,
+ * and there is exactly one way to guarantee that: give them the near swell's
+ * geometry and the near swell's transform, verbatim. They used to be
+ * positioned and translated by their own numbers, which agreed with the water
+ * at one viewport height and drifted a hundred pixels off it at every other —
+ * a bright line hanging in the air above the sea.
+ *
+ * So `--tide` is the whole of it: the same box, the same rise, the same sample
+ * of the breath. What each of them draws is an ellipse hugging the *top edge*
+ * of that box, which is where the water actually ends.
+ */
+.player-scene__foam {
+  position: absolute;
+  left: -18%;
+  right: -18%;
+  bottom: -52%;
+  height: 108%;
+  transform: translate3d(0, calc((1 - var(--e) * var(--drive)) * 38%), 0);
+  will-change: transform, opacity;
+}
+
+/*
+ * The bright stretch of the waterline is centred on the orb rather than on the
+ * screen, for the same reason the path below it is: the light in this room
+ * comes from one place, and the place is the orb. On a desktop the stage is
+ * the left column of a grid, so "the middle of the screen" and "under the
+ * light" are two different points.
+ */
 .player-scene__surface {
   position: absolute;
-  left: -6%;
-  right: -6%;
-  bottom: 22%;
-  height: calc(var(--span) * 0.2);
+  left: var(--heart-x);
+  width: calc(var(--span) * 2.4);
+  bottom: -52%;
+  height: 108%;
+  transform: translate3d(-50%, calc((1 - var(--e) * var(--drive)) * 38%), 0);
+  will-change: transform, opacity;
+}
+
+/*
+ * The surface itself, and the one thing on this screen that is brightest
+ * halfway through a breath rather than at the end of one: `--m` is the eased
+ * curve's own slope, so this is at its strongest halfway up and halfway down
+ * and nearly gone at the turns. Water is most visible while it moves.
+ */
+.player-scene__surface {
   background: radial-gradient(
-    58% 50% at 50% 50%,
-    color-mix(in oklab, var(--moonlight) 96%, transparent) 0%,
-    color-mix(in oklab, var(--gold) 22%, transparent) 44%,
+    38% 5% at 50% 1.5%,
+    color-mix(in oklab, var(--moonlight) 100%, transparent) 0%,
+    color-mix(in oklab, var(--gold) 34%, transparent) 42%,
     transparent 76%
   );
-  transform: translate3d(0, calc((0.5 - var(--e) * var(--drive)) * 150%), 0);
-  opacity: calc((0.4 + var(--m) * 0.5 * var(--drive)) * var(--mix));
+  opacity: calc((0.4 + var(--m) * 0.56 * var(--drive)) * var(--mix));
+}
+
+/*
+ * Foam. Two thin bright arcs running along the surface in opposite directions,
+ * and the only layer in the room that exists purely because of movement — at
+ * the top and bottom of a breath there is none of it, because there is no
+ * swell to break.
+ */
+.player-scene__foam {
+  opacity: calc(var(--m) * var(--base) * var(--drive) * var(--mix));
+  animation: foam-run var(--period) linear infinite;
+}
+
+.player-scene__foam--a {
+  --base: 0.62;
+  --swim: 9%;
+  --period: 43s;
+  background: radial-gradient(
+    22% 2.4% at 38% 2.6%,
+    color-mix(in oklab, var(--moonlight) 96%, transparent) 0%,
+    transparent 74%
+  );
+}
+
+.player-scene__foam--b {
+  --base: 0.44;
+  --swim: -12%;
+  --period: 59s;
+  background: radial-gradient(
+    16% 1.8% at 64% 4.4%,
+    color-mix(in oklab, var(--moonlight) 88%, transparent) 0%,
+    transparent 74%
+  );
+}
+
+/*
+ * Foam runs rather than swaying: it is carried by the water, not hung in it.
+ * The rise has to be folded into the keyframe because both halves of the
+ * movement live on the same property — and it re-reads the breath every frame,
+ * the same way everything else here does.
+ */
+@keyframes foam-run {
+  0% {
+    transform: translate3d(
+      calc(var(--swim) * var(--sway) * -1),
+      calc((1 - var(--e) * var(--drive)) * 38%),
+      0
+    );
+  }
+  100% {
+    transform: translate3d(
+      calc(var(--swim) * var(--sway)),
+      calc((1 - var(--e) * var(--drive)) * 38%),
+      0
+    );
+  }
+}
+
+/*
+ * The path.
+ *
+ * A column of light lying on the water directly beneath the orb — the one
+ * thing in this room that says where you are standing, and the reason the
+ * light in it has somewhere to have come from. It rides the same tide as the
+ * surface, so it always begins exactly at the waterline.
+ */
+.player-scene__path {
+  position: absolute;
+  left: var(--heart-x);
+  bottom: -52%;
+  width: calc(var(--span) * 0.46);
+  height: 108%;
+  transform: translate3d(-50%, calc((1 - var(--e) * var(--drive)) * 38%), 0);
+  background: radial-gradient(
+    38% 28% at 50% 2%,
+    color-mix(in oklab, var(--moonlight) 46%, transparent) 0%,
+    color-mix(in oklab, var(--gold) 16%, transparent) 38%,
+    transparent 76%
+  );
+  opacity: calc((0.52 + var(--m) * 0.34 * var(--drive)) * var(--mix));
   will-change: transform, opacity;
 }
 
@@ -2763,139 +3154,309 @@ html:not(.dark) .breath-aurora__veil {
 /* ── Curtains ───────────────────────────────────────────────── */
 
 /*
- * Curtains reaching down the screen as you fill, and lifting as you empty.
+ * The aurora.
  *
- * Five of them, at their own widths and their own places, each scaled from the
- * top edge so the light grows *downward* into the room rather than outward
- * from a point. They are spread across the three samples of the breath, so an
- * in-breath crosses the sky instead of stretching it as one sheet — the same
- * lag that makes the atmosphere's fields read as a wave, given a direction you
- * can see.
+ * The old room was five soft columns of light scaling down from the top edge —
+ * an honest curtain, and nothing anybody has ever stood outside at two in the
+ * morning to look at. Three things are what make a sky read as an aurora, and
+ * none of them is the colour:
  *
- * Every curtain is a single soft ellipse: no masks, no blurs, and no edges
- * anywhere that a scale could walk into view.
+ *   1. **Rays.** An aurora is not a wash, it is thousands of near-vertical
+ *      filaments following the field lines, and the eye reads that texture
+ *      long before it reads the hue. Here that is one `repeating-linear-gradient`
+ *      per band — static, so it costs a single paint and never a frame.
+ *   2. **A hem.** The light is brightest along the *bottom* edge of the band
+ *      and fades upward into nothing. Curtains hang; an aurora is lit from
+ *      below and dissolves at the top.
+ *   3. **A serpentine.** The band is never straight and never still: it snakes
+ *      slowly along its own length. That is the inner element's job — it
+ *      carries a lazy `translateX` and `skewX` on a long period of its own,
+ *      while the outer element carries the breath. Nested transforms compose,
+ *      so the sky ripples while it reaches, and neither half has to know about
+ *      the other.
+ *
+ * The envelope is a mask rather than a gradient, and that is what buys the
+ * rays: a band whose *shape* is a soft ellipse can carry any texture at all
+ * inside it without the texture's own edges ever showing. It is one small
+ * static mask per band, on an element that already has its own render surface.
+ *
+ * The bands are placed relative to the orb rather than to the viewport, so the
+ * display is centred on the person watching it, and each reads a different
+ * sample of the breath — so an in-breath crosses the sky rather than
+ * stretching it as one sheet.
  */
-.player-scene__curtain {
+/*
+ * The bands fan.
+ *
+ * Real aurora converges on the magnetic zenith — the rays are near-parallel in
+ * space and the perspective splays them across the sky, which is the single
+ * most recognisable thing about a photograph of one. So the skews run from
+ * hard left through nothing to hard right as the bands cross the screen, and
+ * with the origin at the top they open downward from a point overhead. Five
+ * bands at five random leans is weather; five bands on a fan is an aurora.
+ */
+.player-scene__aurora {
   position: absolute;
-  top: -12%;
-  left: var(--x);
+  top: var(--top, -14%);
+  left: calc(var(--heart-x) + var(--span) * var(--ox));
   width: calc(var(--span) * var(--w));
   height: calc(100% * var(--h, 1));
   transform: translateX(-50%) skewX(var(--skew))
-    scaleY(calc(0.4 + var(--lag) * 0.9 * var(--drive)));
+    scaleY(calc(0.28 + var(--lag) * 1.05 * var(--drive)));
   transform-origin: top center;
-  /*
-   * Two gradients, and the pair is what makes this a curtain rather than a
-   * wash: a narrow bright ribbon down the middle, inside a much broader halo
-   * that carries the colour out to nothing. One gradient alone gives either a
-   * hard band or a fog, and a curtain is neither.
-   */
-  background:
-    radial-gradient(20% 70% at 50% 2%, var(--tint) 0%, transparent 72%),
-    radial-gradient(58% 86% at 50% 0%, var(--tint-2) 0%, transparent 78%);
   opacity: calc(
-    (var(--base) + (var(--lag) - 0.5) * 0.3 * var(--drive)) * var(--mix)
+    (var(--base) + (var(--lag) - 0.5) * 0.44 * var(--drive)) * var(--mix)
   );
-  animation: curtain-sway var(--sway-time, 89s) ease-in-out infinite;
-  animation-delay: var(--sway-delay, 0s);
   will-change: transform, opacity;
 }
 
 /*
- * The sway moves the curtain's *foot* and leaves its head where it is, which
- * is how a hanging thing moves. `--sway` damps it to a quarter through a hold,
- * so a held breath holds the whole sky.
+ * The serpentine.
+ *
+ * It leans and slides at the same time, which is what makes a band of light
+ * look like a ribbon seen edge-on rather than a rectangle being nudged. Its
+ * own element, between the breath and the light, so the two movements compose
+ * without either having to know the other exists. `--sway` damps both to a
+ * quarter through a hold, so a held breath holds the whole sky.
  */
-@keyframes curtain-sway {
+.player-scene__aurora-body {
+  position: absolute;
+  inset: 0;
+  animation: aurora-snake var(--snake, 91s) ease-in-out infinite;
+  animation-delay: var(--snake-delay, 0s);
+  will-change: transform;
+}
+
+@keyframes aurora-snake {
   0%,
   100% {
-    margin-left: calc(var(--drift-x, 2%) * var(--sway) * -1);
+    transform: translateX(calc(var(--swim, 3%) * var(--sway) * -1))
+      skewX(calc(var(--bend, 4deg) * var(--sway) * -1));
   }
   50% {
-    margin-left: calc(var(--drift-x, 2%) * var(--sway));
+    transform: translateX(calc(var(--swim, 3%) * var(--sway)))
+      skewX(calc(var(--bend, 4deg) * var(--sway)));
   }
 }
 
-.player-scene__curtain--a {
-  --x: 20%;
-  --w: 0.2;
-  --h: 1.06;
-  --skew: -8deg;
-  --lag: var(--e);
-  --tint: color-mix(in oklab, var(--sage) 74%, transparent);
-  --tint-2: color-mix(in oklab, var(--sage) 22%, transparent);
-  --base: 0.66;
-  --drift-x: 2.4%;
-  --sway-time: 89s;
+/*
+ * Two layers per band, and the pair is the whole look.
+ *
+ * The halo is broad, soft and carries the colour out into the sky — an aurora
+ * lights the air around it, and a band with a clean edge is a stripe. The veil
+ * is narrow, bright, and the only thing carrying the filaments: thousands of
+ * near-vertical striations along the field lines, which is what the eye reads
+ * as an aurora long before it reads the hue.
+ *
+ * Both are shaped by a mask rather than by their own gradients, and both masks
+ * reach transparency *well inside* their element — 46% of the width from the
+ * centre, so the fade completes before the edge instead of at it. That is the
+ * same house rule the rest of this file keeps, and getting it wrong here is
+ * visible as two vertical seams down the sky.
+ *
+ * The colour runs magenta at the hem, green through the body and cool at the
+ * crown, which is the altitude order a real aurora is lit in — and the reason
+ * a band reads as depth rather than as a stripe.
+ */
+.player-scene__aurora-halo,
+.player-scene__aurora-veil {
+  position: absolute;
+  inset: 0;
 }
 
-.player-scene__curtain--b {
-  --x: 42%;
-  --w: 0.15;
-  --h: 0.92;
-  --skew: 6deg;
-  --lag: var(--e-mid);
-  --tint: color-mix(in oklab, var(--rose) 78%, transparent);
-  --tint-2: color-mix(in oklab, var(--rose) 22%, transparent);
-  --base: 0.72;
-  --drift-x: -1.8%;
-  --sway-time: 113s;
-  --sway-delay: -29s;
+.player-scene__aurora-halo {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--crown) 20%,
+    var(--body) 58%,
+    var(--hem) 86%,
+    transparent 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    46% 66% at 50% 70%,
+    #000 0%,
+    rgb(0 0 0 / 0.5) 52%,
+    transparent 86%
+  );
+  mask-image: radial-gradient(
+    46% 66% at 50% 70%,
+    #000 0%,
+    rgb(0 0 0 / 0.5) 52%,
+    transparent 86%
+  );
 }
 
-.player-scene__curtain--c {
-  --x: 66%;
-  --w: 0.19;
-  --h: 1.02;
-  --skew: -5deg;
-  --lag: var(--e-far);
-  --tint: color-mix(in oklab, var(--twilight) 82%, transparent);
-  --tint-2: color-mix(in oklab, var(--twilight) 24%, transparent);
-  --base: 0.62;
-  --drift-x: 2%;
-  --sway-time: 131s;
-  --sway-delay: -53s;
+.player-scene__aurora-veil {
+  background:
+    repeating-linear-gradient(
+      93deg,
+      transparent 0 2.4%,
+      color-mix(in oklab, var(--moonlight) 42%, transparent) 2.4% 3.6%,
+      transparent 3.6% 6.4%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      var(--hem) 62%,
+      var(--hem) 88%,
+      transparent 100%
+    );
+  -webkit-mask-image: radial-gradient(
+    26% 52% at 50% 80%,
+    #000 0%,
+    rgb(0 0 0 / 0.55) 48%,
+    transparent 86%
+  );
+  mask-image: radial-gradient(
+    26% 52% at 50% 80%,
+    #000 0%,
+    rgb(0 0 0 / 0.55) 48%,
+    transparent 86%
+  );
 }
 
-.player-scene__curtain--d {
-  --x: 7%;
-  --w: 0.12;
-  --h: 0.8;
-  --skew: 9deg;
-  --lag: var(--e-far);
-  --tint: color-mix(in oklab, var(--moonlight) 76%, transparent);
-  --tint-2: color-mix(in oklab, var(--moonlight) 20%, transparent);
-  --base: 0.5;
-  --drift-x: -2.6%;
-  --sway-time: 149s;
-  --sway-delay: -17s;
-}
-
-.player-scene__curtain--e {
-  --x: 87%;
-  --w: 0.16;
+/*
+ * Five bands: three green, one lit rose at the hem — the rare low-altitude
+ * one — and one gold. Narrow, and well apart: the dark sky between two
+ * ribbons is as much of the picture as the ribbons are.
+ */
+.player-scene__aurora--a {
+  --ox: -0.52;
+  --w: 0.17;
   --h: 0.86;
-  --skew: -10deg;
-  --lag: var(--e-mid);
-  --tint: color-mix(in oklab, var(--gold) 52%, transparent);
-  --tint-2: color-mix(in oklab, var(--gold) 16%, transparent);
-  --base: 0.46;
-  --drift-x: 1.6%;
-  --sway-time: 167s;
-  --sway-delay: -71s;
+  --skew: -13deg;
+  --lag: var(--e);
+  --base: 0.86;
+  --swim: 4%;
+  --bend: 6deg;
+  --snake: 91s;
+  --hem: color-mix(in oklab, var(--sage) 96%, transparent);
+  --body: color-mix(in oklab, var(--sage) 46%, transparent);
+  --crown: color-mix(in oklab, var(--twilight) 22%, transparent);
 }
 
-/* The sky the curtains hang in, and the ground their light falls on. */
+.player-scene__aurora--b {
+  --ox: -0.26;
+  --w: 0.13;
+  --h: 0.7;
+  --skew: -7deg;
+  --lag: var(--e-mid);
+  --base: 0.92;
+  --swim: -3.2%;
+  --bend: -7deg;
+  --snake: 113s;
+  --snake-delay: -29s;
+  --hem: color-mix(in oklab, var(--rose) 92%, transparent);
+  --body: color-mix(in oklab, var(--sage) 50%, transparent);
+  --crown: color-mix(in oklab, var(--rose) 20%, transparent);
+}
+
+.player-scene__aurora--c {
+  --ox: 0.03;
+  --w: 0.21;
+  --h: 0.94;
+  --skew: 0deg;
+  --lag: var(--e-far);
+  --base: 0.88;
+  --swim: 3%;
+  --bend: 5deg;
+  --snake: 131s;
+  --snake-delay: -53s;
+  --hem: color-mix(in oklab, var(--sage) 100%, transparent);
+  --body: color-mix(in oklab, var(--sage) 38%, transparent);
+  --crown: color-mix(in oklab, var(--moonlight) 24%, transparent);
+}
+
+.player-scene__aurora--d {
+  --ox: 0.3;
+  --w: 0.12;
+  --h: 0.64;
+  --skew: 7deg;
+  --lag: var(--e-far);
+  --base: 0.68;
+  --swim: -4.4%;
+  --bend: 8deg;
+  --snake: 149s;
+  --snake-delay: -17s;
+  --hem: color-mix(in oklab, var(--moonlight) 68%, transparent);
+  --body: color-mix(in oklab, var(--sage) 34%, transparent);
+  --crown: color-mix(in oklab, var(--twilight) 24%, transparent);
+}
+
+.player-scene__aurora--e {
+  --ox: 0.56;
+  --w: 0.16;
+  --h: 0.8;
+  --skew: 13deg;
+  --lag: var(--e-mid);
+  --base: 0.64;
+  --swim: 2.6%;
+  --bend: -6deg;
+  --snake: 167s;
+  --snake-delay: -71s;
+  --hem: color-mix(in oklab, var(--gold) 72%, transparent);
+  --body: color-mix(in oklab, var(--sage) 28%, transparent);
+  --crown: color-mix(in oklab, var(--gold) 16%, transparent);
+}
+
+/*
+ * The corona: the broad green airglow the bands stand in. It is what stops the
+ * sky between them from being empty, and it swells with the far sample of the
+ * breath — the furthest thing up there, and the last to hear about it.
+ */
+.player-scene__corona {
+  position: absolute;
+  left: var(--heart-x);
+  top: calc(var(--heart-y) - var(--span) * 0.55);
+  width: calc(var(--span) * 2.4);
+  height: calc(var(--span) * 1.1);
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--sage) 26%, transparent) 0%,
+    color-mix(in oklab, var(--twilight) 12%, transparent) 44%,
+    transparent 74%
+  );
+  transform: translate(-50%, -50%)
+    scale(calc(0.9 + var(--e-far) * 0.2 * var(--drive)));
+  opacity: calc(
+    (0.46 + (var(--e-far) - 0.5) * 0.32 * var(--drive)) * var(--mix-cloud)
+  );
+  will-change: transform, opacity;
+}
+
+/*
+ * The night.
+ *
+ * Shared by the two rooms that are made of small bright things — Curtains and
+ * Starfield — and load-bearing in both, because both are contrast phenomena:
+ * a green ribbon is only ever as bright as the sky behind it is dark, and a
+ * star is only a star against something. The player's glass is already lifting
+ * everything under it, so the dark has to be drawn rather than assumed.
+ */
+.player-scene__night {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    130% 110% at var(--heart-x) var(--heart-y),
+    color-mix(in oklab, var(--twilight) 38%, transparent) 0%,
+    color-mix(in srgb, var(--bg-0) 72%, transparent) 76%
+  );
+  opacity: calc(0.88 * var(--mix-depth));
+}
+
+/* The sky the aurora hangs in, and the ground its light falls on. */
 .player-scene__sky {
   position: absolute;
   inset: -10% -10% auto;
-  height: 68%;
+  height: 74%;
   background: radial-gradient(
     80% 100% at 50% 0%,
-    color-mix(in oklab, var(--twilight) 34%, transparent) 0%,
-    transparent 72%
+    color-mix(in oklab, var(--twilight) 40%, transparent) 0%,
+    transparent 74%
   );
-  opacity: calc((0.66 + (var(--e-far) - 0.5) * 0.24 * var(--drive)) * var(--mix));
+  opacity: calc((0.7 + (var(--e-far) - 0.5) * 0.24 * var(--drive)) * var(--mix));
   will-change: opacity;
 }
 
@@ -2905,24 +3466,39 @@ html:not(.dark) .breath-aurora__veil {
   height: 46%;
   background: radial-gradient(
     70% 100% at 50% 100%,
-    color-mix(in oklab, var(--sage) 24%, transparent) 0%,
+    color-mix(in oklab, var(--sage) 26%, transparent) 0%,
     transparent 68%
   );
-  opacity: calc((0.44 + (var(--e-far) - 0.5) * 0.24 * var(--drive)) * var(--mix-depth));
+  opacity: calc((0.46 + (var(--e-far) - 0.5) * 0.28 * var(--drive)) * var(--mix-depth));
   will-change: opacity;
 }
 
 /* ── Starfield ──────────────────────────────────────────────── */
 
 /*
- * The same eighteen points of light the atmosphere keeps in its corners,
- * brought to the front and given the whole screen to travel across.
+ * A sky that opens on the in-breath and gathers on the out.
  *
- * Depth is what makes this a room rather than a picture being scaled: a near
- * point moves half again as far on an in-breath as a distant one, so filling
- * your lungs opens the field into depth. The twinkle owns `opacity` and the
- * breath owns `transform`, which is the same division of labour the motes and
- * the clouds already keep.
+ * The field used to travel about a fifth of its radius across a whole breath,
+ * which was tasteful and almost invisible. It now runs from a tight knot ringed
+ * around the orb to a field reaching the corners of the screen — around three
+ * times the radius for the nearest points and about half that for the furthest,
+ * because the difference between those two numbers *is* the depth. A picture
+ * being scaled moves everything by the same factor; a volume opening does not.
+ *
+ * Two things make that survivable at seventy-two points:
+ *
+ *   - The inner radius is measured from the orb, not from the screen. `--halo`
+ *     is the orb's own radius, so "tight" means *ringed against the glass* at
+ *     every window size — and never inside it, where the room's clearance mask
+ *     would quietly eat the whole field at the bottom of every breath.
+ *   - `--open` is the breath when there is one and a half-open pose when there
+ *     is not, so a paused, settled or motion-reduced field rests at a real
+ *     spread rather than collapsing into a dot.
+ *
+ * Depth then decides how much of it each point feels — near points travel
+ * furthest, grow largest and dim as they go, which is what reads as coming
+ * toward you. The twinkle owns `opacity` and the breath owns `transform`, the
+ * same division of labour the rest of the app keeps.
  */
 .player-scene__stars {
   position: absolute;
@@ -2938,37 +3514,106 @@ html:not(.dark) .breath-aurora__veil {
   height: var(--dot, 2px);
   margin: calc(var(--dot, 2px) / -2);
   border-radius: 999px;
-  background: var(--pollen);
-  box-shadow: 0 0 calc(5px + var(--depth, 0.5) * 10px) 1px
-    color-mix(in oklab, var(--pollen) 46%, transparent);
+  /*
+   * Brighter and larger than the atmosphere's motes, and deliberately: those
+   * sit in the corners of a room made of fog, and these *are* the room. The
+   * player's glass lifts everything under it, so a point of light that reads
+   * beautifully against a black page is a smudge against this one.
+   */
+  background: color-mix(in oklab, var(--moonlight) 82%, var(--pollen));
+  box-shadow: 0 0 calc(8px + var(--depth, 0.5) * 18px) 1px
+    color-mix(in oklab, var(--pollen) 74%, transparent);
+  /*
+   * Out along its own spoke. The radius is the orb's rim plus however far this
+   * point's depth lets the breath carry it, and the two scales are what keep
+   * the near field and the far field from moving as one sheet.
+   *
+   * The gathered pose is deliberately not a ring. The inner radius spreads
+   * with each point's own distance and closes with its depth, so at the bottom
+   * of a breath the field is a knot with a front and a back rather than
+   * seventy points politely queued at one radius.
+   *
+   * `scaleX` comes after the rotation, so it stretches along the spoke rather
+   * than across it: at full spread the nearest points draw out a little, which
+   * is the hint of a streak that makes an opening field read as movement
+   * rather than as a rearrangement.
+   */
   transform: rotate(var(--angle))
     translateX(
       calc(
-        var(--span) * 0.56 * var(--distance) *
-          (0.68 + var(--e) * (0.16 + 0.4 * var(--depth, 0.5)) * var(--drive))
+        var(--halo) * (1.2 + 0.85 * var(--distance) - 0.22 * var(--depth, 0.5)) +
+          var(--span) * var(--distance) * var(--open) *
+          (0.22 + 0.5 * var(--depth, 0.5))
       )
-    );
+    )
+    scale(calc(0.72 + var(--open) * (0.3 + 0.62 * var(--depth, 0.5))))
+    scaleX(calc(1 + var(--open) * 0.5 * var(--depth, 0.5) * var(--drive)));
   animation: star-twinkle var(--twinkle, 17s) ease-in-out infinite;
   animation-delay: var(--delay, 0s);
   will-change: transform, opacity;
 }
 
+/*
+ * Brightest gathered, faintest scattered — the same light spread over more
+ * sky. It is a cheap trick and it is the whole reason the knot at the bottom
+ * of a breath feels like something arriving rather than something shrinking.
+ */
 @keyframes star-twinkle {
   0%,
   100% {
-    opacity: calc((0.18 + var(--depth, 0.5) * 0.2) * var(--mix-mote));
+    opacity: calc(
+      (0.34 + var(--depth, 0.5) * 0.36) * (1.34 - var(--open) * 0.5) *
+        var(--mix-mote)
+    );
   }
   50% {
-    opacity: calc((0.42 + var(--depth, 0.5) * 0.5) * var(--mix-mote));
+    opacity: calc(
+      (0.72 + var(--depth, 0.5) * 0.7) * (1.34 - var(--open) * 0.5) *
+        var(--mix-mote)
+    );
   }
 }
 
-/* Two faint orbits, so the field has structure as well as scatter. */
+/*
+ * The core the field comes back to.
+ *
+ * Largest and brightest at the bottom of a breath, when every point is ringed
+ * against the orb — so an out-breath is the sky drawing in *to* something
+ * rather than simply becoming less. It sits behind the orb and is soft the
+ * whole way out, which is why it is not held clear of it: a wash has nothing
+ * for the eye to read as an edge crossing the glass.
+ */
+.player-scene__core {
+  position: absolute;
+  left: var(--heart-x);
+  top: var(--heart-y);
+  width: calc(var(--span) * 0.62);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--moonlight) 40%, transparent) 0%,
+    color-mix(in oklab, var(--pollen) 22%, transparent) 32%,
+    transparent 70%
+  );
+  transform: translate(-50%, -50%)
+    scale(calc(0.54 + (1 - var(--open)) * 0.62));
+  opacity: calc((0.18 + (1 - var(--open)) * 0.46) * var(--mix));
+  will-change: transform, opacity;
+}
+
+/*
+ * Two faint orbits, so the field has structure as well as scatter. They open
+ * with it — anchored to the orb's rim at the bottom of the breath, out past
+ * the near points at the top of it.
+ */
 .player-scene__orbit {
   position: absolute;
   left: var(--heart-x);
   top: var(--heart-y);
-  width: calc(var(--span) * var(--scale));
+  width: calc(
+    var(--halo) * 2.9 + var(--span) * var(--scale) * var(--open) * 2
+  );
   aspect-ratio: 1;
   border-radius: 50%;
   background: radial-gradient(
@@ -2977,22 +3622,19 @@ html:not(.dark) .breath-aurora__veil {
     color-mix(in oklab, var(--moonlight) 18%, transparent) 80%,
     transparent 94%
   );
-  transform: translate(-50%, -50%)
-    scale(calc(1 + (var(--lag) - 0.5) * 0.18 * var(--drive)));
-  opacity: calc(var(--base) * var(--mix));
+  transform: translate(-50%, -50%);
+  opacity: calc(var(--base) * (1.15 - var(--open) * 0.4) * var(--mix));
   will-change: transform, opacity;
 }
 
 .player-scene__orbit--near {
-  --scale: 0.72;
-  --lag: var(--e-mid);
+  --scale: 0.2;
   --base: 0.5;
 }
 
 .player-scene__orbit--far {
-  --scale: 1.24;
-  --lag: var(--e-far);
-  --base: 0.32;
+  --scale: 0.44;
+  --base: 0.3;
 }
 
 /* The band of dust the points are scattered through. */
@@ -3000,29 +3642,32 @@ html:not(.dark) .breath-aurora__veil {
   position: absolute;
   left: var(--heart-x);
   top: var(--heart-y);
-  width: calc(var(--span) * 1.9);
-  height: calc(var(--span) * 0.66);
+  width: calc(var(--span) * 2.1);
+  height: calc(var(--span) * 0.72);
   border-radius: 50%;
   background: radial-gradient(
     closest-side,
-    color-mix(in oklab, var(--twilight) 16%, transparent) 0%,
-    color-mix(in oklab, var(--moonlight) 8%, transparent) 44%,
+    color-mix(in oklab, var(--twilight) 18%, transparent) 0%,
+    color-mix(in oklab, var(--moonlight) 9%, transparent) 44%,
     transparent 74%
   );
-  opacity: calc(0.55 * var(--mix-cloud));
+  opacity: calc((0.4 + var(--open) * 0.3) * var(--mix-cloud));
   animation: dust-turn 181s linear infinite;
-  will-change: transform;
+  will-change: transform, opacity;
 }
 
 @keyframes dust-turn {
   0% {
-    transform: translate(-50%, -50%) rotate(-18deg);
+    transform: translate(-50%, -50%) rotate(-18deg)
+      scale(calc(0.86 + var(--open) * 0.24));
   }
   50% {
-    transform: translate(-50%, -50%) rotate(18deg);
+    transform: translate(-50%, -50%) rotate(18deg)
+      scale(calc(0.86 + var(--open) * 0.24));
   }
   100% {
-    transform: translate(-50%, -50%) rotate(-18deg);
+    transform: translate(-50%, -50%) rotate(-18deg)
+      scale(calc(0.86 + var(--open) * 0.24));
   }
 }
 
@@ -3084,15 +3729,37 @@ html:not(.dark) .breath-aurora__veil {
 @media (prefers-reduced-motion: reduce) {
   .player-scene__petal,
   .player-scene__shimmer,
-  .player-scene__curtain,
+  .player-scene__current,
+  .player-scene__swell-crest,
+  .player-scene__foam,
+  .player-scene__aurora-veil,
   .player-scene__dust,
   .player-scene__star {
     animation: none;
     will-change: auto;
   }
 
+  /*
+   * Two layers exist only because of movement, and under this preference
+   * there is none: the foam and the shafts key off `--m`, the breath's own
+   * slope, which is held at zero. Left alone they would simply be invisible,
+   * which is a room with two of its layers missing rather than a room at
+   * rest — so they are given the pose they hold mid-stroke instead.
+   */
+  .player-scene__foam {
+    opacity: calc(var(--base) * 0.5 * var(--mix));
+  }
+
+  .player-scene__shaft {
+    opacity: calc(0.4 * var(--base) * var(--mix-cloud));
+  }
+
   .player-scene__star {
     opacity: calc((0.3 + var(--depth, 0.5) * 0.34) * var(--mix-mote));
+  }
+
+  .player-scene__dust {
+    transform: translate(-50%, -50%) scale(calc(0.86 + var(--open) * 0.24));
   }
 }
 
@@ -3111,8 +3778,14 @@ html:not(.dark) .breath-aurora__veil {
   --span: 3.6rem;
   --heart-x: 50%;
   --heart-y: 52%;
-  /* A picture of a room has no orb standing in it, so nothing is cut out. */
+  /*
+   * There is no orb in a picture of a room, so nothing is cut out of it — but
+   * the rooms that measure themselves against one still need a radius to
+   * measure against. Starfield rings its knot on this, so it is deliberately
+   * small: a tile is mostly sky.
+   */
   --heart-clear: none;
+  --halo: 0.34rem;
   --reach: 2.2rem;
   --drive: 1;
   --sway: 1;
@@ -3149,8 +3822,27 @@ html:not(.dark) .breath-aurora__veil {
   --span: 2.5rem;
 }
 
+/*
+ * Atmosphere is the one room with nothing in it but light, and light sized
+ * against the tile's own `--span` is a faint smudge in the middle of a
+ * rectangle. It gets a larger one so the fields fill the frame, which is what
+ * the room actually looks like at full size.
+ */
+.player-scene-thumb .player-scene--atmosphere {
+  --span: 5.6rem;
+}
+
 .player-scene-thumb .player-scene--starfield {
-  --span: 7.5rem;
+  --span: 5.4rem;
+}
+
+/*
+ * And Waterline wants its swell to read at tile size: the crests are sized in
+ * `--span`, and at the tile's own value the surface line is a hairline nobody
+ * can see.
+ */
+.player-scene-thumb .player-scene--waterline {
+  --span: 6.4rem;
 }
 
 /* Nothing in a still picture of a room should be moving. */

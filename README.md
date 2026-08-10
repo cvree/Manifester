@@ -159,16 +159,17 @@ app.
 - **A background visualiser**: the whole screen becomes a room that expands and
   settles with the guide, in one of **six rooms** — **Atmosphere** (light,
   colour and haze gathering behind the orb), **Rings** (a ring of light leaving
-  on every in-breath and travelling out across the screen), **Waterline** (the
-  room filling like water and drawing back), **Curtains** (light reaching down
-  the screen and lifting), **Starfield** (a field of stars opening outward), and
-  **Stillness** (one deep field, and nothing else). Or **Drifting**, which moves
+  on every in-breath and travelling out across the screen), **Waterline** (an
+  ocean filling and draining, with moonlight on the water beneath you),
+  **Curtains** (the aurora, fanning down the sky and lifting again),
+  **Starfield** (a sky that opens wide as you fill and gathers tight around you
+  as you empty), and **Stillness** (one deep field, and nothing else). Or **Drifting**, which moves
   between all six, a minute and a half at a time, crossfading over four seconds.
   Every room runs on the guide's own clock, and it is on by default. Whichever
-  room you are in, it is centred on the orb itself — measured, not guessed —
-  and nothing in it with an edge ever crosses the orb. Rooms are chosen under
-  **Breathing**, where picking one walks you on to the next question, and all
-  of it is written up below.
+  room you are in, it is drawn as a circle centred on the orb itself —
+  measured, not guessed — and nothing in it with an edge ever crosses the orb.
+  Rooms are chosen under **Breathing**, where picking one walks you on to the
+  next question, and all of it is written up below.
 - **Delay between loops**, 0–60 seconds, counted down on screen (*"Next loop in
   6s"*) and frozen exactly where it was if you pause.
 - Time remaining, or elapsed time when there is no timer.
@@ -360,15 +361,16 @@ it gathers back in and the colour goes fractionally warmer.
 **Six rooms, one breath.** Under the switch is a picker, and each tile is the
 room itself at a fixed half-open pose — the same markup and the same stylesheet
 as the thing behind the player, so what you choose from cannot quietly stop
-resembling what you get.
+resembling what you get. Choosing one walks you on to the next question, the
+same way choosing a pattern or a form does.
 
 | Room | What the breath is drawn as |
 | --- | --- |
 | **Atmosphere** | The original: near and far fields of light, the echo a full inhale leaves behind, three aurora clouds on incommensurable orbits, haze at two depths, and eighteen points of pollen light. |
 | **Rings** | Four rings leaving the centre and opening across the whole screen, each reading the breath further back in time than the one inside it. |
-| **Waterline** | Three water planes rising from below the bottom edge, with a bright surface line that is brightest halfway up — water is most visible while it moves. |
-| **Curtains** | Five curtains of light scaling down from the top edge, each on a different sample of the breath, so the light ripples across the sky instead of stretching as one sheet. |
-| **Starfield** | The same eighteen points, given the whole screen: near stars travel half again as far as distant ones, so filling your lungs opens the field into depth. |
+| **Waterline** | An ocean. Three swells rise and drain on three samples of the breath, their domed crests sliding past each other so the waterline is never flat; currents move under it, shafts of light come down through it, foam only exists while the sea is moving, and a path of moonlight lies on the water directly beneath you. |
+| **Curtains** | The aurora. Five ribbons fanning from a zenith overhead, lit magenta at the hem and green through the body, filled with fine vertical filaments, each snaking on its own long period and reaching down the sky on its own sample of the breath. |
+| **Starfield** | Sixty points that open from a knot ringed against the orb to a field reaching the corners of the screen — about three times the radius for the nearest of them and half that for the furthest, so an in-breath opens a volume rather than scaling a picture. |
 | **Stillness** | One field, and the dark around it. For the times the rest of the screen is already carrying enough. |
 
 **Drifting** holds a room for about a minute and a half and then crossfades to
@@ -884,6 +886,19 @@ viewport changes, and on a bounded frame loop after the layout is told to change
 Every layer in `theme.css` was already drawn around that point, so the entire
 environment re-centres without one of them learning that it moved.
 
+**Every room is measured in circles, not in percentages of the window.** The
+breath-driven layers used to be sized as percentages of the field — `width:
+170%`, `height: 160%` — which on a 1440×950 window makes a 2431×1520 *ellipse*.
+Its box was centred on the orb to the pixel and it still did not look centred,
+because light that reaches half again as far sideways as it does vertically
+reads as a band the orb is sitting in rather than as a room gathered around it.
+Every one of them is now `width: calc(var(--span) * k)` with `aspect-ratio: 1`,
+placed with `translate(-50%, -50%)` on the heart — the same construction Rings
+has always used — so the room is a true circle on the orb at every window shape.
+The three aurora clouds moved with them: they used to hang at fixed corners of
+the viewport, which meant the colour gathered wherever the window happened to be
+widest.
+
 **Nothing with an edge crosses the orb.** The card is translucent glass, which is
 the whole look and also the one way the illusion breaks: a ring's bright arc, a
 curtain's ribbon, the waterline or a star passing *across* the orb reads as being
@@ -1330,7 +1345,8 @@ src/
     useBreathing.ts drives the orb — and everything mirroring it — from the
                     wall clock
     environment.ts  the room itself: background modes, how far the breath lags
-                    at distance, and the seeded field of motes
+                    at distance, and the two seeded fields of points — eighteen
+                    motes for the corners of a room, sixty stars for a sky
     useBackgroundMix.ts   wakes and settles the room, without ever touching
                           the breath underneath it
     useHeartAnchor.ts     measures the orb, so the room is centred on it rather

@@ -62,17 +62,20 @@ export const BACKGROUND_MODES: BackgroundMode[] = [
   {
     id: 'waterline',
     name: 'Waterline',
-    description: 'The room fills like water as you breathe in, and draws back.',
+    description:
+      'An ocean filling as you breathe in and draining as you empty, with the light on the water beneath you.',
   },
   {
     id: 'curtains',
     name: 'Curtains',
-    description: 'Light reaching down the screen, and lifting again.',
+    description:
+      'The aurora: ribbons of green and rose reaching down the sky as you fill, and lifting as you empty.',
   },
   {
     id: 'starfield',
     name: 'Starfield',
-    description: 'A field of stars opening outward around you.',
+    description:
+      'A sky that opens wide as you breathe in, and gathers tight around you as you breathe out.',
   },
   {
     id: 'stillness',
@@ -195,6 +198,19 @@ export interface Mote {
 const MOTE_COUNT = 18
 
 /**
+ * Starfield gets its own, larger field.
+ *
+ * The motes are corner-of-the-eye pollen light in a room that is mostly fog,
+ * and eighteen is exactly right for that. Starfield is a different job: the
+ * points *are* the room, and on an in-breath they now open to nearly six times
+ * the radius they hold at the bottom of a breath. Eighteen points spread that
+ * far is not a night sky, it is eighteen dots — the count has to carry the
+ * spread, so this field is three times the size and drawn from its own seed so
+ * the two skies are not the same scatter at two densities.
+ */
+const STAR_COUNT = 60
+
+/**
  * A small deterministic generator.
  *
  * `Math.random()` would place these differently on every mount, which means a
@@ -223,8 +239,8 @@ function mulberry32(seed: number): () => number {
  * far back and only a few points are near enough to have real presence. A
  * screen where every point is a foreground point has no depth at all.
  */
-function buildField(count: number): Mote[] {
-  const random = mulberry32(0x9e37)
+function buildField(count: number, seed = 0x9e37): Mote[] {
+  const random = mulberry32(seed)
   const sector = 360 / count
 
   return Array.from({ length: count }, (_, index) => {
@@ -245,3 +261,21 @@ function buildField(count: number): Mote[] {
 }
 
 export const MOTE_FIELD: readonly Mote[] = buildField(MOTE_COUNT)
+
+/**
+ * The night sky Starfield opens into.
+ *
+ * Same construction, its own seed, four times the points — and one difference
+ * that matters at this count: the distances run all the way in to the middle
+ * rather than starting half a radius out. Starfield contracts to a tight knot
+ * around the orb at the bottom of every breath, and a field with a hole in the
+ * centre contracts to a ring rather than to a knot.
+ */
+export const STAR_FIELD: readonly Mote[] = buildField(STAR_COUNT, 0x5f3a).map(
+  (star, index) => ({
+    ...star,
+    // Stratified inward as well as around: a sixth of the field is kept close,
+    // so the knot has a core and the spread has somewhere to come from.
+    distance: 0.22 + ((index % 6) / 6) * 0.5 + star.distance * 0.36,
+  }),
+)
