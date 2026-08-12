@@ -464,6 +464,8 @@ export function PlayerRoute() {
         settled={complete}
         utterance={playing ? (currentLine ?? undefined) : undefined}
         mode={preferences.backgroundMode}
+        breathStyle={preferences.breathStyle}
+        live={breathing.live}
       />
 
       {/*

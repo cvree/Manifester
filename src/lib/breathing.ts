@@ -147,6 +147,8 @@ export type BreathStyleId =
   | 'aurora'
   | 'constellation'
   | 'tide'
+  | 'cathedral'
+  | 'moonpool'
 
 export interface BreathStyle {
   id: BreathStyleId
@@ -185,7 +187,39 @@ export const BREATH_STYLES: BreathStyle[] = [
     name: 'Tide',
     description: 'A water line rising and falling inside the circle.',
   },
+  {
+    id: 'cathedral',
+    name: 'Ink Cathedral',
+    description: 'Ink rising into arches, releasing into vapour as you empty.',
+  },
+  {
+    id: 'moonpool',
+    name: 'Moonpool',
+    description: 'Deep water, and an opening onto moonlight widening above you.',
+  },
 ]
+
+/**
+ * The two forms that are drawn rather than styled.
+ *
+ * The other six are a handful of elements reading `--e` and cost no JavaScript
+ * per frame, which is the right way to build a shape that opens and closes.
+ * These two are worlds — geometry that changes every breath, hundreds of
+ * points of light, an exhale that is a different event from the inhale rather
+ * than its reverse — and none of that is a thing CSS can be asked for
+ * honestly. They read the same breath on the same frame; see `scenes/types.ts`.
+ *
+ * They are also the two that, with the background visualiser on, become the
+ * room as well as the guide: the environment they build extends past the orb
+ * to the edges of the screen instead of a separate scene being drawn behind
+ * them. Two environments at once is mud, and the setting people reach for when
+ * they choose one of these is the whole screen.
+ */
+export function isLivingStyle(
+  id: BreathStyleId,
+): id is 'cathedral' | 'moonpool' {
+  return id === 'cathedral' || id === 'moonpool'
+}
 
 export const DEFAULT_STYLE: BreathStyleId = 'bloom'
 

@@ -10,6 +10,8 @@
  * elsewhere again (`useBackgroundMix`).
  */
 
+import { mulberry32 } from './random'
+
 /* ── Modes ──────────────────────────────────────────────────── */
 
 /**
@@ -175,6 +177,12 @@ export const BREATH_LAG_SECONDS = {
 
 /* ── The points of light ────────────────────────────────────── */
 
+/*
+ * Placed from a seeded generator rather than from `Math.random()`, because a
+ * point of light that moves when an unrelated piece of UI state changed is not
+ * a place. See `random.ts`.
+ */
+
 export interface Mote {
   /** Degrees around the orb. */
   angle: number
@@ -209,23 +217,6 @@ const MOTE_COUNT = 18
  * the two skies are not the same scatter at two densities.
  */
 const STAR_COUNT = 60
-
-/**
- * A small deterministic generator.
- *
- * `Math.random()` would place these differently on every mount, which means a
- * point of light could jump across the screen because an unrelated piece of UI
- * state changed. The room has to be the same room.
- */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
 
 /**
  * The field, built once at module load and never again.

@@ -1,17 +1,28 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { DEFAULT_STYLE, type BreathStyleId } from '../lib/breathing'
+import {
+  DEFAULT_STYLE,
+  isLivingStyle,
+  type BreathStyleId,
+} from '../lib/breathing'
 import { cx } from '../lib/cx'
 import type { BreathingRuntime } from '../lib/useBreathing'
+import { LivingCanvas } from './LivingCanvas'
 
 /**
  * The emotional centre of Manifester.
  *
- * Six forms, one clock. Every style is driven by the same two CSS custom
- * properties the breathing hook writes each frame — `--e` for expansion and
- * `--p` for progress through the current phase — so whichever one you pick,
+ * Eight forms, one clock. Six of them are driven entirely by the two CSS
+ * custom properties the breathing hook writes each frame — `--e` for expansion
+ * and `--p` for progress through the current phase — so whichever one you pick,
  * it is following your breath to the same millisecond, and the browser only
  * ever composites transforms, opacity and one dash offset. React re-renders
  * once a second, for the countdown, and never for the animation itself.
+ *
+ * The last two — Ink Cathedral and Moonpool — are drawn on a canvas, because
+ * they are worlds rather than shapes: the geometry changes with every breath,
+ * and the exhale is a different event from the inhale rather than its reverse.
+ * They are not on a clock of their own either. They read the *same* frame, as
+ * numbers, from the same `breathStateAt` call; see `LivingCanvas`.
  *
  * The same component appears small in the Create preview and large in the
  * Player; only `--size` changes. It is a registered custom property, so when
@@ -90,7 +101,11 @@ export function BreathingVisualizer({
           : 'Breathing guide, resting.'
       }
     >
-      {LAYERS[style] ?? LAYERS.bloom}
+      {isLivingStyle(style) ? (
+        <LivingCanvas style={style} live={runtime.live} variant="orb" />
+      ) : (
+        (LAYERS[style] ?? LAYERS.bloom)
+      )}
 
       <svg
         aria-hidden="true"
@@ -121,13 +136,16 @@ export function BreathingVisualizer({
   )
 }
 
-/* ── The six forms ──────────────────────────────────────────── */
+/* ── The six styled forms ───────────────────────────────────── */
+
+/** Everything the stylesheet draws — which is every form but the two worlds. */
+type StyledId = Exclude<BreathStyleId, 'cathedral' | 'moonpool'>
 
 /**
  * Each entry is only markup: every scale, drift and fade lives in `theme.css`
  * against `--e`, so adding a style never adds a frame of JavaScript.
  */
-const LAYERS: Record<BreathStyleId, ReactNode> = {
+const LAYERS: Record<StyledId, ReactNode> = {
   /* A seed of light opening into six petals, wrapped in a moonlit halo. */
   bloom: (
     <>
@@ -272,7 +290,18 @@ export function BreathStyleThumbnail({
       className={cx('breath breath--thumb', `breath--${style}`, className)}
       style={{ '--size': '3.5rem', '--e': 0.62, '--p': 0.62 } as CSSProperties}
     >
-      {LAYERS[style] ?? LAYERS.bloom}
+      {/*
+        The living forms have no markup to freeze, so their thumbnail is the
+        renderer itself holding a fixed pose — two thirds of the way up an
+        in-breath, where the shape is already legible as architecture or as an
+        opening onto a sky, and the last fifth is still something you have to
+        breathe for.
+      */}
+      {isLivingStyle(style) ? (
+        <LivingCanvas style={style} variant="thumb" />
+      ) : (
+        (LAYERS[style] ?? LAYERS.bloom)
+      )}
     </span>
   )
 }

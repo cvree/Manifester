@@ -165,7 +165,7 @@ app.
   way back is the same button, the Escape key, or leaving fullscreen however
   your browser offers to. It is written up under
   [Decisions worth explaining](#decisions-worth-explaining).
-- A **breathing guide** in one of six forms, with a thin ring reporting progress
+- A **breathing guide** in one of eight forms, with a thin ring reporting progress
   through the phase, the phase name and a countdown in the centre. Ten patterns,
   five breath voices, and custom timing for every phase — it has a section of
   its own below. It pauses and resumes with the session.
@@ -178,6 +178,9 @@ app.
   **Starfield** (a sky that opens wide as you fill and gathers tight around you
   as you empty), and **Stillness** (one deep field, and nothing else). Or **Drifting**, which moves
   between all six, a minute and a half at a time, crossfading over four seconds.
+  Two of the guide's forms — **Ink Cathedral** and **Moonpool** — are places
+  rather than shapes, and with this switch on they become the room themselves,
+  reaching past the orb to the edges of the screen.
   Every room runs on the guide's own clock, and it is on by default. Whichever
   room you are in, it is drawn as a circle centred on the orb itself —
   measured, not guessed — and nothing in it with an edge ever crosses the orb.
@@ -320,7 +323,7 @@ half a second rather than whole seconds because coherent breathing is 5.5 a
 side, and a custom control that cannot reach the preset next to it is a control
 that quietly calls itself a liar. Set a phase to zero to skip it.
 
-### Six forms
+### Eight forms
 
 | Form | What it is |
 | --- | --- |
@@ -330,10 +333,84 @@ that quietly calls itself a liar. Set a phase to zero to skip it.
 | **Aurora** | Slow drifts of colour that gather and part |
 | **Constellation** | Stars drawing apart and back into a point |
 | **Tide** | A water line rising and falling inside the circle |
+| **Ink Cathedral** | Ink rising into arches, releasing into vapour as you empty |
+| **Moonpool** | Deep water, and an opening onto moonlight widening above you |
 
-The picker shows six live thumbnails rather than six adjectives — each is the
-real component at a smaller size, so whatever a form does on its own is a thing
-you can watch before you choose it.
+The picker shows eight live thumbnails rather than eight adjectives — each is
+the real component at a smaller size, so whatever a form does on its own is a
+thing you can watch before you choose it.
+
+### Two of them are worlds
+
+The first six are a handful of elements reading two CSS custom properties. That
+is the right way to build a shape that opens and closes, and it is why they cost
+no JavaScript per frame at all.
+
+The last two are not shapes that open and close. They are places, drawn on a
+canvas, and they exist because there is a thing a breathing guide can do that a
+shape cannot: make the out-breath *its own event* rather than the in-breath
+played backwards.
+
+**Ink Cathedral.** Almost-black space. Luminous pearl-and-gold ink rises through
+it as you fill — tendrils that lean, branch and bundle into clustered piers —
+and at the springing line they turn into pointed arches that close from both
+sides at once toward a keystone that lights as it meets. In the last fifth of
+the in-breath the vault arrives: ribs fanning from every keystone to the point
+the ceiling gathers at, two soft shafts of light coming down through it, and a
+shimmer travelling along the ink.
+
+Then the exhale, which does not retract any of it. The architecture *loosens*:
+each strand has its own moment of release, flares brighter as it lets go, comes
+away from the structure it was holding and turns into vapour that drifts up and
+outward and thins to nothing. At the bottom there is a dark room with a few
+motes still in the air, which is where the next breath starts.
+
+**Moonpool.** You are under an impossibly calm dark ocean, looking up at
+Snell's window — the circle of sky a diver sees from below. Breathe in and the
+opening widens: more stars cross into it, faintest last, so the sky keeps giving
+you something the longer you fill. The moonlight spreads, caustics stretch away
+from the rim across the underside of the surface, shafts come down through the
+water, the haze thins and the dark at the edge of vision draws back. Breathe out
+and the ocean closes over you again — the light softening rather than switching
+off, until what is left is deep water with a few silver motes suspended in it.
+
+The water does not follow the breath, and the gap is the whole thing. The
+opening chases it through a first-order lag, so it is still widening a beat
+after you have stopped filling and still open a beat after you have started to
+empty. The rim is never a circle either: its radius is a sum of harmonics at
+ratios that do not resolve, on a clock of the scene's own. Water that tracked
+the breath exactly would read as a circle being scaled — which is what it would
+in fact be.
+
+**Never the same twice, and never a different place.** Both worlds keep two
+kinds of randomness strictly apart. A *session* seed, fixed for as long as the
+tab is open, decides what this cathedral is — how many bays, how far apart, how
+high the arches spring, how warm the ink runs — or where this session's moon
+hangs and how its stars are scattered. The *breath index* then perturbs that by
+a few percent and redraws the branching, the tendrils, the highlights and the
+surface. So no two breaths are the same, and every one of them is recognisably
+the same place you have been breathing in for ten minutes.
+
+Occasionally the hash lands on something rarer. About one breath in six brings
+the cathedral a rose window, a ceiling of constellations, one perfect twin arch,
+or a fall of light down the central axis. Moonpool's are rarer still — about one
+in twelve — and are a shooting star, a breath of unusual glassy stillness, a
+constellation drawn between its stars, a bloom of silver particles, or the moon
+drifting across the opening. They arrive when they arrive; a rarity that turns
+up on schedule is a feature rather than weather, and weather is the point.
+
+**The reward is at the top of the breath you were asked for.** Nothing of the
+vault exists below 78% of an in-breath, and Moonpool's faintest stars cross
+their threshold in the last third. That is deliberate, and so is the ceiling:
+the curve tops out at the cadence you picked, so finishing the guided inhale
+gets you all of it and breathing *harder* than the guide gets you nothing extra.
+
+With the background visualiser on, these two do not sit inside a room — they
+*are* the room, drawn out to the edges of the screen, re-centred on the orb and
+faded by the same mix as everything else. The room picker says so and steps
+aside rather than offering six choices that would change nothing. With
+`prefers-reduced-motion` on they hold one half-open pose exactly as the other
+six do, and the words, the countdown and the phase ring do the guiding.
 
 ### Five voices — the guide with your eyes shut
 
@@ -1166,13 +1243,39 @@ one modal surface in the app — a bottom sheet on a phone, a centred dialog fro
 about sixty lines. A headless UI package would be ~15 kB for behaviour we need
 exactly one variant of.
 
-**No animation library for the breathing guide.** Every layer of all six forms
-is driven by the same two CSS custom properties (`--e` for expansion, `--p` for
-phase progress) that [`useBreathing`](src/lib/useBreathing.ts) writes straight
-onto the element each frame. React re-renders once a second, for the countdown,
-and never for the animation itself — so the browser only ever composites
-transforms, opacity and one dash offset, and adding a seventh form would cost
-no JavaScript at all.
+**No animation library for the breathing guide.** Every layer of the six styled
+forms is driven by the same two CSS custom properties (`--e` for expansion,
+`--p` for phase progress) that [`useBreathing`](src/lib/useBreathing.ts) writes
+straight onto the element each frame. React re-renders once a second, for the
+countdown, and never for the animation itself — so the browser only ever
+composites transforms, opacity and one dash offset, and adding a seventh styled
+form would cost no JavaScript at all.
+
+**A canvas for the two forms that are places rather than shapes, and one clock
+for all eight.** Ink Cathedral and Moonpool need geometry that changes every
+breath, a few hundred points of light in a different position every frame, and
+an exhale that is a different event from the inhale — none of which CSS can be
+asked for honestly. They do *not* need a clock of their own, and giving them one
+would have been the mistake: a four-second loop agrees with a four-second breath
+for about a minute and then spends the rest of the session visibly disagreeing
+with it. So `useBreathing` writes the same frame it writes as `--e` into a plain
+object as numbers, and the renderers read whatever is in it when their own frame
+comes round. A canvas form is in step with a CSS form to the millisecond for
+exactly the reason two CSS forms are: they are not agreeing, they are the same
+number.
+
+Everything expensive about a scene like that is fill rate, so all the levers are
+about pixels. The device ratio is capped rather than honoured — 2× in the orb,
+which has edges worth resolving, 1.25× across the viewport, where the picture is
+soft gradients and the extra resolution is invisible, 1× on a modest device. The
+static ground each world sits on is a CSS gradient *behind* the canvas rather
+than two full-viewport fills every frame, which is the same house rule the rest
+of `theme.css` runs on: no gradient is ever recomputed per frame. Bays that fall
+off the edge of the screen are built — the geometry has to be identical in both
+canvases — and then not drawn. Points of light are stamped from one pre-rendered
+brush instead of allocating a radial gradient apiece, and nothing anywhere goes
+near `shadowBlur`, which is the obvious way to get a glow and the reliable way
+to turn sixty frames a second into twelve.
 
 **No React Bits or Skiper UI packages.** Both were used as *reference* for the
 kind of polish worth aiming at. The two effects that survived — a shimmer sweep
@@ -1421,6 +1524,31 @@ the result.
 - **Compatibility.** A loop record written by the previous version — no
   `brainwave` key, no `rainCharacter` — loads with the feature off and everything
   else intact. A tampered `targetHz` is rebuilt from its preset.
+- **One world, two canvases.** The living forms are drawn twice at once — inside
+  the orb and across the room — by two objects that never exchange a byte, so
+  the test that matters is that the same session and the same breath build a
+  byte-identical building. That is also the test that would fail, silently and
+  beautifully, the moment anyone reached for `Math.random()` inside the builder.
+  Around it: forty consecutive breaths are asserted to be forty different
+  buildings whose vault stays within a quarter of itself, because *never the
+  same twice* and *recognisably one place* are both requirements and they pull
+  against each other. Every seed is checked for Gothic proportions, for a vault
+  that fits the box it is drawn in, and for arches that close — both halves have
+  to reach the keystone, or an arch never visibly connects.
+- **An exhale is not a rewind.** `revealFor` is walked across whole breath
+  cycles at sixty frames a second and asserted never to decrease except in the
+  first frames of a new in-breath. This is the one rule the entire Ink Cathedral
+  rests on: tie the reveal to `--e` instead and the out-breath un-draws the
+  arches from the keystone down, which every viewer reads instantly as a video
+  being scrubbed backwards.
+- **Rarity stays rare.** Twenty thousand breaths of each form, asserting that
+  something happens about one breath in six for the cathedral and one in twelve
+  for Moonpool, that every rare moment is reachable rather than dead code, and
+  that the two forms do not brighten on the same breaths.
+- **Water has the same inertia at any frame rate.** `approach` is asserted to
+  land in the same place after a second at 30Hz and at 120Hz. The naive version
+  of that lag does not have this property, and the bug it causes — water that
+  lags twice as far on a fast screen — is invisible until someone reports it.
 - **Words on screen against words in the ear.** The spoken chunks are asserted
   to be exactly the lines the player counts, for short lines, blank lines,
   Windows line endings and a paragraph that has to be split — because the two
@@ -1446,7 +1574,10 @@ the result.
 src/
   components/     design system + composed UI
     Sheet.tsx             the one modal surface: bottom sheet / centred dialog
-    BreathingVisualizer   all six guide forms, plus the phase ring
+    BreathingVisualizer   all eight guide forms, plus the phase ring
+    LivingCanvas          the canvas, the frame loop and the device ratio the
+                          two drawn forms share — and nothing about what they
+                          look like, which belongs to the scenes
     PlayerAtmosphere      the room the player breathes in, on the orb's clock —
                           temperature, the scene, and the depth over both
     BackgroundScene       the six rooms, and the still frames the picker shows
@@ -1466,6 +1597,17 @@ src/
     speech.ts       line-per-utterance chunking, voices, the looping speaker
     voiceRanking.ts scores device voices and picks the best of each style
     breathing.ts    pure breath-phase maths, patterns and forms
+    random.ts       the two kinds of determinism the living forms need: a seeded
+                    stream for placing a field once, and a pure hash of
+                    (seed, breath) so two canvases build one world without
+                    ever speaking to each other
+    scenes/
+      types.ts        what a scene is, the shaping and colour it shares, and
+                      the soft brush every point of light is stamped from
+      inkCathedral.ts ink, arches, a vault, and an exhale that releases rather
+                      than rewinds
+      moonpool.ts     an ocean, an opening onto the sky, and water with inertia
+                      of its own
     breathAudio.ts  the breath's own synthesised voices
     breathEngine.ts the breath itself: one clock at module scope, owned by the
                     session rather than by a screen, writing phases onto the
