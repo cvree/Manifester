@@ -14,40 +14,27 @@ import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
 import { EmptyState } from '../components/EmptyState'
+import { PlayerAdjust } from '../components/PlayerAdjust'
 import { PlayerAtmosphere } from '../components/PlayerAtmosphere'
 import {
-  BreathIcon,
   CloseIcon,
   CollapseIcon,
   ExpandIcon,
   MuteIcon,
   PauseIcon,
   PlayIcon,
-  PulseIcon,
   SeedIcon,
   SparkIcon,
   StopIcon,
   TuneIcon,
   WaveIcon,
 } from '../components/Icons'
-import { SettingRow } from '../components/SettingRow'
-import { Slider } from '../components/Slider'
-import { VoiceQuickSettings } from '../components/VoiceQuickSettings'
-import { MAX_MUSIC_VOLUME } from '../lib/audioBus'
 import { cx } from '../lib/cx'
 import { primeBreathAudio } from '../lib/breathAudio'
 import { cue, primeFeedback } from '../lib/feedback'
 import { countWords, formatClock } from '../lib/format'
 import { useReducedMotion } from '../lib/motion'
-import { MAX_VOICE_VOLUME } from '../lib/speech'
-import {
-  affirmationLines,
-  brainwaveSummary,
-  breathingSummary,
-  feelSummary,
-  soundName,
-  soundSummary,
-} from '../lib/summaries'
+import { affirmationLines, soundName } from '../lib/summaries'
 import { useBackgroundMix } from '../lib/useBackgroundMix'
 import { useSessionBreathing } from '../lib/useBreathing'
 import { useFittedLine } from '../lib/useFittedLine'
@@ -69,8 +56,17 @@ const QUIET_AFTER_MS = 4200
  * The player.
  *
  * A calm ritual space rather than a media dashboard: one large breathing
- * guide, the line you are hearing, and the two controls that matter. Levels
- * and settings are present but quiet, below the fold of the stage.
+ * guide, the line you are hearing, and the controls that matter.
+ *
+ * There is one thing on this screen, and that is deliberate. It used to be two
+ * — the stage, and a column beside it carrying a Levels card, four setting rows
+ * and a button back to the editor — which made the calmest screen in the app
+ * look like a mixing desk, and on a phone put those controls *below* a
+ * full-height stage where they cluttered the page without being reachable.
+ * Everything from that column is one tap away in `PlayerAdjust`, from a control
+ * that sits in the same place whatever the size of the screen and whether or
+ * not the stage has been expanded. Nothing was taken away; it stopped being
+ * permanently in the way.
  *
  * The stage can also grow to fill the screen. That is one class and one tween
  * on this same markup — see `useStageExpansion` — rather than a second player:
@@ -100,19 +96,16 @@ export function PlayerRoute() {
     stop,
     prime,
     dismissNotice,
-    setLiveVoiceVolume,
-    setLiveMusicVolume,
-    setLiveRate,
-    setLivePitch,
-    setLiveVoice,
-    voices,
-    voicesReady,
-    resolvedDeviceVoice,
   } = useSession()
   const { preferences } = usePreferences()
   const { allTracks } = useLibrary()
   const { expanded, setExpanded } = useStage()
-  const [sheet, setSheet] = useState<PanelKey | null>(null)
+  /**
+   * Which surface is open over the stage: the Adjust sheet, one of the detail
+   * sheets it hands off to, or nothing. One value, because only one of them is
+   * ever open.
+   */
+  const [sheet, setSheet] = useState<PanelKey | 'adjust' | null>(null)
   const reducedMotion = useReducedMotion()
 
   const hasText = countWords(draft.text) > 0
@@ -473,14 +466,24 @@ export function PlayerRoute() {
         mode={preferences.backgroundMode}
       />
 
-      <div className="mx-auto grid max-w-xl grid-cols-[minmax(0,1fr)] gap-6 lg:max-w-none lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8 xl:grid-cols-[minmax(0,1fr)_26rem]">
+      {/*
+        One column, and the stage is what is in it.
+
+        There used to be a second column here carrying a Levels card, four
+        setting rows and a button — three surfaces of controls permanently
+        beside the one thing this screen is for, and on a phone they stacked
+        underneath a full-height stage where they were both clutter and out of
+        reach. All of it is one tap away in `PlayerAdjust` now, and the room
+        that is left goes to the orb.
+      */}
+      <div className="mx-auto flex max-w-2xl flex-col gap-6">
         {session.notice && (
           <div
             role="alert"
             data-rise
             inert={expanded}
             className={cx(
-              'flex items-start gap-3 rounded-[1.25rem] border border-[var(--gold)] bg-[var(--gold-soft)] px-4 py-3.5 lg:col-span-2',
+              'flex items-start gap-3 rounded-[1.25rem] border border-[var(--gold)] bg-[var(--gold-soft)] px-4 py-3.5',
               'transition-opacity duration-[620ms] ease-[var(--ease-breath)]',
               expanded && 'pointer-events-none opacity-0',
             )}
@@ -505,7 +508,7 @@ export function PlayerRoute() {
           expanded it is lifted out of the flow, and without this the column
           beside it would collapse upward and the page would scroll under it.
         */}
-        <div ref={slotRef} className="lg:col-start-1">
+        <div ref={slotRef}>
           {complete ? (
             <Card data-rise level="stage">
               <div className="flex flex-col items-center px-2 py-8 text-center">
@@ -603,7 +606,16 @@ export function PlayerRoute() {
               </button>
 
               <div className="stage__top flex w-full flex-col items-center">
-                <p className="type-label">{stateLabel}</p>
+                {/*
+                  Whether it is playing, resting between passes, paused or
+                  waiting for you is the one piece of status that has to be
+                  unmistakable — so it is announced as well as shown. It reads
+                  as a change of state rather than as a label being re-read,
+                  because it only ever changes when the state does.
+                */}
+                <p className="type-label" role="status" aria-live="polite">
+                  {stateLabel}
+                </p>
                 <h1 className="stage__title mt-2 max-w-full truncate text-center font-display text-[1.75rem] leading-tight text-ink sm:text-[2rem]">
                   {session.title || draft.title.trim() || 'Untitled loop'}
                 </h1>
@@ -714,18 +726,43 @@ export function PlayerRoute() {
                   <span className="type-meta">{timeCaption}</span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    cue('stop')
-                    stop()
-                  }}
-                  disabled={idle}
-                  className="stage__leave interactive inline-flex min-h-11 items-center gap-2 rounded-pill border border-[var(--control-border)] px-5 text-[0.92rem] font-medium text-ink-muted hover:bg-[var(--quiet)] hover:text-ink disabled:opacity-35"
-                >
-                  <StopIcon className="text-[0.85rem]" />
-                  End session
-                </button>
+                {/*
+                  The two quiet ones, side by side and the same size, because
+                  they are the same kind of thing: everything that is not
+                  play/pause.
+
+                  Adjust is here rather than in a column beside the stage so
+                  that there is one way to reach the settings and it is the same
+                  way on a phone, on a desktop, and with the stage filling the
+                  screen — where a column would not exist at all. Both step back
+                  when the room goes quiet; both come straight back on a
+                  keyboard. See `.stage__leave`.
+                */}
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      cue('tap')
+                      setSheet('adjust')
+                    }}
+                    className="stage__leave interactive inline-flex min-h-11 items-center gap-2 rounded-pill border border-[var(--control-border)] px-5 text-[0.92rem] font-medium text-ink-muted hover:bg-[var(--quiet)] hover:text-ink"
+                  >
+                    <TuneIcon className="text-[0.9rem]" />
+                    Adjust
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      cue('stop')
+                      stop()
+                    }}
+                    disabled={idle}
+                    className="stage__leave interactive inline-flex min-h-11 items-center gap-2 rounded-pill border border-[var(--control-border)] px-5 text-[0.92rem] font-medium text-ink-muted hover:bg-[var(--quiet)] hover:text-ink disabled:opacity-35"
+                  >
+                    <StopIcon className="text-[0.85rem]" />
+                    End session
+                  </button>
+                </div>
               </div>
 
               {/*
@@ -777,132 +814,28 @@ export function PlayerRoute() {
           )}
         </div>
 
-        {/* ── The quiet column ── */}
-        {/*
-          It slides quietly out of the way while the stage has the screen, and
-          goes inert with it: nothing behind an expanded stage should be
-          reachable by tab, or announced to a screen reader, while it is there.
-        */}
-        <div
-          data-rise
-          inert={expanded}
-          aria-hidden={expanded || undefined}
-          className={cx(
-            'space-y-4 lg:col-start-2 lg:sticky lg:top-6 lg:self-start',
-            'transition-[opacity,transform] duration-[620ms] ease-[var(--ease-breath)]',
-            expanded && 'pointer-events-none translate-y-4 opacity-0',
-          )}
-        >
-          <Card level="panel" title="Levels">
-            <div className="space-y-5">
-              <Slider
-                label="Voice"
-                min={0}
-                max={MAX_VOICE_VOLUME}
-                step={0.05}
-                value={draft.settings.voiceVolume}
-                display={`${Math.round(draft.settings.voiceVolume * 100)}%`}
-                onChange={setLiveVoiceVolume}
-              />
-              <Slider
-                label="Sound"
-                min={0}
-                max={MAX_MUSIC_VOLUME}
-                step={0.05}
-                value={draft.settings.musicVolume}
-                display={`${Math.round(draft.settings.musicVolume * 100)}%`}
-                onChange={setLiveMusicVolume}
-              />
-
-              {/*
-                The other three numbers that shape a voice, folded away under
-                the two that are always wanted. All of them are live — the
-                running speech loop is re-optioned rather than restarted — so
-                a voice that is a shade too fast can be fixed without leaving
-                the player or breaking the loop's step.
-              */}
-              <VoiceQuickSettings
-                settings={draft.settings}
-                voices={voices}
-                voicesReady={voicesReady}
-                resolved={resolvedDeviceVoice}
-                onVoiceChange={setLiveVoice}
-                onRateChange={setLiveRate}
-                onPitchChange={setLivePitch}
-                live={!idle}
-              />
-            </div>
-            {!idle && (
-              <p className="type-meta mt-4">
-                Voice level takes effect on the next line.
-              </p>
-            )}
-          </Card>
-
-          <div className="surface-panel overflow-hidden">
-            {/*
-              The same sheet the stage's corner button opens. It is worth
-              having in both places: the corner is where your hand is while
-              you listen, and this is where the eye looks when the player is a
-              page rather than a room.
-            */}
-            <SettingRow
-              icon={soundOn ? <WaveIcon /> : <MuteIcon />}
-              title="Background sound"
-              summary={soundSummary(draft.settings, allTracks)}
-              onClick={() => {
-                cue('tap')
-                setSheet('sound')
-              }}
-              accent={soundOn}
-            />
-            <SettingRow
-              icon={<PulseIcon />}
-              title="Brainwave rhythm"
-              summary={brainwaveSummary(draft.settings.brainwave)}
-              onClick={() => {
-                cue('tap')
-                setSheet('brainwave')
-              }}
-              accent={draft.settings.brainwave.enabled}
-            />
-            <SettingRow
-              icon={<BreathIcon />}
-              title="Breathing"
-              summary={breathingSummary(
-                preferences.breathingEnabled,
-                preferences.breathPattern,
-                preferences.breathStyle,
-                preferences.breathSound,
-                preferences.backgroundVisualizer,
-                preferences.backgroundMode,
-              )}
-              onClick={() => {
-                cue('tap')
-                setSheet('breathing')
-              }}
-              accent={preferences.breathingEnabled || backgroundOn}
-            />
-            <SettingRow
-              icon={<TuneIcon />}
-              title="Haptics and sounds"
-              summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
-              onClick={() => {
-                cue('tap')
-                setSheet('feel')
-              }}
-            />
-          </div>
-
-          <div className="flex justify-center lg:justify-start">
-            <Button variant="ghost" onClick={() => navigate('/create')}>
-              Edit these words
-            </Button>
-          </div>
-        </div>
       </div>
 
-      <SettingsSheets open={sheet} onOpenChange={setSheet} />
+      {/*
+        One sheet at a time. Choosing a row inside Adjust closes it and opens
+        the sheet that row is about, rather than stacking a second scrim and a
+        second focus trap over the first — and the way out of the second one is
+        the stage, which is where you were going anyway.
+      */}
+      <PlayerAdjust
+        open={sheet === 'adjust'}
+        onClose={() => setSheet(null)}
+        onOpenPanel={setSheet}
+        onEditWords={() => {
+          cue('tap')
+          setSheet(null)
+          navigate('/create')
+        }}
+      />
+      <SettingsSheets
+        open={sheet === 'adjust' ? null : sheet}
+        onOpenChange={setSheet}
+      />
     </>
   )
 }
