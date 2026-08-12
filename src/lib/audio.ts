@@ -21,7 +21,7 @@ import {
   type RainCharacter,
 } from './ambient'
 import type { AudioBus } from './audioBus'
-import { scheduleIn } from './heartbeat'
+import { onHeartbeat, scheduleIn } from './heartbeat'
 import { isLowPowerDevice } from './motion'
 import type { RepeatMode } from './types'
 
@@ -69,6 +69,8 @@ export class MusicEngine {
    */
   private segmentCancel: (() => void) | null = null
   private fadeTimer: number | null = null
+  /** Detaches the heartbeat that keeps a media-element fade smooth when hidden. */
+  private fadeRelease: (() => void) | null = null
 
   private queue: TrackSource[] = []
   private queueIndex = 0
@@ -386,7 +388,22 @@ export class MusicEngine {
     void this.playCurrent(generation)
   }
 
-  /** Linear volume ramp for media elements, which have no scheduled params. */
+  /**
+   * Linear volume ramp for media elements, which have no scheduled params.
+   *
+   * Every step recomputes from the wall clock, so the fade always *lands* on
+   * target however badly its callbacks are throttled — only the number of steps
+   * between here and there changes. The heartbeat runs alongside the timer
+   * because a hidden tab clamps that timer to a second, and a 1.5-second
+   * crossfade taken in two jumps is a click rather than a fade. It is a narrow
+   * case — a playlist has to advance onto or off an imported file while the
+   * page is out of sight — but a click is exactly the sort of "the sound
+   * changed when I switched tabs" all of this exists to remove.
+   *
+   * A generated ambience never comes through here: it crossfades on an
+   * `AudioParam`, which is sample-accurate and completely indifferent to
+   * whether anybody is looking.
+   */
   private rampElement(
     element: HTMLAudioElement,
     target: number,
@@ -401,13 +418,16 @@ export class MusicEngine {
       const progress = Math.min(1, (performance.now() - startedAt) / durationMs)
       element.volume = Math.min(1, Math.max(0, start + (target - start) * progress))
       if (progress < 1) {
+        // Only the timer is re-armed; the heartbeat is already running.
+        if (this.fadeTimer != null) clearTimeout(this.fadeTimer)
         this.fadeTimer = window.setTimeout(step, 30)
-      } else {
-        this.fadeTimer = null
-        onDone?.()
+        return
       }
+      this.clearFadeTimer()
+      onDone?.()
     }
 
+    this.fadeRelease = onHeartbeat(step)
     step()
   }
 
@@ -417,6 +437,8 @@ export class MusicEngine {
   }
 
   private clearFadeTimer(): void {
+    this.fadeRelease?.()
+    this.fadeRelease = null
     if (this.fadeTimer != null) {
       clearTimeout(this.fadeTimer)
       this.fadeTimer = null
