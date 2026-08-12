@@ -159,9 +159,6 @@ export function CreateRoute() {
   const breathing = useBreathing({
     pattern: preferences.breathPattern,
     active: preferences.breathingEnabled,
-    sound: 'off',
-    soundVolume: 0,
-    hapticCues: false,
   })
 
   /*

@@ -32,6 +32,7 @@ import {
   wake,
 } from './audioSession'
 import { easeInOut, type BreathPhase } from './breathing'
+import { registerClockSource, releaseClockSource } from './heartbeat'
 
 export type BreathVoiceId = 'chime' | 'bowl' | 'ocean' | 'breath' | 'drone'
 export type BreathSound = 'off' | BreathVoiceId
@@ -132,12 +133,27 @@ function context(): AudioContext | null {
     if (!Ctor) return null
     sharedContext = new Ctor()
     releaseContext = keepAwake(sharedContext)
+    // The breath's context is the one that exists whenever a guide is running,
+    // so it is the natural clock for everything that must keep time out of
+    // sight. Offering it is free; the heartbeat takes the first one it is given.
+    registerClockSource(sharedContext)
   }
 
   // Not `state === 'suspended'`: iOS parks an interrupted context in a state
   // of its own, and this loop is exactly the kind of long-running audio that
   // gets interrupted — a call, an alarm, the screen locking.
   wake(sharedContext)
+  return sharedContext
+}
+
+/**
+ * The context the guide's voice runs on, if it has been opened.
+ *
+ * `breathEngine` needs it to convert wall-clock time into audio-clock time,
+ * which is the conversion that lets a breath be scheduled before it happens.
+ * It never opens one — that has to come from a gesture, through `primeBreathAudio`.
+ */
+export function breathContext(): AudioContext | null {
   return sharedContext
 }
 
@@ -178,13 +194,19 @@ function noise(ctx: AudioContext): AudioBuffer {
 
 /* ── Param helpers ──────────────────────────────────────────── */
 
-function pin(param: AudioParam, at: number): void {
+/**
+ * Cut every scheduled value from `at` onward and hold whatever the param had
+ * reached. Returns that value, which is where the next ramp has to start from.
+ */
+function pin(param: AudioParam, at: number): number {
+  const held = param.value
   param.cancelScheduledValues(at)
-  param.setValueAtTime(param.value, at)
+  param.setValueAtTime(held, at)
+  return held
 }
 
 /**
- * Travel a param from where it is to `to` over `seconds`, along `shape`.
+ * Travel a param from `from` to `to` over `seconds`, along `shape`.
  *
  * Deliberately a chain of short linear ramps rather than
  * `setValueCurveAtTime`: a curve throws if it overlaps another curve, and
@@ -192,20 +214,27 @@ function pin(param: AudioParam, at: number): void {
  * phase that ends early. Linear segments can always be cancelled and
  * re-pointed from wherever the value actually reached, which is the property
  * that keeps this click-free.
+ *
+ * `from` is passed in rather than read off the param, and that is the whole
+ * reason a breath can be scheduled *before it happens*. `param.value` is the
+ * value now; a phase being laid down six seconds ahead has to start from the
+ * value the phase before it will have left behind, which only the caller
+ * knows. Reading the param here is what made this module unable to work
+ * further ahead than the current frame — see `breathEngine`.
  */
 function glide(
   param: AudioParam,
+  from: number,
   to: number,
   seconds: number,
   start: number,
   shape: (t: number) => number = easeInOut,
 ): void {
-  pin(param, start)
+  param.setValueAtTime(from, start)
   if (seconds <= 0) {
     param.setValueAtTime(to, start)
     return
   }
-  const from = param.value
   for (let i = 1; i <= CURVE_STEPS; i += 1) {
     const t = i / CURVE_STEPS
     param.linearRampToValueAtTime(
@@ -224,17 +253,17 @@ function glide(
  */
 function swell(
   param: AudioParam,
+  from: number,
   peak: number,
   seconds: number,
   start: number,
   floor = 0,
 ): void {
-  pin(param, start)
+  param.setValueAtTime(from, start)
   if (seconds <= 0) {
     param.setValueAtTime(floor, start)
     return
   }
-  const from = param.value
   for (let i = 1; i <= CURVE_STEPS; i += 1) {
     const t = i / CURVE_STEPS
     // A raised sine hump: zero at both ends, one in the middle.
@@ -277,6 +306,20 @@ export class BreathVoicePlayer {
   private volume = DEFAULT_BREATH_VOLUME
   private sustained: Sustained | null = null
   private running = false
+  /*
+   * Where each param will be standing once everything already scheduled has
+   * played out — not where it is now.
+   *
+   * This is the difference between a guide that can only react and one that can
+   * be written down in advance. Phases are laid onto the audio clock several
+   * breaths ahead (see `breathEngine`), so the ramp for the out-breath at
+   * t+9s has to begin from the value the in-breath at t+4s will have reached.
+   * Asking the param would give the value *now*, and every scheduled phase
+   * would start from the wrong place.
+   */
+  private levelEnd = 0
+  private colourEnd = 0
+  private colour2End = 0
 
   constructor(ctx: AudioContext, destination: AudioNode) {
     this.ctx = ctx
@@ -322,19 +365,49 @@ export class BreathVoicePlayer {
   /**
    * Sound one phase of the breath, scheduled across its whole duration.
    *
-   * Called once per phase change rather than per frame: the Web Audio clock is
+   * Called once per phase rather than per frame: the Web Audio clock is
    * sample-accurate and the animation clock is not, so handing the phase's
    * length to the audio thread keeps the sound exactly in step even while the
-   * main thread is busy laying out a settings sheet.
+   * main thread is busy laying out a settings sheet — or not running at all,
+   * which is what a hidden tab is.
+   *
+   * `at` is what makes the second half of that true. Left out, this means
+   * "now", and everything already scheduled is cut: the live, interrupting
+   * call, for a pattern change or a stop. Given a context time, the phase is
+   * *appended* to the schedule instead, chaining from the value the previous
+   * scheduled phase will leave behind. `breathEngine` uses that to lay several
+   * breaths onto the audio clock at a time, which is why backgrounding the tab
+   * no longer stops the guide from breathing.
    */
-  phase(phase: BreathPhase, seconds: number): void {
+  phase(phase: BreathPhase, seconds: number, at?: number): void {
     if (!this.running || this.voice === 'off') return
 
     const now = this.ctx.currentTime
     const length = Math.max(0.15, seconds)
+    // A phase whose moment has already passed is heard now rather than not at
+    // all — and it has to interrupt, because the schedule it was meant to join
+    // is behind us.
+    const start = at != null && at > now ? at : now
+    if (at == null || at <= now) this.resetSchedule(now)
 
-    if (this.sustained) this.sustainedPhase(phase, length, now)
-    else this.struckPhase(phase, now)
+    if (this.sustained) this.sustainedPhase(phase, length, start)
+    else this.struckPhase(phase, start)
+  }
+
+  /**
+   * Forget everything scheduled ahead and hold the sound exactly where it is.
+   *
+   * The one honest way to change your mind mid-breath: a pattern edit, a
+   * resumed session, a jump in the clock. Every param is pinned at the value it
+   * had actually reached, so what comes next starts from the sound in the room
+   * rather than from the sound that was going to be there.
+   */
+  resetSchedule(at = this.ctx.currentTime): void {
+    const graph = this.sustained
+    if (!graph) return
+    this.levelEnd = pin(graph.level.gain, at)
+    this.colourEnd = pin(graph.colour, at)
+    if (graph.colour2) this.colour2End = pin(graph.colour2, at)
   }
 
   dispose(): void {
@@ -349,6 +422,16 @@ export class BreathVoicePlayer {
   /* ── Graph construction ── */
 
   private build(): void {
+    this.buildGraph()
+    // A fresh graph is the one moment the params really are where they say they
+    // are, so the schedule is anchored to them rather than to a guess.
+    const graph = this.sustained
+    this.levelEnd = graph ? graph.level.gain.value : 0
+    this.colourEnd = graph ? graph.colour.value : 0
+    this.colour2End = graph?.colour2 ? graph.colour2.value : 0
+  }
+
+  private buildGraph(): void {
     const meta = findVoice(this.voice)
     if (!meta?.sustained) return
 
@@ -464,12 +547,31 @@ export class BreathVoicePlayer {
 
   /* ── Per-phase scheduling ── */
 
-  private sustainedPhase(phase: BreathPhase, seconds: number, now: number): void {
+  private sustainedPhase(phase: BreathPhase, seconds: number, at: number): void {
     const graph = this.sustained
     if (!graph) return
 
     const peak = VOICE_GAIN[this.voice as BreathVoiceId] ?? 0.2
     const { level, colour, colour2 } = graph
+
+    /*
+     * Each of these both schedules the ramp and records where it lands, so the
+     * phase appended after it knows where to begin. Keeping the two together
+     * is the only way they cannot drift apart.
+     */
+    const toLevel = (target: number, over: number) => {
+      glide(level.gain, this.levelEnd, target, over, at)
+      this.levelEnd = target
+    }
+    const toColour = (target: number, over: number) => {
+      glide(colour, this.colourEnd, target, over, at)
+      this.colourEnd = target
+    }
+    const swellLevel = (target: number, over: number) => {
+      swell(level.gain, this.levelEnd, target, over, at)
+      // A swell is a hump: it ends where it began, at the floor.
+      this.levelEnd = 0
+    }
 
     if (this.voice === 'drone') {
       // Pitch alone carries the phase: up a fifth on the way in, back down on
@@ -477,12 +579,15 @@ export class BreathVoicePlayer {
       const target =
         phase === 'inhale' || phase === 'holdIn' ? DRONE_BASE * 1.5 : DRONE_BASE
       const travel = phase === 'inhale' || phase === 'exhale' ? seconds : 0.25
-      glide(colour, target, travel, now)
-      if (colour2) glide(colour2, target, travel, now)
+      toColour(target, travel)
+      if (colour2) {
+        glide(colour2, this.colour2End, target, travel, at)
+        this.colour2End = target
+      }
 
       const loud =
         phase === 'inhale' || phase === 'holdIn' ? peak : peak * 0.72
-      glide(level.gain, phase === 'holdOut' ? peak * 0.4 : loud, Math.min(seconds, 1.2), now)
+      toLevel(phase === 'holdOut' ? peak * 0.4 : loud, Math.min(seconds, 1.2))
       return
     }
 
@@ -490,20 +595,20 @@ export class BreathVoicePlayer {
       switch (phase) {
         case 'inhale':
           // The wave gathers: louder and brighter the further in you get.
-          glide(level.gain, peak, seconds, now)
-          glide(colour, OCEAN_HIGH, seconds, now)
+          toLevel(peak, seconds)
+          toColour(OCEAN_HIGH, seconds)
           break
         case 'holdIn':
-          glide(level.gain, peak * 0.8, Math.min(seconds, 1), now)
-          glide(colour, OCEAN_HIGH * 0.85, Math.min(seconds, 1), now)
+          toLevel(peak * 0.8, Math.min(seconds, 1))
+          toColour(OCEAN_HIGH * 0.85, Math.min(seconds, 1))
           break
         case 'exhale':
-          glide(level.gain, peak * 0.12, seconds, now)
-          glide(colour, OCEAN_LOW, seconds, now)
+          toLevel(peak * 0.12, seconds)
+          toColour(OCEAN_LOW, seconds)
           break
         case 'holdOut':
-          glide(level.gain, 0, Math.min(seconds, 0.8), now)
-          glide(colour, OCEAN_LOW, Math.min(seconds, 0.8), now)
+          toLevel(0, Math.min(seconds, 0.8))
+          toColour(OCEAN_LOW, Math.min(seconds, 0.8))
           break
       }
       return
@@ -513,15 +618,15 @@ export class BreathVoicePlayer {
     // with the band rising on the way in and falling on the way out.
     switch (phase) {
       case 'inhale':
-        swell(level.gain, peak, seconds, now)
-        glide(colour, HUSH_HIGH, seconds, now)
+        swellLevel(peak, seconds)
+        toColour(HUSH_HIGH, seconds)
         break
       case 'exhale':
-        swell(level.gain, peak * 0.92, seconds, now)
-        glide(colour, HUSH_LOW, seconds, now)
+        swellLevel(peak * 0.92, seconds)
+        toColour(HUSH_LOW, seconds)
         break
       default:
-        glide(level.gain, 0, Math.min(seconds, 0.45), now)
+        toLevel(0, Math.min(seconds, 0.45))
         break
     }
   }
@@ -703,6 +808,7 @@ export function disposeBreathAudio(): void {
   if (sharedContext) {
     releaseContext?.()
     releaseContext = null
+    releaseClockSource(sharedContext)
     void sharedContext.close().catch(() => undefined)
     sharedContext = null
   }

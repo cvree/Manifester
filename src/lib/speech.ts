@@ -13,6 +13,8 @@
  *    can never let an old session resurrect itself.
  */
 
+import { scheduleAt } from './heartbeat'
+
 /** Longer chunks are more natural; shorter chunks are more reliable. */
 const MAX_CHUNK_CHARS = 180
 /** If nothing is speaking or pending for this long, assume the chunk ended. */
@@ -296,7 +298,18 @@ export class SpeechLooper {
   private voices: SpeechSynthesisVoice[] = []
   /** Held so Chrome cannot garbage-collect an utterance that is still speaking. */
   private pending = new Set<SpeechSynthesisUtterance>()
-  private pauseTimer: number | null = null
+  /**
+   * Cancels the silence between repetitions.
+   *
+   * Not a `setTimeout` id, because a `setTimeout` is not a promise about when
+   * anything happens: a hidden tab clamps it to a second and can push it much
+   * further than that. The gap between passes is part of the sound design — a
+   * three-second rest that becomes an eleven-second rest because somebody
+   * checked their email is exactly the kind of unasked-for change this pass
+   * exists to remove. `scheduleAt` arms a timer *and* a heartbeat, so whichever
+   * of the two the browser is still honouring is the one that fires it.
+   */
+  private gapCancel: (() => void) | null = null
   private stallTimer: number | null = null
   private announceTimer: number | null = null
   private keepAlive: number | null = null
@@ -321,7 +334,7 @@ export class SpeechLooper {
   get delayRemainingSeconds(): number | null {
     if (!this.running) return null
     if (this.pausedGapMs != null) return this.pausedGapMs / 1000
-    if (this.pauseTimer != null && this.gapEndsAt > 0) {
+    if (this.gapCancel != null && this.gapEndsAt > 0) {
       return Math.max(0, (this.gapEndsAt - Date.now()) / 1000)
     }
     return null
@@ -370,13 +383,41 @@ export class SpeechLooper {
 
     // Pausing during the silence between repetitions has to remember how much
     // of that silence is left, or the loop would never start again.
-    if (this.pauseTimer != null) {
+    if (this.gapCancel != null) {
       this.pausedGapMs = Math.max(0, this.gapEndsAt - Date.now())
     }
 
-    this.clearTimer('pauseTimer')
+    this.clearGap()
     this.clearTimer('stallTimer')
     window.speechSynthesis.pause()
+  }
+
+  /**
+   * Check that the voice is still going, and start it again if it is not.
+   *
+   * Speech synthesis renders outside the page and outside this app's control,
+   * and browsers treat a backgrounded tab's queue with a good deal of latitude:
+   * Chrome has been known to drop the queue on the floor, and iOS pauses it
+   * when the app goes away and does not always resume it. The stall watchdog
+   * catches that while the page is visible; this is the same question asked at
+   * the one other moment it is worth asking — the moment somebody comes back
+   * and would otherwise be looking at a running clock over silence.
+   *
+   * It is careful to be a no-op in every case where something *is* happening,
+   * including the deliberate silence between passes, so it can never
+   * double-speak.
+   */
+  recover(): void {
+    if (!this.running || !isSpeechSupported()) return
+    if (this.gapCancel != null || this.pausedGapMs != null) return
+
+    const synth = window.speechSynthesis
+    if (synth.speaking || synth.pending) {
+      // Speaking but parked: iOS leaves the queue paused after an interruption.
+      if (synth.paused) synth.resume()
+      return
+    }
+    this.advance(this.generation)
   }
 
   resume(): void {
@@ -403,7 +444,7 @@ export class SpeechLooper {
     this.pending.clear()
     this.gapEndsAt = 0
     this.pausedGapMs = null
-    this.clearTimer('pauseTimer')
+    this.clearGap()
     this.clearTimer('stallTimer')
     this.clearTimer('announceTimer')
     this.stopKeepAlive()
@@ -520,13 +561,18 @@ export class SpeechLooper {
 
   /** Hold the silence between repetitions, then begin again. */
   private startGap(generation: number, durationMs: number): void {
-    this.clearTimer('pauseTimer')
+    this.clearGap()
     this.gapEndsAt = Date.now() + durationMs
-    this.pauseTimer = window.setTimeout(() => {
-      this.pauseTimer = null
+    this.gapCancel = scheduleAt(this.gapEndsAt, () => {
+      this.gapCancel = null
       this.gapEndsAt = 0
       this.speakCurrent(generation)
-    }, durationMs)
+    })
+  }
+
+  private clearGap(): void {
+    this.gapCancel?.()
+    this.gapCancel = null
   }
 
   /**
@@ -578,7 +624,7 @@ export class SpeechLooper {
     handlers.onFinish?.()
   }
 
-  private clearTimer(which: 'pauseTimer' | 'stallTimer' | 'announceTimer'): void {
+  private clearTimer(which: 'stallTimer' | 'announceTimer'): void {
     const id = this[which]
     if (id != null) {
       clearTimeout(id)

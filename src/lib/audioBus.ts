@@ -28,6 +28,7 @@ import {
   releaseMediaChannel,
   wake,
 } from './audioSession'
+import { registerClockSource, releaseClockSource } from './heartbeat'
 
 /** Short enough to feel immediate on a slider, long enough not to step. */
 const RAMP_SECONDS = 0.12
@@ -182,6 +183,10 @@ export class AudioBus {
       this.release = keepAwake(this.ctx, () => !this.parked)
     }
 
+    // The audio thread is the one clock a hidden tab cannot slow down, and
+    // everything that has to keep time out of sight runs on it. See `heartbeat`.
+    registerClockSource(this.ctx)
+
     // Not `state === 'suspended'`: iOS has an `interrupted` state as well, and
     // a context left in it never comes back on its own.
     this.parked = false
@@ -232,6 +237,7 @@ export class AudioBus {
     if (!this.ctx) return
     this.release?.()
     this.release = null
+    releaseClockSource(this.ctx)
     void this.ctx.close().catch(() => undefined)
     this.ctx = null
     this.graph = null

@@ -21,6 +21,7 @@ import {
   type RainCharacter,
 } from './ambient'
 import type { AudioBus } from './audioBus'
+import { scheduleIn } from './heartbeat'
 import { isLowPowerDevice } from './motion'
 import type { RepeatMode } from './types'
 
@@ -57,7 +58,16 @@ export class MusicEngine {
   private ambient: AmbientHandle | null = null
   private element: HTMLAudioElement | null = null
   private objectUrl: string | null = null
-  private segmentTimer: number | null = null
+  /**
+   * Cancels the wait before a playlist moves off a generated ambience.
+   *
+   * Through the heartbeat rather than `setTimeout`, because when a playlist
+   * moves on is part of the sound design. A hidden tab can hold an ordinary
+   * timer well past its due time, and a soundscape that was meant to hand over
+   * after two and a half minutes carrying on for six is precisely the "why did
+   * the sound change — or not change?" this pass is about.
+   */
+  private segmentCancel: (() => void) | null = null
   private fadeTimer: number | null = null
 
   private queue: TrackSource[] = []
@@ -276,10 +286,10 @@ export class MusicEngine {
     // A generated ambience never "ends", so a playlist needs a nudge.
     const loopsForever = this.queue.length === 1 || this.repeat === 'one'
     if (!loopsForever) {
-      this.segmentTimer = window.setTimeout(() => {
-        this.segmentTimer = null
+      this.segmentCancel = scheduleIn(BUILTIN_SEGMENT_MS, () => {
+        this.segmentCancel = null
         this.advance(generation)
-      }, BUILTIN_SEGMENT_MS)
+      })
     }
   }
 
@@ -402,10 +412,8 @@ export class MusicEngine {
   }
 
   private clearSegmentTimer(): void {
-    if (this.segmentTimer != null) {
-      clearTimeout(this.segmentTimer)
-      this.segmentTimer = null
-    }
+    this.segmentCancel?.()
+    this.segmentCancel = null
   }
 
   private clearFadeTimer(): void {

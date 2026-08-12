@@ -18,6 +18,9 @@ import {
 import { findAmbientPreset } from '../lib/ambient'
 import { MusicEngine, type TrackSource } from '../lib/audio'
 import { AudioBus } from '../lib/audioBus'
+import { configureBreath, setBreathActive } from '../lib/breathEngine'
+import { beat } from '../lib/heartbeat'
+import { usePreferences } from './PreferencesProvider'
 import {
   BrainwaveVoice,
   normaliseBrainwave,
@@ -162,6 +165,7 @@ function newDraft(): Draft {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const { preferences } = usePreferences()
   const [draft, setDraft] = useState<Draft>(newDraft)
   const [voices, setVoices] = useState<RankedVoice[]>([])
   const [voicesReady, setVoicesReady] = useState(false)
@@ -698,29 +702,73 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     })
   }, [draft.settings.sound.rainCharacter])
 
+  /* ── The breathing guide ── */
+
+  /*
+   * The guide is driven from here, and that is the whole point of it being
+   * here.
+   *
+   * It used to be driven from inside the player's own animation loop, which
+   * meant it stopped when the player was not on screen and stopped again when
+   * the tab was not on screen — so leaving the player for the library silenced
+   * the breath cues under a session that was otherwise still running, and
+   * switching tabs silenced them and then made them lurch on the way back. The
+   * session provider is the one thing in this app that is mounted for as long
+   * as there is a session, so this is where the guide belongs; the player draws
+   * a picture of it and nothing more. See `breathEngine`.
+   */
+  useEffect(() => {
+    configureBreath({
+      pattern: preferences.breathPattern,
+      sound: preferences.breathSound,
+      volume: preferences.breathSoundVolume,
+      haptics: preferences.breathHapticCues,
+    })
+  }, [
+    preferences.breathPattern,
+    preferences.breathSound,
+    preferences.breathSoundVolume,
+    preferences.breathHapticCues,
+  ])
+
+  useEffect(() => {
+    setBreathActive(preferences.breathingEnabled && session.status === 'playing')
+  }, [preferences.breathingEnabled, session.status])
+
   /* ── Lifecycle ── */
 
   useEffect(() => {
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        /*
-         * The media element was the only thing being recovered here, which
-         * left the whole generated mix behind: every ambience and the
-         * brainwave rhythm live on the bus's `AudioContext`, and a phone that
-         * has been locked, taken a call, or simply let another app have the
-         * audio route hands that context back suspended — or, on iOS,
-         * interrupted. The session would come back with a running clock, a
-         * moving orb and a spoken voice, and no sound underneath any of it.
-         */
-        if (session.status === 'playing') busRef.current?.resume()
-        musicRef.current?.resumeIfSuspended()
-        if (wakeLockRef.current === null && session.status === 'playing') {
-          void requestWakeLock()
-        }
+    const recover = () => {
+      if (document.visibilityState !== 'visible') return
+      /*
+       * The media element was the only thing being recovered here, which
+       * left the whole generated mix behind: every ambience and the
+       * brainwave rhythm live on the bus's `AudioContext`, and a phone that
+       * has been locked, taken a call, or simply let another app have the
+       * audio route hands that context back suspended — or, on iOS,
+       * interrupted. The session would come back with a running clock, a
+       * moving orb and a spoken voice, and no sound underneath any of it.
+       */
+      if (session.status === 'playing') busRef.current?.resume()
+      musicRef.current?.resumeIfSuspended()
+      if (wakeLockRef.current === null && session.status === 'playing') {
+        void requestWakeLock()
       }
+      /*
+       * And a catch-up on everything that schedules ahead — the breath, the
+       * ambience's transients, the gap between repetitions — so anything a
+       * throttled timer left undone is done on this turn rather than up to
+       * half a second later, which is long enough to hear.
+       */
+      beat()
+      if (session.status === 'playing') speechRef.current?.recover()
     }
-    document.addEventListener('visibilitychange', onVisibility)
-    return () => document.removeEventListener('visibilitychange', onVisibility)
+    document.addEventListener('visibilitychange', recover)
+    window.addEventListener('pageshow', recover)
+    return () => {
+      document.removeEventListener('visibilitychange', recover)
+      window.removeEventListener('pageshow', recover)
+    }
   }, [requestWakeLock, session.status])
 
   useEffect(() => {
@@ -735,6 +783,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       brainwave?.dispose()
       timer?.stop()
       bus?.close()
+      setBreathActive(false)
       stopElapsed()
     }
   }, [stopElapsed])

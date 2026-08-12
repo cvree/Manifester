@@ -97,9 +97,6 @@ export function BreathingSettings({
   const preview = useBreathing({
     pattern,
     active: preferences.breathingEnabled && valid,
-    sound: 'off',
-    soundVolume: 0,
-    hapticCues: false,
   })
 
   const [auditioning, setAuditioning] = useState<BreathSound | null>(null)

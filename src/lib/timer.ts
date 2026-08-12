@@ -2,8 +2,13 @@
  * Session countdown.
  *
  * Wall-clock based rather than tick-counting, so a backgrounded tab (where
- * timers are throttled hard) still finishes at the right moment.
+ * timers are throttled hard) still finishes at the right moment — and driven by
+ * the heartbeat as well as by its own interval, so "the right moment" is not
+ * left to a timer a hidden tab is entitled to ignore. A thirty-minute session
+ * should end after thirty minutes whether or not anyone was watching it.
  */
+
+import { onHeartbeat } from './heartbeat'
 
 export interface SessionTimerHandlers {
   onTick?: (remainingSeconds: number) => void
@@ -16,6 +21,7 @@ export class SessionTimer {
   private endsAt = 0
   private pausedRemaining: number | null = null
   private interval: number | null = null
+  private release: (() => void) | null = null
   private handlers: SessionTimerHandlers = {}
 
   get isRunning(): boolean {
@@ -34,7 +40,7 @@ export class SessionTimer {
     this.endsAt = Date.now() + durationMs
     this.pausedRemaining = null
     this.handlers.onTick?.(durationMs / 1000)
-    this.interval = window.setInterval(() => this.tick(), TICK_MS)
+    this.run()
   }
 
   pause(): void {
@@ -47,7 +53,7 @@ export class SessionTimer {
     if (this.pausedRemaining == null) return
     this.endsAt = Date.now() + this.pausedRemaining
     this.pausedRemaining = null
-    this.interval = window.setInterval(() => this.tick(), TICK_MS)
+    this.run()
   }
 
   stop(): void {
@@ -66,10 +72,20 @@ export class SessionTimer {
     }
   }
 
+  private run(): void {
+    this.clearInterval()
+    // Four times a second for a countdown that reads smoothly, and the
+    // heartbeat underneath it for the one tick that has to land: the last one.
+    this.interval = window.setInterval(() => this.tick(), TICK_MS)
+    this.release = onHeartbeat(() => this.tick())
+  }
+
   private clearInterval(): void {
     if (this.interval != null) {
       window.clearInterval(this.interval)
       this.interval = null
     }
+    this.release?.()
+    this.release = null
   }
 }

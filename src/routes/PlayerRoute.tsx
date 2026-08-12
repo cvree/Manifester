@@ -49,7 +49,7 @@ import {
   soundSummary,
 } from '../lib/summaries'
 import { useBackgroundMix } from '../lib/useBackgroundMix'
-import { useBreathing } from '../lib/useBreathing'
+import { useSessionBreathing } from '../lib/useBreathing'
 import { useFittedLine } from '../lib/useFittedLine'
 import { useHeartAnchor } from '../lib/useHeartAnchor'
 import { useStageExpansion } from '../lib/useStageExpansion'
@@ -140,15 +140,19 @@ export function PlayerRoute() {
    *
    * `mirrors` is what makes the room breathe with it. Both the stage and the
    * atmosphere behind it receive the same `--e` and `--p` the orb does, on the
-   * same frame, from this one clock — which is the only arrangement in which
+   * same frame, from one clock — which is the only arrangement in which
    * "everything inhales together" is a fact rather than a hope.
+   *
+   * That clock is not here, and that is the important part. It runs in
+   * `breathEngine`, owned by the session rather than by this screen, and it
+   * writes the guide's voice onto the audio clock several breaths ahead. So
+   * this hook draws a picture and holds no responsibility for the sound: the
+   * breath carries on unchanged when you open the library, switch tabs, or put
+   * the phone in your pocket, which it emphatically did not before.
    */
-  const breathing = useBreathing({
+  const breathing = useSessionBreathing({
     pattern: preferences.breathPattern,
     active: preferences.breathingEnabled && playing,
-    sound: preferences.breathSound,
-    soundVolume: preferences.breathSoundVolume,
-    hapticCues: preferences.breathHapticCues,
     mirrors: [stageRef, fieldRef],
   })
 

@@ -24,6 +24,7 @@
  */
 
 import { createSoftCeiling, rampParam } from './audioParams'
+import { onHeartbeat } from './heartbeat'
 
 /* ── Public shape ────────────────────────────────────────────── */
 
@@ -423,8 +424,24 @@ class Rig {
    * `fill(from, to)` is handed absolute context times and schedules whatever
    * belongs in that span. Offline, the whole render is filled in one call,
    * because no timer would ever fire.
+   *
+   * ── Why the window is this wide ──
+   *
+   * Rain used to thin out when you looked away. The horizon was two seconds and
+   * it was refilled every 1.2, which is comfortable while a page is visible and
+   * has no margin at all once it is not: a hidden tab clamps timers to one
+   * second and is entitled to push them a great deal further. Miss one refill
+   * and the audio thread runs out of droplets to play, so the rain quietly
+   * becomes a drizzle — and then a downpour again when you came back and the
+   * missed windows were filled at once.
+   *
+   * Six seconds of horizon, topped up twice a second by the heartbeat, is the
+   * fix. The heartbeat is not a timer alone (see `heartbeat.ts`), and even if it
+   * were reduced to one beat a second the horizon would still be five seconds
+   * clear. The cost is a slightly longer list of scheduled transients on the
+   * audio thread, which is a thing audio threads are extremely good at.
    */
-  schedule(fill: (from: number, to: number) => void, windowSeconds = 2): void {
+  schedule(fill: (from: number, to: number) => void, windowSeconds = 6): void {
     const start = this.ctx.currentTime + 0.05
 
     if (this.offlineSeconds) {
@@ -434,7 +451,6 @@ class Rig {
 
     this.scheduling = true
     let horizon = start
-    let timer: number | null = null
 
     const tick = () => {
       if (this.stopped) return
@@ -443,15 +459,29 @@ class Rig {
         fill(horizon, to)
         horizon = to
       }
-      timer = later(tick, windowSeconds * 600)
+    }
+
+    /*
+     * Both, deliberately. The heartbeat holds the cadence when the page is
+     * hidden; its own timer covers the case where nothing has yet offered the
+     * heartbeat an audio clock and the tab is throttled anyway. Refilling twice
+     * when once would do is free — `tick` only ever fills the part of the
+     * window that is not already filled.
+     */
+    const release = onHeartbeat(tick)
+    let timer: number | null = null
+    const own = () => {
+      tick()
+      timer = later(own, windowSeconds * 250)
     }
 
     this.cancels.push(() => {
+      release()
       if (timer != null) cancelLater(timer)
       timer = null
     })
 
-    tick()
+    own()
   }
 
   handle(): AmbientHandle {
