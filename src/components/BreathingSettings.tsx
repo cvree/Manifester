@@ -13,7 +13,9 @@ import {
   cycleSeconds,
   describePattern,
   findPreset,
+  findStyle,
   formatSeconds,
+  isLivingStyle,
   isPatternValid,
   MOOD_LABEL,
   MOOD_ORDER,
@@ -194,7 +196,28 @@ export function BreathingSettings({
         drawing of it — so what you pick from cannot quietly stop resembling
         what you get.
       */}
-      {preferences.backgroundVisualizer && (
+      {/*
+        Unless the form has already answered the question.
+
+        Ink Cathedral and Moonpool are not shapes drawn inside a room, they are
+        rooms, and with the visualiser on they fill the screen themselves. So
+        the six tiles would be a control that changes nothing — which is a
+        worse thing to show someone than one sentence saying why it is not
+        there. Choosing any other form brings it straight back, with whatever
+        was picked last still picked.
+      */}
+      {preferences.backgroundVisualizer && isLivingStyle(preferences.breathStyle) && (
+        <div>
+          <FieldLabel hint="Behind the player">The room</FieldLabel>
+          <p className="type-meta -mt-1">
+            {findStyle(preferences.breathStyle).name} is the room as well as the
+            guide: it reaches past the orb to the edges of the screen. Pick
+            another form to choose a room again.
+          </p>
+        </div>
+      )}
+
+      {preferences.backgroundVisualizer && !isLivingStyle(preferences.breathStyle) && (
         <div>
           <FieldLabel hint="Behind the player">The room</FieldLabel>
           <div

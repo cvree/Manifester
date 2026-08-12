@@ -1,4 +1,5 @@
 import { useMemo, type CSSProperties, type RefObject } from 'react'
+import { isLivingStyle, type BreathStyleId } from '../lib/breathing'
 import {
   DEFAULT_BACKGROUND_CHOICE,
   type BackgroundChoice,
@@ -6,7 +7,9 @@ import {
 import { cx } from '../lib/cx'
 import { isLowPowerDevice, useReducedMotion } from '../lib/motion'
 import { useBackgroundScenes } from '../lib/useBackgroundScenes'
+import type { LiveBreath } from '../lib/useBreathing'
 import { BackgroundScene } from './BackgroundScene'
+import { LivingCanvas } from './LivingCanvas'
 
 /**
  * The room the player sits in.
@@ -34,6 +37,12 @@ import { BackgroundScene } from './BackgroundScene'
  * `BackgroundScene` for the rooms and `useBackgroundScenes` for the drift
  * between them; both of them read the same breath this element is carrying, so
  * a change of room is a crossfade and never a restart.
+ *
+ * Unless the *form* is already a room. Ink Cathedral and Moonpool are not
+ * shapes drawn inside a scene, they are worlds, and when one of them is the
+ * guide it takes that middle slot: the same world the orb is drawing, at the
+ * scale of the whole screen, re-centred on the orb and faded by the same mix.
+ * See `LivingCanvas`.
  *
  * All of it is drawn around one point — the orb's own centre, measured rather
  * than guessed. The player writes it here as `--heart-x`/`--heart-y`, with the
@@ -92,6 +101,19 @@ interface PlayerAtmosphereProps {
   utterance?: string
   /** Which kind of room this is, or `random` to drift. See `BACKGROUND_MODES`. */
   mode?: BackgroundChoice
+  /**
+   * Which form the guide is drawn as.
+   *
+   * Only two of the eight matter here. Ink Cathedral and Moonpool are not
+   * shapes inside a room, they are rooms — so when one of them is chosen the
+   * environment it builds *is* the environment, drawn out to the edges of the
+   * screen instead of a separate scene being drawn behind it. Two
+   * environments at once is mud, and someone who picks a cathedral has
+   * already chosen the room.
+   */
+  breathStyle?: BreathStyleId
+  /** The breath, for the forms that are drawn rather than styled. */
+  live?: RefObject<LiveBreath>
 }
 
 export function PlayerAtmosphere({
@@ -101,9 +123,13 @@ export function PlayerAtmosphere({
   settled = false,
   utterance,
   mode = DEFAULT_BACKGROUND_CHOICE,
+  breathStyle,
+  live,
 }: PlayerAtmosphereProps) {
   const reducedMotion = useReducedMotion()
   const scenes = useBackgroundScenes({ choice: mode, reducedMotion })
+  const livingStyle =
+    breathStyle != null && isLivingStyle(breathStyle) ? breathStyle : null
   /*
    * Measured once. The answer cannot change while the page is open, and it
    * costs a throwaway WebGL context to ask — see `isLowPowerDevice`.
@@ -142,16 +168,38 @@ export function PlayerAtmosphere({
         the pair are at the same instant of the same breath the whole way
         across, because neither of them owns a clock — see `BackgroundScene`.
       */}
-      {scenes.map((scene) => (
-        <BackgroundScene
-          key={scene.key}
-          mode={scene.id}
-          entering={scene.entering}
-          leaving={scene.leaving}
-          rich={rich}
-          immersive={immersive}
+      {livingStyle ? (
+        /*
+         * The world, out to the edges of the screen.
+         *
+         * The same scene the orb is drawing, from the same session seed and the
+         * same breath index, so it is one place at two scales rather than two
+         * drawings that resemble each other — and it re-centres on the orb
+         * because it reads `--heart-x`/`--heart-y` off this element, which is
+         * where `useHeartAnchor` has already measured them to.
+         *
+         * It reads `--mix` from here too, so the background visualiser's
+         * switch fades it exactly as it fades every other layer, mid-breath and
+         * without either of them noticing.
+         */
+        <LivingCanvas
+          style={livingStyle}
+          live={live}
+          variant="field"
+          hostRef={fieldRef}
         />
-      ))}
+      ) : (
+        scenes.map((scene) => (
+          <BackgroundScene
+            key={scene.key}
+            mode={scene.id}
+            entering={scene.entering}
+            leaving={scene.leaving}
+            rich={rich}
+            immersive={immersive}
+          />
+        ))
+      )}
 
       {/*
         The words affecting the room they are spoken into: a brief, very faint

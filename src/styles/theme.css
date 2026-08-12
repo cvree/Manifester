@@ -1581,6 +1581,158 @@ html:not(.dark) .breath-aurora__veil {
   }
 }
 
+/* ── 7 & 8 · The living forms ───────────────────────────────── */
+
+/*
+ * Ink Cathedral and Moonpool are drawn rather than styled, so there is almost
+ * nothing for the stylesheet to say about them: one canvas, sized to whatever
+ * box it is in, and the rules that keep it in its place.
+ *
+ * What *is* here is the two things a canvas cannot do for itself. In the orb
+ * it is clipped to a circle and given a rim, so the guide reads as a portal
+ * into somewhere rather than as a square of artwork sitting in a round hole.
+ * Across the viewport it is pinned behind everything and told, in the plainest
+ * possible terms, never to take a pointer event.
+ */
+.living-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.living-canvas--orb,
+.living-canvas--thumb {
+  border-radius: 999px;
+  /*
+   * The rim of the portal. Faint, and drawn *over* the canvas rather than
+   * around it, so the dark inside the orb meets the room outside it through a
+   * soft edge instead of a cut one.
+   */
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--moonlight) 46%, transparent),
+    inset 0 0 26px 4px rgb(0 0 0 / 0.28),
+    0 0 46px -10px var(--glow);
+}
+
+/*
+ * The room. Fixed and full-bleed, beneath the page's own light and above
+ * nothing at all: the orb, the words and every control stay exactly where the
+ * layout put them, which is the difference between depth and a parallax gimmick.
+ */
+.living-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.living-canvas--field {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * The dark the room is drawn on.
+ *
+ * This is the one part of a living world that never changes, and so it is the
+ * one part that must not be redrawn sixty times a second. It is a single
+ * static gradient, centred on the same measured orb the whole atmosphere is
+ * centred on, and faded by the same mix — which is the house rule from "The
+ * atmosphere" applied to a canvas scene: nothing viewport-sized is ever
+ * recomputed per frame.
+ *
+ * In the day palette it is barely present. These are near-black worlds and
+ * they are honest about it at night; across a light page with words on it, a
+ * near-black wash would be a legibility bug wearing a mood.
+ */
+.living-field__ground {
+  position: absolute;
+  inset: 0;
+  opacity: calc(var(--mix) * 0.12);
+}
+
+.dark .living-field__ground {
+  opacity: calc(var(--mix) * 0.62);
+}
+
+.living-field--cathedral .living-field__ground {
+  background: radial-gradient(
+    circle 62vmax at var(--heart-x) var(--heart-y),
+    rgb(20 17 31 / 0.3) 0%,
+    rgb(20 17 31 / 0.56) 52%,
+    rgb(14 11 22 / 0.94) 100%
+  );
+}
+
+.living-field--moonpool .living-field__ground {
+  background: radial-gradient(
+    circle 58vmax at var(--heart-x) var(--heart-y),
+    rgb(12 18 38 / 0.42) 0%,
+    rgb(9 13 30 / 0.74) 44%,
+    rgb(6 9 20 / 1) 100%
+  );
+}
+
+/*
+ * And the water you are looking through, which *does* change: it thickens as
+ * the breath empties and thins as it fills. One opacity on one already-promoted
+ * layer, driven by the same `--e` the orb is using — not a gradient being
+ * re-interpolated, which is the expensive way to say the same thing.
+ */
+.living-field--moonpool .living-field__ground::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle 46vmax at var(--heart-x) var(--heart-y),
+    rgb(8 12 26 / 0) 18%,
+    rgb(8 12 26 / 0.45) 58%,
+    rgb(8 12 26 / 0.9) 100%
+  );
+  opacity: calc(0.32 + (1 - var(--e)) * 0.4 * var(--drive));
+  will-change: opacity;
+}
+
+/*
+ * The phase word, over a window into the dark.
+ *
+ * Every other form is drawn *in* the room's own light, so the ordinary ink
+ * colour reads over it in both palettes. These two are portals: the inside of
+ * the orb is near-black whatever the page around it is doing, and in the day
+ * palette `--ink` is a dark brown. So the caption takes the night ink here and
+ * only here — the one place in the app where what is behind the words does not
+ * follow the theme.
+ */
+.breath--cathedral .breath-caption,
+.breath--moonpool .breath-caption {
+  color: #f3ece2;
+}
+
+.breath--cathedral .breath-caption span,
+.breath--moonpool .breath-caption span {
+  color: inherit;
+}
+
+.breath--cathedral .breath-caption .type-numeral,
+.breath--moonpool .breath-caption .type-numeral {
+  color: color-mix(in oklab, #f3ece2 62%, transparent);
+}
+
+/*
+ * Reduced motion holds these two exactly as it holds the other six: one
+ * comfortable half-open pose, and the words, the countdown and the phase ring
+ * doing the guiding. The renderer draws that pose once and then only when the
+ * theme or the size changes — see `LivingCanvas` — so there is nothing here for
+ * the stylesheet to stop.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .living-canvas--orb {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, var(--moonlight) 34%, transparent),
+      inset 0 0 18px 2px rgb(0 0 0 / 0.45);
+  }
+}
+
 /* ── The phase progress ring, drawn once and offset per frame ── */
 
 .breath-progress {

@@ -25,6 +25,57 @@ interface BreathFrame {
   far: number
 }
 
+/**
+ * The same frame, as numbers rather than as CSS.
+ *
+ * Five of the six forms are drawn by the stylesheet, and for those the custom
+ * properties above are the whole story. The two *living* forms — Ink Cathedral
+ * and Moonpool — are drawn on a canvas, and a canvas cannot read a custom
+ * property without asking the browser to resolve a style, which is a layout
+ * flush and precisely the cost this app spends its stylesheet avoiding.
+ *
+ * So the same values are also written into a plain object, on the same frame,
+ * from the same `breathStateAt` call. Nothing subscribes to it and nothing
+ * re-renders for it: a renderer reads whatever is in it when its own frame
+ * comes round, which is by construction the current one.
+ */
+export interface LiveBreath {
+  /** Expansion here and now, 0 → 1 → 0. */
+  e: number
+  /** Progress through the current phase. */
+  p: number
+  /** How much of this phase's movement is happening right now. */
+  m: number
+  /** The same expansion curve a quarter-second back. */
+  mid: number
+  /** And two thirds of a second back. */
+  far: number
+  phase: BreathPhase
+  /** Completed breaths — the index a living scene evolves against. */
+  breaths: number
+  /** Seconds into the clock this breath is read from. */
+  seconds: number
+  /** False while the guide is at rest: no clock is running. */
+  active: boolean
+  /** True when someone has asked for less motion. */
+  calm: boolean
+}
+
+function restingBreath(): LiveBreath {
+  return {
+    e: 0.35,
+    p: 0,
+    m: 0,
+    mid: 0.35,
+    far: 0.35,
+    phase: 'inhale',
+    breaths: 0,
+    seconds: 0,
+    active: false,
+    calm: false,
+  }
+}
+
 export interface BreathingRuntime {
   /**
    * Attach to the element the orb scales inside. It receives the breath as
@@ -32,6 +83,11 @@ export interface BreathingRuntime {
    * progress) chief among them.
    */
   stageRef: React.RefObject<HTMLDivElement | null>
+  /**
+   * The same frame in numbers, for the forms that are drawn rather than
+   * styled. Mutated in place every frame; never a reason to re-render.
+   */
+  live: React.RefObject<LiveBreath>
   phase: BreathPhase
   label: string
   /** Whole seconds left in this phase. */
@@ -113,6 +169,8 @@ interface DrawOptions {
   reducedMotion: boolean
   elapsed: () => number
   write: (frame: BreathFrame, mirror?: boolean) => void
+  /** Receives the same frame as numbers, for the canvas-drawn forms. */
+  live: React.RefObject<LiveBreath>
   onFrame?: (phase: BreathPhase, remaining: number, breaths: number) => void
 }
 
@@ -131,6 +189,7 @@ function useDraw({
   reducedMotion,
   elapsed,
   write,
+  live,
   onFrame,
 }: DrawOptions): void {
   const frameRef = useRef(0)
@@ -148,11 +207,32 @@ function useDraw({
       const seconds = elapsedRef.current()
       const state = breathStateAt(pattern, seconds)
 
+      /*
+       * The canvas forms get the honest curve even under reduced motion. What
+       * "less motion" means to them is that nothing runs on a clock of its own
+       * — no drifting particles, no wandering water — and they are told that
+       * by `calm` rather than by being handed a frozen breath. A guide that
+       * stops reporting the breath is not a calmer guide, it is a broken one.
+       */
+      const frame = live.current
+      frame.e = state.expansion
+      frame.p = state.phaseProgress
+      frame.m = state.motion
+      frame.mid = state.expansion
+      frame.far = state.expansion
+      frame.phase = state.phase
+      frame.breaths = state.completedBreaths
+      frame.seconds = seconds
+      frame.active = true
+      frame.calm = reducedMotion
+
       if (reducedMotion) {
         // The phase ring still turns: it reports progress without anything
         // moving fast, which is the one piece of motion worth keeping here.
         write({ ...REDUCED_POSE, p: state.phaseProgress })
       } else {
+        frame.mid = expansionAt(pattern, seconds - BREATH_LAG_SECONDS.mid)
+        frame.far = expansionAt(pattern, seconds - BREATH_LAG_SECONDS.far)
         /*
          * The two extra samples are the room's sense of distance: the same
          * curve, read a fraction of a second earlier, so an in-breath appears
@@ -162,8 +242,8 @@ function useDraw({
           e: state.expansion,
           p: state.phaseProgress,
           m: state.motion,
-          mid: expansionAt(pattern, seconds - BREATH_LAG_SECONDS.mid),
-          far: expansionAt(pattern, seconds - BREATH_LAG_SECONDS.far),
+          mid: frame.mid,
+          far: frame.far,
         })
       }
 
@@ -192,13 +272,16 @@ function useDraw({
     }
     frameRef.current = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(frameRef.current)
-  }, [active, pattern, reducedMotion, valid, write])
+  }, [active, live, pattern, reducedMotion, valid, write])
 
   // Settle the orb to a resting half-open pose when the guide is switched off,
   // rather than collapsing it to nothing — a closed orb reads as broken.
   useEffect(() => {
-    if (!active && !reducedMotion) write(RESTING_POSE, false)
-  }, [active, reducedMotion, write])
+    if (active) return
+    live.current.active = false
+    live.current.calm = reducedMotion
+    if (!reducedMotion) write(RESTING_POSE, false)
+  }, [active, live, reducedMotion, write])
 }
 
 /* ── The guide you are following ────────────────────────────── */
@@ -218,6 +301,7 @@ export function useSessionBreathing({
   mirrors,
 }: PreviewOptions): BreathingRuntime {
   const stageRef = useRef<HTMLDivElement | null>(null)
+  const live = useRef<LiveBreath>(restingBreath())
   const reducedMotion = useReducedMotion()
   const write = useWriter(stageRef, mirrors)
 
@@ -258,6 +342,7 @@ export function useSessionBreathing({
     reducedMotion,
     elapsed: breathElapsed,
     write,
+    live,
     onFrame: report,
   })
 
@@ -279,6 +364,7 @@ export function useSessionBreathing({
 
   return {
     stageRef,
+    live,
     phase: display.phase,
     label: PHASE_LABEL[display.phase],
     remaining: display.remaining,
@@ -312,6 +398,7 @@ export function useBreathing({
   mirrors,
 }: PreviewOptions): BreathingRuntime {
   const stageRef = useRef<HTMLDivElement | null>(null)
+  const live = useRef<LiveBreath>(restingBreath())
   const reducedMotion = useReducedMotion()
   const write = useWriter(stageRef, mirrors)
 
@@ -371,11 +458,13 @@ export function useBreathing({
     reducedMotion,
     elapsed,
     write,
+    live,
     onFrame: report,
   })
 
   return {
     stageRef,
+    live,
     phase: display.phase,
     label: PHASE_LABEL[display.phase],
     remaining: display.remaining,
