@@ -139,14 +139,27 @@ app.
 
 **Player**
 
-- The calmest screen in the app: a large breathing guide, the words being
-  spoken, the two controls that matter, and nothing that looks like a mixing
-  desk. On a phone the navigation slides away while a session runs, and a strip
-  at the bottom edge brings it straight back.
-- One large play/pause control, with a smaller *End session* below it.
+- The calmest screen in the app, and now the whole of it: a large breathing
+  guide, the words being spoken, the controls that matter, and nothing else at
+  all. There used to be a column of settings beside the stage, which made a
+  ritual space look like a mixing desk and on a phone put those controls
+  *below* a full-height stage where they were clutter without being reachable.
+  On a phone the navigation slides away while a session runs, and a strip at
+  the bottom edge brings it straight back.
+- One large play/pause control, with *Adjust* and *End session* together
+  beneath it.
+- **Everything else is one tap away, in one place.** *Adjust* opens a single
+  sheet in the order things are wanted: the voice and sound faders, then a
+  folded *Voice, speed and pitch*, then background sound, brainwave rhythm,
+  breathing and haptics, then the way back to the words. Nothing was taken away
+  to get there — the sliders are the same live ones and the rows open the same
+  sheets — and it is the same one control on a phone, on a desktop, and with
+  the stage filling the screen, where a column beside the stage would not exist
+  at all. Choosing a row closes the sheet and opens the one it is about, rather
+  than stacking a second scrim on the first.
 - **An expanded view**, one tap from the corner of the stage: the player grows
-  into the whole screen, the guide grows with it, and the header, the
-  navigation and the settings column step back until nothing is left but the
+  into the whole screen, the guide grows with it, and the header and the
+  navigation step back until nothing is left but the
   words, the breath and the controls. It is the same player throughout — the
   session, the clock, the pass count and the audio carry straight on — and the
   way back is the same button, the Escape key, or leaving fullscreen however
@@ -174,20 +187,21 @@ app.
   6s"*) and frozen exactly where it was if you pause.
 - Time remaining, or elapsed time when there is no timer.
 - Progress through the current pass, and how many passes you have listened to.
-- Voice volume and sound volume adjust live, and under them a **Voice, speed
-  and pitch** disclosure changes who is reading, how fast and how high without
-  leaving the player: the running speech loop is re-optioned rather than
-  restarted, so each change lands on the next line and the loop never breaks
-  step. Voice runs 0–100%, because 100% is as loud as a browser will ever speak
-  — see [Decisions worth explaining](#decisions-worth-explaining).
+- Voice volume and sound volume adjust live under *Adjust*, and under them a
+  **Voice, speed and pitch** disclosure changes who is reading, how fast and
+  how high without leaving the player: the running speech loop is re-optioned
+  rather than restarted, so each change lands on the next line and the loop
+  never breaks step. Voice runs 0–100%, because 100% is as loud as a browser
+  will ever speak — see
+  [Decisions worth explaining](#decisions-worth-explaining).
 - **The background sound, one tap away and live.** A small control sits in the
   corner of the stage opposite *Expand* — including expanded, where it is the
   only thing on the screen besides the words, the breath and the transport. It
   opens one list: silence, every built-in ambience, every sound you have
   imported, and your playlist if you have one. Picking one **crossfades under
   the running loop**: the voice, the clock, the breath and the timer carry
-  straight on, and nothing restarts. The same list is a row in the settings
-  column, and choosing a sound in the Library while a session runs now reaches
+  straight on, and nothing restarts. The same list is a row under *Adjust*,
+  and choosing a sound in the Library while a session runs reaches
   it the same way — the days of stopping a session to change what is behind it
   are over.
 - A mini player follows you to the other tabs while a session is running.
@@ -352,14 +366,22 @@ second player, so pressing *hear it* mid-session never disturbs the breath you
 are actually following.
 
 Sound is scheduled a phase at a time rather than nudged each frame: the whole
-length of the phase is handed to the audio clock the moment it begins. The Web
-Audio clock is sample-accurate and the animation clock is not, so this is what
-keeps the sound exactly in step even while the main thread is busy laying out a
-settings sheet. [`breathAudio.test.ts`](src/lib/breathAudio.test.ts) renders
+length of the phase is handed to the audio clock. The Web Audio clock is
+sample-accurate and the animation clock is not, so this is what keeps the sound
+exactly in step even while the main thread is busy laying out a settings sheet.
+
+It is now handed over *before the phase begins*, and several breaths at a time,
+which is what makes the guide survive being ignored — see
+[The breath is written down in advance](#the-breath-is-written-down-in-advance).
+
+[`breathAudio.test.ts`](src/lib/breathAudio.test.ts) renders
 every voice offline and measures it — that the in-breath really does rise, that
 the out-breath really does fall, that a struck voice really does clear out
 before the next turn — because "some audio came out" would pass just as happily
 on a voice that played the same flat hiss both ways.
+[`breathEngine.test.ts`](src/lib/breathEngine.test.ts) then renders a whole
+cycle that was scheduled in one go at time zero, with nothing touching the graph
+afterwards, which is exactly the situation of a tab nobody is looking at.
 
 Vibration is offered separately, where the device supports it. iPhone does not
 let web apps vibrate, and the app says so rather than showing a dead switch.
@@ -803,6 +825,78 @@ and never second-guesses it. Interface tap sounds are woken the same way but
 deliberately do **not** claim the playback category — a tap confirmation really
 is interface noise, and a phone switched to silent should not be answered with
 a beep.
+
+<a id="the-breath-is-written-down-in-advance"></a>
+
+**The breath is written down in advance, because a hidden tab is not a paused
+tab.** Switching to another browser tab used to stop the breathing guide's
+voice, or change it, or make it lurch on the way back; leaving the player for
+the library silenced the breath cues under a session that was otherwise still
+running. Both had the same cause, and it was not an audio bug at all.
+
+The guide was driven from the player's own `requestAnimationFrame` loop: one
+loop computed the breath, wrote it onto the orb, *and* told the voice when a
+phase had turned. That is the right shape for something you are looking at and
+the wrong shape for something you are hearing, and the difference only appears
+when you stop looking. Browsers stop animation frames for a hidden page
+outright, so the phase turn due four seconds later never arrived and the sound
+held whatever it had last been asked for — a sustained voice sitting at the top
+of an in-breath for as long as you were away, a struck voice simply falling
+silent. Come back, and the clock had moved twelve seconds; the next frame landed
+in a different phase, and the guide jumped to catch up. Walking to another tab
+inside the app was worse still: the component unmounted and its cleanup stopped
+the voice, so the words and the ambience carried on with the breath quietly gone.
+
+Timers were the same problem one step down. `setTimeout` is clamped to one
+second in a hidden page and, in Chrome, to **one a minute** after five minutes
+out of sight. The silence between passes, the moment a playlist hands over from
+one soundscape to the next, and the rolling scheduler that lays down individual
+rain droplets were all ordinary timers — so a three-second rest could become
+eleven, and rain thinned to a drizzle and then came back as a downpour when the
+missed windows were filled at once. None of that is a browser misbehaving. It is
+a browser doing exactly what it says it does to a page that has not made itself
+an exception.
+
+Three changes, and the order matters:
+
+- **The guide is an engine, not a component.**
+  [`breathEngine.ts`](src/lib/breathEngine.ts) owns the clock at module scope
+  and is driven by the session rather than by a screen, so nothing about it can
+  unmount. Elapsed time is wall-clock measured and banked across pauses, which
+  means a stalled tab, a dropped frame or twenty minutes in another application
+  change where the breath *is* not at all — only when anyone next asks. The
+  player draws a picture of that clock and holds no responsibility for the
+  sound.
+- **Phases are scheduled eight seconds ahead.** The audio thread is handed each
+  phase at its exact moment before it arrives, so it plays them whether or not
+  this page is being rendered, scheduled, or thought about. The piece that had
+  to change to allow it is small and was the whole difficulty: every ramp used
+  to start from the param's *current* value, which is the right answer at the
+  moment a phase begins and the wrong answer six seconds early. Each ramp now
+  chains from the value the previously scheduled phase will leave behind — and
+  because that failure is inaudible in a visible tab, it has a test of its own.
+- **One heartbeat, from two sources.** [`heartbeat.ts`](src/lib/heartbeat.ts)
+  beats every half second from a timer *and* from the audio clock — a short
+  source node whose `ended` event arms the next one. The audio thread has no
+  idea whether a tab is visible, and `ended` is an ordinary task rather than a
+  throttled timer, so it holds when the timer does not; the timer holds when
+  the context is suspended, which is what pausing deliberately does. Neither is
+  trusted alone. The gap between repetitions, the playlist's segment clock, the
+  session countdown and the ambience's transient scheduler all run on it, and
+  every one of them asks "given the wall clock, what should already have been
+  scheduled?" — a question with the same answer however late it is asked. The
+  ambience's horizon went from two seconds to six for the same reason: two left
+  no margin at all once timers are clamped to one.
+
+Coming back to the page also nudges the speech queue, which browsers feel free
+to drop or leave parked while a page is hidden, and catches up every scheduler
+on the same turn rather than up to half a second later.
+
+What none of this can do is defeat a platform that genuinely stops the page —
+iOS will still suspend a backgrounded web app's audio in ways no web API can
+refuse. The claim is narrower and it is the one that was broken: switching tabs,
+switching windows, or walking to another screen inside the app does not change
+what you hear.
 
 **The voice slider stops at 100%, because that is where the voice stops.**
 `SpeechSynthesisUtterance.volume` is spec'd to `[0, 1]` and every browser clamps
@@ -1308,6 +1402,16 @@ the result.
 - **Lifecycle.** Each soundscape is asserted to hold sources open while playing,
   release every one on stop, ignore a second stop, and keep two concurrent
   instances independent.
+- **The breath, with nobody watching.** A whole cycle is scheduled in one go at
+  time zero and then rendered with nothing touching the graph afterwards, which
+  is exactly the situation of a hidden tab. The in-breath has to rise, the
+  out-breath has to fall, and the second breath has to be as loud as the first —
+  a chain of scheduled ramps that leaks a little each time round is a guide that
+  fades away over half an hour. This is the test that fails if a ramp goes back
+  to reading the param's current value, which is a mistake with no symptom at
+  all while the tab is visible. Phase placement is checked separately: absolute
+  time rather than folded into one cycle, zero-length phases skipped, and all
+  four phases of a box breath walked in order.
 - **Choosing a sound.** What one tap on a sound means — which mode, which
   track, and what it leaves alone — is a pure function with its own tests, and
   so is the question the player asks before it disturbs live audio: rain's
@@ -1350,6 +1454,7 @@ src/
     CosmicBackground      the twilight garden behind every screen
     RitualPreview.tsx     the live picture of the finished ritual
     CustomizePanel.tsx    the advanced settings, as summarised rows + sheets
+    PlayerAdjust.tsx      everything the player can change, in one sheet
     SettingRow.tsx        one row of that list, stating its own value
     AppearanceSettings    the palette band, the night light and day/night
     DragBar.tsx           a band you drag, whose track is markup rather than
@@ -1362,8 +1467,12 @@ src/
     voiceRanking.ts scores device voices and picks the best of each style
     breathing.ts    pure breath-phase maths, patterns and forms
     breathAudio.ts  the breath's own synthesised voices
-    useBreathing.ts drives the orb — and everything mirroring it — from the
-                    wall clock
+    breathEngine.ts the breath itself: one clock at module scope, owned by the
+                    session rather than by a screen, writing phases onto the
+                    audio clock eight seconds ahead so a hidden tab changes
+                    nothing about what is heard
+    useBreathing.ts draws the orb — and everything mirroring it — from that
+                    clock, plus a silent local clock for the previews
     environment.ts  the room itself: background modes, how far the breath lags
                     at distance, and the two seeded fields of points — eighteen
                     motes for the corners of a room, sixty stars for a sky
@@ -1378,6 +1487,9 @@ src/
     exportAudio.ts  offline bed rendering, decoding, normalisation
     audio.ts        background sound engine (synth + imported files)
     audioBus.ts     owns the AudioContext and the generated-sound mix
+    heartbeat.ts    one clock for everything that must keep time out of sight:
+                    a timer and an audio-clock ticker, because a hidden tab
+                    throttles the first and cannot touch the second
     audioParams.ts  click-free ramps and the soft-clip ceiling
     ambient.ts      the five generated ambiences
     brainwaveAudio.ts  preset table, frequency maths and the rhythm engine
@@ -1443,6 +1555,19 @@ them go away:
   reliable route.
 - **The first tap matters.** Browsers require a genuine user gesture before any
   audio starts. If nothing happens, tap play once more.
+- **A hidden tab is throttled, and Manifester works around it rather than
+  through it.** Animation frames stop entirely for a page you cannot see, and
+  timers are clamped to one second — in Chrome, to one a minute after five
+  minutes out of sight. Nothing about the sound is driven by either any more:
+  the breath is scheduled onto the audio clock several breaths ahead, and
+  everything that has to keep time runs on a heartbeat with an audio-clock
+  source under it. So switching tabs, switching windows or walking to another
+  screen inside the app does not change what you hear. What that cannot beat is
+  a platform that stops the page outright — iOS still suspends a backgrounded
+  web app's audio in ways no web API can decline, and installing to the home
+  screen with the screen on is the reliable route for a long session on a
+  phone. See
+  [The breath is written down in advance](#the-breath-is-written-down-in-advance).
 - **A phone's silent switch mutes Web Audio, but not speech.** Which is why "the
   words play and nothing else does" is the classic mobile report. Manifester
   declares its audio session as `playback` *and* holds a silent looping media
