@@ -6,12 +6,18 @@ import {
   formatRelativeDate,
 } from '../lib/format'
 import { cue } from '../lib/feedback'
-import { canShare, copyText, loopShareText, shareText } from '../lib/share'
+import {
+  canShare,
+  copyText,
+  createLoopShareUrl,
+  shareText,
+} from '../lib/share'
 import type { SavedLoop } from '../lib/types'
 import { Button } from './Button'
 import { IconButton } from './IconButton'
 import {
   ClipboardIcon,
+  ClockIcon,
   CopyIcon,
   DownloadIcon,
   PencilIcon,
@@ -25,13 +31,12 @@ interface SavedLoopCardProps {
   loop: SavedLoop
   onPlay: () => void
   onEdit: () => void
-  /** Opens the download sheet for this loop, with the full export panel in it. */
   onDownload: () => void
+  onRemind: () => void
   onDuplicate: () => void
   onDelete: () => void
 }
 
-/** How long a "Copied" line stays before the card goes back to its date. */
 const NOTE_MS = 2600
 
 export function SavedLoopCard({
@@ -39,6 +44,7 @@ export function SavedLoopCard({
   onPlay,
   onEdit,
   onDownload,
+  onRemind,
   onDuplicate,
   onDelete,
 }: SavedLoopCardProps) {
@@ -54,12 +60,6 @@ export function SavedLoopCard({
     [],
   )
 
-  /*
-   * Delete comes from the menu, and choosing it takes the menu — and the
-   * button focus was standing on — off the card. Focus lands on Keep rather
-   * than on Delete: the destructive option should never be the one a stray
-   * Enter finds.
-   */
   useEffect(() => {
     if (confirming) keepRef.current?.focus({ preventScroll: true })
   }, [confirming])
@@ -70,14 +70,21 @@ export function SavedLoopCard({
     noteTimer.current = setTimeout(() => setNote(null), NOTE_MS)
   }
 
-  const share = async () => {
+  const shareLink = async () => {
+    let link: string
+    try {
+      link = createLoopShareUrl(loop)
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'This loop could not be shared.')
+      return
+    }
     const outcome = await shareText({
       title: loop.title,
-      text: loopShareText(loop.title, loop.text),
+      text: 'A Manifester loop shared with you.',
+      url: link,
     })
-    // A share sheet that was opened and dismissed needs no comment from us.
-    if (outcome === 'copied') flash('Copied — no share sheet in this browser')
-    else if (outcome === 'failed') flash('This browser would not share it')
+    if (outcome === 'copied') flash('Link copied')
+    else if (outcome === 'failed') flash('This browser would not share the link')
     else if (outcome === 'shared') cue('save')
   }
 
@@ -94,17 +101,25 @@ export function SavedLoopCard({
 
   const actions: MenuAction[] = [
     {
+      id: 'share-link',
+      label: canShare() ? 'Share loop link' : 'Copy loop link',
+      hint: 'Open or save it on another device',
+      icon: <ShareIcon />,
+      onSelect: () => void shareLink(),
+    },
+    {
+      id: 'reminder',
+      label: 'Add calendar reminder',
+      hint: 'One reminder, only when you choose it',
+      icon: <ClockIcon />,
+      onSelect: onRemind,
+    },
+    {
       id: 'download',
       label: 'Download audio',
       hint: 'Render this loop as an MP3',
       icon: <DownloadIcon />,
       onSelect: onDownload,
-    },
-    {
-      id: 'share',
-      label: canShare() ? 'Share the words' : 'Copy the words to share',
-      icon: <ShareIcon />,
-      onSelect: () => void share(),
     },
     {
       id: 'copy',
@@ -162,11 +177,6 @@ export function SavedLoopCard({
       )}
 
       <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-[var(--quiet-border)] pt-4">
-        {/*
-          One line, whatever it is saying: the date, or what just happened. A
-          note that appeared beside the date would move the buttons, and this
-          card is small enough that the shift would be the loudest thing on it.
-        */}
         <span
           role="status"
           aria-live="polite"
@@ -202,7 +212,7 @@ export function SavedLoopCard({
             <Menu
               label={`More for ${loop.title}`}
               title={loop.title}
-              description="Download it, share it, or make another copy."
+              description="Share it, set one reminder, download it, or make another copy."
               actions={actions}
             />
           </span>

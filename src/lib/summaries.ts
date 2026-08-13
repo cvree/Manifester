@@ -130,12 +130,8 @@ export function recordingSummary(recordingId: string | null): string {
     : 'Optional, for downloadable audio'
 }
 
-export function feelSummary(uiSounds: boolean, uiHaptics: boolean): string {
-  const parts = [
-    uiSounds ? 'Interface sounds on' : null,
-    uiHaptics && hapticsSupported() ? 'Haptics on' : null,
-  ].filter(Boolean)
-  return parts.length > 0 ? parts.join(' · ') : 'Quiet'
+export function feelSummary(_uiSounds: boolean, uiHaptics: boolean): string {
+  return uiHaptics && hapticsSupported() ? 'On' : 'Off'
 }
 
 export function exportSummary(

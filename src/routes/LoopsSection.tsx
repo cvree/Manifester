@@ -5,6 +5,7 @@ import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
 import { ExportPanel } from '../components/ExportPanel'
 import { LeafIcon } from '../components/Icons'
+import { ReminderPanel } from '../components/ReminderPanel'
 import { SavedLoopCard } from '../components/SavedLoopCard'
 import { Sheet } from '../components/Sheet'
 import { soundSummary, voiceSummary } from '../lib/summaries'
@@ -15,21 +16,14 @@ import { useSession } from '../state/SessionProvider'
 
 export function LoopsSection() {
   const navigate = useNavigate()
-  const { loops, ready, allTracks, removeLoop, duplicateLoop, touchLoop } =
-    useLibrary()
+  const { loops, ready, allTracks, removeLoop, duplicateLoop } = useLibrary()
   const { loadIntoDraft, start, voices } = useSession()
-
-  /**
-   * The loop whose download sheet is open. Held here rather than in the card
-   * so the sheet is a sibling of the grid: one at a time, and never inside a
-   * card that is about to re-order itself under it.
-   */
   const [exporting, setExporting] = useState<SavedLoop | null>(null)
+  const [reminding, setReminding] = useState<SavedLoop | null>(null)
 
   const play = (loop: SavedLoop) => {
     loadIntoDraft(loop)
     start(loop)
-    void touchLoop(loop.id)
     navigate('/player')
   }
 
@@ -42,11 +36,7 @@ export function LoopsSection() {
     <div className="space-y-6">
       {!ready ? (
         <Card data-rise level="panel">
-          <p
-            className="type-meta py-8 text-center"
-            role="status"
-            aria-live="polite"
-          >
+          <p className="type-meta py-8 text-center" role="status" aria-live="polite">
             Opening your library…
           </p>
         </Card>
@@ -72,6 +62,7 @@ export function LoopsSection() {
               onPlay={() => play(loop)}
               onEdit={() => edit(loop)}
               onDownload={() => setExporting(loop)}
+              onRemind={() => setReminding(loop)}
               onDuplicate={() => void duplicateLoop(loop.id)}
               onDelete={() => void removeLoop(loop.id)}
             />
@@ -79,13 +70,6 @@ export function LoopsSection() {
         </div>
       )}
 
-      {/*
-        The same export panel the Create tab uses, pointed at a saved loop
-        instead of the draft — every length, the manifest of what is going in
-        the file, the worker, the progress and the WAV fallback included. A
-        loop you saved a month ago is exactly as downloadable as the one you
-        are writing now, and you do not have to load it back into Create first.
-      */}
       <Sheet
         open={exporting != null}
         onClose={() => setExporting(null)}
@@ -111,6 +95,15 @@ export function LoopsSection() {
             )}
           />
         )}
+      </Sheet>
+
+      <Sheet
+        open={reminding != null}
+        onClose={() => setReminding(null)}
+        title="Calendar reminder"
+        description={reminding ? `Choose one time for “${reminding.title}”.` : undefined}
+      >
+        {reminding && <ReminderPanel loop={reminding} />}
       </Sheet>
     </div>
   )

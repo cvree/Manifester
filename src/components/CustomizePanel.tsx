@@ -78,8 +78,8 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
     description: 'Render this loop as a file you can play anywhere.',
   },
   feel: {
-    title: 'Haptics and interface sounds',
-    description: 'How the app answers when you touch it.',
+    title: 'Haptics',
+    description: 'Optional touch feedback on supported devices.',
   },
   ai: {
     title: 'AI writing help',
@@ -196,15 +196,6 @@ export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
 
       <Sheet open={open === 'feel'} onClose={close} {...TITLES.feel}>
         <div className="space-y-5">
-          <Toggle
-            label="Interface sounds"
-            description="A soft tone when you start, pause, save or finish something."
-            checked={preferences.uiSounds}
-            onChange={(uiSounds) => {
-              updatePreferences({ uiSounds })
-              if (uiSounds) cue('tap')
-            }}
-          />
           <Toggle
             label="Haptics"
             description={
@@ -338,7 +329,7 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
           />
           <SettingRow
             icon={<TuneIcon />}
-            title="Haptics and interface sounds"
+            title="Haptics"
             summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
             onClick={() => openPanel('feel')}
           />

@@ -268,6 +268,8 @@ export interface SpeechLoopOptions {
   volume: number
   /** Silence between repetitions. */
   repeatPauseMs: number
+  /** A small settling silence before the first word. */
+  initialDelayMs?: number
   /** When false the text is spoken once and then finishes. */
   loop: boolean
 }
@@ -312,12 +314,17 @@ export class SpeechLooper {
   private gapCancel: (() => void) | null = null
   private stallTimer: number | null = null
   private announceTimer: number | null = null
+  private resumeTimer: number | null = null
   private keepAlive: number | null = null
   private running = false
-  /** When the current inter-repeat silence is due to end. */
+  private paused = false
+  /** When the current silence is due to end. */
   private gapEndsAt = 0
+  /** Initial settling silence is deliberately not shown as a repeat delay. */
+  private gapVisible = true
   /** Milliseconds of silence still owed, when paused during that gap. */
   private pausedGapMs: number | null = null
+  private pausedGapVisible = true
 
   get isRunning(): boolean {
     return this.running
@@ -333,9 +340,13 @@ export class SpeechLooper {
    */
   get delayRemainingSeconds(): number | null {
     if (!this.running) return null
-    if (this.pausedGapMs != null) return this.pausedGapMs / 1000
+    if (this.pausedGapMs != null) {
+      return this.pausedGapVisible ? this.pausedGapMs / 1000 : null
+    }
     if (this.gapCancel != null && this.gapEndsAt > 0) {
-      return Math.max(0, (this.gapEndsAt - Date.now()) / 1000)
+      return this.gapVisible
+        ? Math.max(0, (this.gapEndsAt - Date.now()) / 1000)
+        : null
     }
     return null
   }
@@ -372,24 +383,39 @@ export class SpeechLooper {
     this.options = options
     this.handlers = handlers
     this.running = true
+    this.paused = false
 
     this.startKeepAlive()
-    this.speakCurrent(this.generation)
+    const initialDelay = Math.max(0, options.initialDelayMs ?? 0)
+    if (initialDelay > 0) this.startGap(this.generation, initialDelay, false)
+    else this.speakCurrent(this.generation)
     return true
   }
 
   pause(): void {
-    if (!this.running || !isSpeechSupported()) return
+    if (!this.running || this.paused || !isSpeechSupported()) return
+    this.paused = true
 
-    // Pausing during the silence between repetitions has to remember how much
-    // of that silence is left, or the loop would never start again.
     if (this.gapCancel != null) {
       this.pausedGapMs = Math.max(0, this.gapEndsAt - Date.now())
+      this.pausedGapVisible = this.gapVisible
     }
 
+    // Invalidate every callback from the utterance being cancelled. Resuming
+    // deliberately restarts the current line, which is safer than skipping it
+    // or trusting browser-specific suspended queue behaviour.
+    this.generation += 1
     this.clearGap()
     this.clearTimer('stallTimer')
-    window.speechSynthesis.pause()
+    this.clearTimer('announceTimer')
+    this.clearTimer('resumeTimer')
+    this.stopKeepAlive()
+    this.pending.clear()
+    try {
+      window.speechSynthesis.cancel()
+    } catch {
+      /* Cancelling an empty queue is allowed to throw on older engines. */
+    }
   }
 
   /**
@@ -408,45 +434,52 @@ export class SpeechLooper {
    * double-speak.
    */
   recover(): void {
-    if (!this.running || !isSpeechSupported()) return
+    if (!this.running || this.paused || !isSpeechSupported()) return
     if (this.gapCancel != null || this.pausedGapMs != null) return
 
     const synth = window.speechSynthesis
-    if (synth.speaking || synth.pending) {
-      // Speaking but parked: iOS leaves the queue paused after an interruption.
-      if (synth.paused) synth.resume()
-      return
-    }
-    this.advance(this.generation)
+    if (synth.speaking || synth.pending) return
+    this.speakCurrent(this.generation)
   }
 
   resume(): void {
-    if (!this.running || !isSpeechSupported()) return
-
-    const synth = window.speechSynthesis
-    synth.resume()
+    if (!this.running || !this.paused || !isSpeechSupported()) return
+    this.paused = false
+    this.generation += 1
+    const generation = this.generation
+    this.startKeepAlive()
 
     if (this.pausedGapMs != null) {
-      // Nothing was mid-utterance, so restart the queue after the remaining gap.
       const remaining = this.pausedGapMs
+      const visible = this.pausedGapVisible
       this.pausedGapMs = null
-      const generation = this.generation
-      this.startGap(generation, remaining)
+      this.pausedGapVisible = true
+      this.startGap(generation, remaining, visible)
       return
     }
 
-    this.armStallWatchdog(this.generation)
+    // Give cancel() one brief turn to release the platform queue before
+    // putting the current line back. This avoids the overlap several engines
+    // otherwise produce on a quick pause → resume.
+    this.resumeTimer = window.setTimeout(() => {
+      this.resumeTimer = null
+      this.speakCurrent(generation)
+    }, 80)
   }
 
   stop(): void {
     this.generation += 1
     this.running = false
+    this.paused = false
     this.pending.clear()
     this.gapEndsAt = 0
+    this.gapVisible = true
     this.pausedGapMs = null
+    this.pausedGapVisible = true
     this.clearGap()
     this.clearTimer('stallTimer')
     this.clearTimer('announceTimer')
+    this.clearTimer('resumeTimer')
     this.stopKeepAlive()
     if (isSpeechSupported()) {
       try {
@@ -460,7 +493,7 @@ export class SpeechLooper {
   /* ── internals ── */
 
   private speakCurrent(generation: number): void {
-    if (generation !== this.generation || !this.options) return
+    if (generation !== this.generation || !this.options || this.paused) return
 
     const synth = window.speechSynthesis
     const text = this.chunks[this.index]
@@ -537,7 +570,7 @@ export class SpeechLooper {
   }
 
   private advance(generation: number): void {
-    if (generation !== this.generation || !this.options) return
+    if (generation !== this.generation || !this.options || this.paused) return
 
     if (this.index < this.chunks.length - 1) {
       this.index += 1
@@ -559,14 +592,20 @@ export class SpeechLooper {
     this.startGap(generation, Math.max(0, this.options.repeatPauseMs))
   }
 
-  /** Hold the silence between repetitions, then begin again. */
-  private startGap(generation: number, durationMs: number): void {
+  /** Hold a deliberate silence, then begin again. */
+  private startGap(
+    generation: number,
+    durationMs: number,
+    visible = true,
+  ): void {
     this.clearGap()
+    this.gapVisible = visible
     this.gapEndsAt = Date.now() + durationMs
     this.gapCancel = scheduleAt(this.gapEndsAt, () => {
       this.gapCancel = null
       this.gapEndsAt = 0
-      this.speakCurrent(generation)
+      this.gapVisible = true
+      if (!this.paused) this.speakCurrent(generation)
     })
   }
 
@@ -583,7 +622,7 @@ export class SpeechLooper {
   private armStallWatchdog(generation: number): void {
     this.clearTimer('stallTimer')
     const check = () => {
-      if (generation !== this.generation || !this.running) return
+      if (generation !== this.generation || !this.running || this.paused) return
       const synth = window.speechSynthesis
       if (synth.speaking || synth.pending || synth.paused) {
         this.stallTimer = window.setTimeout(check, STALL_TIMEOUT_MS)
@@ -604,7 +643,7 @@ export class SpeechLooper {
     if (isAppleMobile()) return
     this.keepAlive = window.setInterval(() => {
       const synth = window.speechSynthesis
-      if (this.running && synth.speaking && !synth.paused) {
+      if (this.running && !this.paused && synth.speaking && !synth.paused) {
         synth.pause()
         synth.resume()
       }
@@ -624,7 +663,7 @@ export class SpeechLooper {
     handlers.onFinish?.()
   }
 
-  private clearTimer(which: 'stallTimer' | 'announceTimer'): void {
+  private clearTimer(which: 'stallTimer' | 'announceTimer' | 'resumeTimer'): void {
     const id = this[which]
     if (id != null) {
       clearTimeout(id)

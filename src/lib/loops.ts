@@ -44,24 +44,23 @@ export function loopToDraft(loop: SavedLoop): Draft {
 }
 
 /**
- * Fill in anything a loop saved by an older version is missing, so adding a
- * setting never breaks someone's existing library.
- *
- * Three values are rebuilt rather than merged. A rhythm's `targetHz` is derived
- * from its preset, because a stale or hand-edited frequency must never reach the
- * audio graph; an unrecognised rain character falls back to the middle setting
- * rather than indexing a table with `undefined`; and the voice level is brought
- * back inside its ceiling.
- *
- * That last one is a migration. The voice setting used to run to 2, on the
- * theory that an exported recording could use the headroom even though the
- * spoken voice never could — so a loop saved then can carry a level no control
- * in the app is able to show any more. It comes back at 100%, which is what it
- * always sounded like.
+ * The launch loop. A played loop outranks an edited one; before anything has
+ * been played, the most recently updated saved loop is the least surprising.
  */
+export function pickLaunchLoop(loops: SavedLoop[]): SavedLoop | null {
+  const usable = loops.filter((loop) => loop.text.trim().length > 0)
+  if (usable.length === 0) return null
+  const hasPlayed = usable.some((loop) => loop.lastPlayedAt != null)
+  return [...usable].sort((a, b) => {
+    const aTime = hasPlayed ? (a.lastPlayedAt ?? -1) : a.updatedAt
+    const bTime = hasPlayed ? (b.lastPlayedAt ?? -1) : b.updatedAt
+    return bTime - aTime
+  })[0]
+}
+
+/** Fill in anything a loop saved by an older version is missing. */
 export function normaliseSettings(settings: Partial<LoopSettings>): LoopSettings {
   const sound = { ...DEFAULT_SETTINGS.sound, ...settings.sound }
-
   return {
     ...DEFAULT_SETTINGS,
     ...settings,

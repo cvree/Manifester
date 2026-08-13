@@ -175,7 +175,7 @@ export function PlayerAdjust({
           />
           <SettingRow
             icon={<TuneIcon />}
-            title="Haptics and interface sounds"
+            title="Haptics"
             summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
             onClick={() => go('feel')}
           />

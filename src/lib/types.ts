@@ -102,11 +102,10 @@ export const DEFAULT_SETTINGS: LoopSettings = {
   recordingId: null,
   rate: 0.9,
   pitch: 1,
-  voiceVolume: 1,
-  // Raised from 0.4: with the makeup gain in `audioBus.ts` this is a
-  // comfortable, present level out of the box rather than something you have
-  // to go and turn up before the app sounds like anything.
-  musicVolume: 0.75,
+  // Clear, but not full-volume on the first use in a dark room.
+  voiceVolume: 0.82,
+  // Present without arriving loudly in a dark room.
+  musicVolume: 0.4,
   repeatPauseSeconds: 3,
   timerMinutes: 10,
   sound: DEFAULT_SOUND,

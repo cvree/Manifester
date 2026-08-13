@@ -23,7 +23,7 @@ import { TextArea, TextField } from '../components/TextArea'
 import { TimerSettings } from '../components/TimerSettings'
 import { primeBreathAudio } from '../lib/breathAudio'
 import { recordEngagement } from '../lib/engagement'
-import { cue, primeFeedback } from '../lib/feedback'
+import { cue } from '../lib/feedback'
 import { countWords } from '../lib/format'
 import { draftToLoop } from '../lib/loops'
 import { useReducedMotion } from '../lib/motion'
@@ -57,7 +57,7 @@ const STARTERS = [
 ]
 
 /** Long enough for the button to settle before the route changes. */
-const START_TRANSITION_MS = 620
+const START_TRANSITION_MS = 320
 
 /** What the writing helper last did, and the text it did it to. */
 interface HelperState {
@@ -209,9 +209,7 @@ export function CreateRoute() {
     // Reach for the audio hardware while we are still inside the tap, then
     // let the button animate. Safari will not unlock it a beat later.
     prime()
-    primeFeedback()
     primeBreathAudio()
-    cue('start')
     setStarting(true)
 
     const delay = reducedMotion ? 0 : START_TRANSITION_MS

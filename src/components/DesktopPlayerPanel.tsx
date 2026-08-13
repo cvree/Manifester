@@ -119,7 +119,7 @@ export function DesktopPlayerPanel({
         />
         <SettingRow
           icon={<TuneIcon />}
-          title="Haptics and interface sounds"
+          title="Haptics"
           summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
           onClick={() => open('feel')}
         />

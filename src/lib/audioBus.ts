@@ -194,6 +194,16 @@ export class AudioBus {
     return this.ctx
   }
 
+  beginGentleStart(durationSeconds = 1.15): void {
+    const ctx = this.ensure()
+    const master = this.graph?.master
+    if (!ctx || !master) return
+    const now = ctx.currentTime
+    master.gain.cancelScheduledValues(now)
+    master.gain.setValueAtTime(0.0001, now)
+    master.gain.exponentialRampToValueAtTime(1, now + durationSeconds)
+  }
+
   setMusicVolume(value: number): void {
     this.musicLevel = clampMusicVolume(value)
     if (this.graph && this.ctx) {

@@ -1,15 +1,9 @@
-/**
- * Local-only persistence.
- *
- * IndexedDB holds saved loops and imported audio blobs; localStorage holds a
- * couple of tiny UI preferences. Nothing here ever leaves the device.
- */
+/** Local-only persistence. Nothing here ever leaves the device. */
 
 import type { LoopSettings, SavedLoop, TrackMeta } from './types'
 
 const DB_NAME = 'manifester'
 const DB_VERSION = 2
-
 const STORE_LOOPS = 'loops'
 const STORE_TRACKS = 'tracks'
 const STORE_KV = 'kv'
@@ -20,6 +14,14 @@ export interface StoredTrack extends TrackMeta {
   blob: Blob
 }
 
+export interface StoredRecording {
+  id: string
+  blob: Blob
+  durationSeconds: number
+  mimeType: string
+  createdAt: number
+}
+
 let dbPromise: Promise<IDBDatabase> | null = null
 
 export function isStorageAvailable(): boolean {
@@ -28,15 +30,12 @@ export function isStorageAvailable(): boolean {
 
 function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise
-
   dbPromise = new Promise((resolve, reject) => {
     if (!isStorageAvailable()) {
       reject(new Error('IndexedDB is not available in this browser.'))
       return
     }
-
     const request = indexedDB.open(DB_NAME, DB_VERSION)
-
     request.onupgradeneeded = () => {
       const db = request.result
       if (!db.objectStoreNames.contains(STORE_LOOPS)) {
@@ -52,17 +51,13 @@ function openDb(): Promise<IDBDatabase> {
         db.createObjectStore(STORE_RECORDINGS, { keyPath: 'id' })
       }
     }
-
     request.onsuccess = () => resolve(request.result)
     request.onerror = () =>
       reject(request.error ?? new Error('Could not open the local database.'))
   })
-
-  // A failed open should not poison every later call.
   dbPromise.catch(() => {
     dbPromise = null
   })
-
   return dbPromise
 }
 
@@ -83,12 +78,8 @@ function runRequest<T>(
   )
 }
 
-/* ── Saved loops ─────────────────────────────────────────────── */
-
 export async function listLoops(): Promise<SavedLoop[]> {
-  const loops = await runRequest<SavedLoop[]>(STORE_LOOPS, 'readonly', (s) =>
-    s.getAll(),
-  )
+  const loops = await runRequest<SavedLoop[]>(STORE_LOOPS, 'readonly', (s) => s.getAll())
   return loops.sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
@@ -100,12 +91,8 @@ export async function deleteLoop(id: string): Promise<void> {
   await runRequest(STORE_LOOPS, 'readwrite', (s) => s.delete(id))
 }
 
-/* ── Imported audio ──────────────────────────────────────────── */
-
 export async function listCustomTracks(): Promise<StoredTrack[]> {
-  const tracks = await runRequest<StoredTrack[]>(STORE_TRACKS, 'readonly', (s) =>
-    s.getAll(),
-  )
+  const tracks = await runRequest<StoredTrack[]>(STORE_TRACKS, 'readonly', (s) => s.getAll())
   return tracks.sort((a, b) => a.createdAt - b.createdAt)
 }
 
@@ -114,44 +101,57 @@ export async function putCustomTrack(track: StoredTrack): Promise<void> {
 }
 
 export async function getCustomTrack(id: string): Promise<StoredTrack | undefined> {
-  return runRequest<StoredTrack | undefined>(STORE_TRACKS, 'readonly', (s) =>
-    s.get(id),
-  )
+  return runRequest<StoredTrack | undefined>(STORE_TRACKS, 'readonly', (s) => s.get(id))
 }
 
 export async function deleteCustomTrack(id: string): Promise<void> {
   await runRequest(STORE_TRACKS, 'readwrite', (s) => s.delete(id))
 }
 
-/* ── Voice recordings ────────────────────────────────────────── */
-
-export interface StoredRecording {
-  id: string
-  blob: Blob
-  durationSeconds: number
-  mimeType: string
-  createdAt: number
+export async function listRecordings(): Promise<StoredRecording[]> {
+  const recordings = await runRequest<StoredRecording[]>(
+    STORE_RECORDINGS,
+    'readonly',
+    (s) => s.getAll(),
+  )
+  return recordings.sort((a, b) => a.createdAt - b.createdAt)
 }
 
 export async function putRecording(recording: StoredRecording): Promise<void> {
   await runRequest(STORE_RECORDINGS, 'readwrite', (s) => s.put(recording))
 }
 
-export async function getRecording(
-  id: string,
-): Promise<StoredRecording | undefined> {
-  return runRequest<StoredRecording | undefined>(
-    STORE_RECORDINGS,
-    'readonly',
-    (s) => s.get(id),
-  )
+export async function getRecording(id: string): Promise<StoredRecording | undefined> {
+  return runRequest<StoredRecording | undefined>(STORE_RECORDINGS, 'readonly', (s) => s.get(id))
 }
 
 export async function deleteRecording(id: string): Promise<void> {
   await runRequest(STORE_RECORDINGS, 'readwrite', (s) => s.delete(id))
 }
 
-/* ── Small key/value settings ────────────────────────────────── */
+/** One transaction: malformed restore data can never leave a half-restored library. */
+export async function importLibrarySnapshot(input: {
+  loops: SavedLoop[]
+  customTracks: StoredTrack[]
+  recordings: StoredRecording[]
+}): Promise<void> {
+  const db = await openDb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(
+      [STORE_LOOPS, STORE_TRACKS, STORE_RECORDINGS],
+      'readwrite',
+    )
+    const loops = tx.objectStore(STORE_LOOPS)
+    const tracks = tx.objectStore(STORE_TRACKS)
+    const recordings = tx.objectStore(STORE_RECORDINGS)
+    input.loops.forEach((loop) => loops.put(loop))
+    input.customTracks.forEach((track) => tracks.put(track))
+    input.recordings.forEach((recording) => recordings.put(recording))
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('The backup could not be restored.'))
+    tx.onabort = () => reject(tx.error ?? new Error('The backup restore was cancelled.'))
+  })
+}
 
 interface KvRecord<T> {
   key: string
@@ -159,10 +159,8 @@ interface KvRecord<T> {
 }
 
 export async function readKv<T>(key: string): Promise<T | undefined> {
-  const record = await runRequest<KvRecord<T> | undefined>(
-    STORE_KV,
-    'readonly',
-    (s) => s.get(key),
+  const record = await runRequest<KvRecord<T> | undefined>(STORE_KV, 'readonly', (s) =>
+    s.get(key),
   )
   return record?.value
 }
@@ -181,8 +179,6 @@ export function saveLastSettings(settings: LoopSettings): Promise<void> {
   return writeKv(LAST_SETTINGS_KEY, settings).catch(() => undefined)
 }
 
-/* ── localStorage (tiny, synchronous preferences only) ───────── */
-
 export function readLocal(key: string): string | null {
   try {
     return localStorage.getItem(`manifester:${key}`)
@@ -199,7 +195,6 @@ export function writeLocal(key: string, value: string): void {
   }
 }
 
-/** Approximate how much room the app is using, when the browser will say. */
 export async function estimateUsage(): Promise<{
   usageBytes: number
   quotaBytes: number

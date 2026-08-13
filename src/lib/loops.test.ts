@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_BRAINWAVE, getTargetHz } from './brainwaveAudio'
-import { draftToLoop, loopToDraft, normaliseSettings, type Draft } from './loops'
+import { draftToLoop, loopToDraft, normaliseSettings, pickLaunchLoop, type Draft } from './loops'
 import { DEFAULT_SETTINGS, type LoopSettings, type SavedLoop } from './types'
 
 /** A loop exactly as the previous version of the app would have written it. */
@@ -161,5 +161,37 @@ describe('defaults', () => {
     expect(DEFAULT_SETTINGS.sound.rainCharacter).toBe('steady')
     // The existing default sound is unchanged, so no-one's saved loop moves.
     expect(DEFAULT_SETTINGS.sound.trackId).toBe('moon-garden')
+  })
+})
+
+describe('returning-user launch loop', () => {
+  const make = (id: string, updatedAt: number, lastPlayedAt: number | null): SavedLoop => ({
+    ...LEGACY_LOOP,
+    id,
+    text: `Words for ${id}`,
+    updatedAt,
+    lastPlayedAt,
+  })
+
+  it('restores the most recently played loop, not merely the most recently edited', () => {
+    const last = pickLaunchLoop([
+      make('edited', 900, 100),
+      make('played', 500, 800),
+    ])
+    expect(last?.id).toBe('played')
+  })
+
+  it('uses the most recently updated loop before anything has been played', () => {
+    expect(pickLaunchLoop([make('old', 1, null), make('new', 2, null)])?.id).toBe('new')
+  })
+
+  it('keeps the true empty state when there is no saved content', () => {
+    expect(pickLaunchLoop([])).toBeNull()
+    expect(
+      pickLaunchLoop([
+        { ...make('blank', 1, null), text: '   ' },
+        { ...make('blank-2', 2, null), text: '   ' },
+      ]),
+    ).toBeNull()
   })
 })

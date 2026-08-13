@@ -20,13 +20,15 @@ import { MusicEngine, type TrackSource } from '../lib/audio'
 import { AudioBus } from '../lib/audioBus'
 import { configureBreath, setBreathActive } from '../lib/breathEngine'
 import { beat } from '../lib/heartbeat'
+import { useLibrary } from './LibraryProvider'
 import { usePreferences } from './PreferencesProvider'
 import {
   BrainwaveVoice,
   normaliseBrainwave,
   type BrainwaveSettings,
 } from '../lib/brainwaveAudio'
-import { loopToDraft, normaliseSettings, type Draft } from '../lib/loops'
+import { loopToDraft, normaliseSettings, pickLaunchLoop, type Draft } from '../lib/loops'
+import { ActiveTimeClock } from '../lib/sessionClock'
 import { soundPlaybackChanged } from '../lib/soundChoice'
 import {
   LIVE_VOICE_VOLUME_CAP,
@@ -74,6 +76,7 @@ interface SessionSnapshot {
 }
 
 interface SessionContextValue {
+  ready: boolean
   draft: Draft
   updateDraft: (patch: Partial<Omit<Draft, 'settings'>>) => void
   updateSettings: (patch: Partial<LoopSettings>) => void
@@ -166,7 +169,14 @@ function newDraft(): Draft {
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const { preferences } = usePreferences()
+  const {
+    loops,
+    ready: libraryReady,
+    touchLoop,
+    recordListening,
+  } = useLibrary()
   const [draft, setDraft] = useState<Draft>(newDraft)
+  const [ready, setReady] = useState(false)
   const [voices, setVoices] = useState<RankedVoice[]>([])
   const [voicesReady, setVoicesReady] = useState(false)
   const [session, setSession] = useState<SessionSnapshot>(EMPTY_SESSION)
@@ -178,10 +188,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const musicRef = useRef<MusicEngine | null>(null)
   const brainwaveRef = useRef<BrainwaveVoice | null>(null)
   const timerRef = useRef<SessionTimer | null>(null)
-  const elapsedRef = useRef<{ startedAt: number; interval: number | null }>({
-    startedAt: 0,
+  const elapsedRef = useRef<{ clock: ActiveTimeClock; interval: number | null }>({
+    clock: new ActiveTimeClock(),
     interval: null,
   })
+  const listeningRef = useRef({
+    recordedSeconds: 0,
+    counted: false,
+    startedAt: 0,
+  })
+  const statusRef = useRef<SessionStatus>('idle')
+  const draftTouchedRef = useRef(false)
   /**
    * True between `start()` and `finish()`. Generated sound is only ever touched
    * while this holds, which is what guarantees nothing reaches for the audio
@@ -246,30 +263,41 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return pickBestVoice(voices, draft.settings.voiceStyle)
   }, [voices, draft.settings.voiceURI, draft.settings.voiceStyle])
 
-  /* ── Restore last-used settings ── */
+  /* ── Restore the returning user's last loop ── */
 
   useEffect(() => {
+    if (!libraryReady || ready) return
     let cancelled = false
     void storage.loadLastSettings().then((saved) => {
-      if (cancelled || !saved) return
-      setDraft((current) => ({
-        ...current,
-        settings: normaliseSettings({ ...current.settings, ...saved }),
-      }))
+      if (cancelled) return
+      const last = pickLaunchLoop(loops)
+      setDraft((current) => {
+        if (draftTouchedRef.current) return current
+        if (last) return loopToDraft(last)
+        return saved
+          ? {
+              ...current,
+              settings: normaliseSettings({ ...current.settings, ...saved }),
+            }
+          : current
+      })
+      setReady(true)
     })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [libraryReady, loops, ready])
 
   /* ── Draft editing ── */
 
   const updateDraft = useCallback<SessionContextValue['updateDraft']>((patch) => {
+    draftTouchedRef.current = true
     setDraft((current) => ({ ...current, ...patch }))
   }, [])
 
   const updateSettings = useCallback<SessionContextValue['updateSettings']>(
     (patch) => {
+      draftTouchedRef.current = true
       setDraft((current) => {
         const settings: LoopSettings = {
           ...current.settings,
@@ -285,12 +313,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [],
   )
 
-  const loadIntoDraft = useCallback(
-    (loop: SavedLoop) => setDraft(loopToDraft(loop)),
-    [],
-  )
+  const loadIntoDraft = useCallback((loop: SavedLoop) => {
+    draftTouchedRef.current = true
+    setDraft(loopToDraft(loop))
+  }, [])
 
-  const resetDraft = useCallback(() => setDraft(newDraft()), [])
+  const resetDraft = useCallback(() => {
+    draftTouchedRef.current = true
+    setDraft(newDraft())
+  }, [])
 
   /* ── Voice preview ── */
 
@@ -357,33 +388,72 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     wakeLockRef.current = null
   }, [])
 
-  /* ── Elapsed clock ── */
+  /* ── Active listening clock and persistent total ── */
 
-  const startElapsed = useCallback(() => {
-    const state = elapsedRef.current
-    state.startedAt = Date.now()
-    if (state.interval != null) clearInterval(state.interval)
-    state.interval = window.setInterval(() => {
-      const remaining = speechRef.current?.delayRemainingSeconds ?? null
-      setSession((current) =>
-        current.status === 'playing'
-          ? {
-              ...current,
-              elapsedSeconds: Math.floor((Date.now() - state.startedAt) / 1000),
-              delayRemaining: remaining == null ? null : Math.ceil(remaining),
-            }
-          : current,
-      )
-    }, 250)
-  }, [])
+  const flushListening = useCallback(
+    (now = Date.now()) => {
+      const total = Math.floor(elapsedRef.current.clock.elapsedSeconds(now))
+      const state = listeningRef.current
+      const delta = Math.max(0, total - state.recordedSeconds)
+      if (delta <= 0) return
+      const countSession = !state.counted && total >= 1
+      recordListening(delta, countSession, state.startedAt || now)
+      state.recordedSeconds = total
+      if (countSession) state.counted = true
+    },
+    [recordListening],
+  )
 
-  const stopElapsed = useCallback(() => {
+  const clearElapsedInterval = useCallback(() => {
     const state = elapsedRef.current
     if (state.interval != null) {
       clearInterval(state.interval)
       state.interval = null
     }
   }, [])
+
+  const startElapsed = useCallback(
+    (reset = false) => {
+      const now = Date.now()
+      const state = elapsedRef.current
+      if (reset) state.clock.start(now)
+      else state.clock.resume(now)
+      clearElapsedInterval()
+      state.interval = window.setInterval(() => {
+        const tickAt = Date.now()
+        const elapsedSeconds = Math.floor(state.clock.elapsedSeconds(tickAt))
+        const remaining = speechRef.current?.delayRemainingSeconds ?? null
+        setSession((current) =>
+          current.status === 'playing'
+            ? {
+                ...current,
+                elapsedSeconds,
+                delayRemaining: remaining == null ? null : Math.ceil(remaining),
+              }
+            : current,
+        )
+        if (elapsedSeconds - listeningRef.current.recordedSeconds >= 5) {
+          flushListening(tickAt)
+        }
+      }, 250)
+    },
+    [clearElapsedInterval, flushListening],
+  )
+
+  const pauseElapsed = useCallback(() => {
+    const now = Date.now()
+    const state = elapsedRef.current
+    state.clock.pause(now)
+    clearElapsedInterval()
+    const elapsedSeconds = Math.floor(state.clock.elapsedSeconds(now))
+    setSession((current) => ({ ...current, elapsedSeconds }))
+    flushListening(now)
+  }, [clearElapsedInterval, flushListening])
+
+  const stopElapsed = useCallback(() => {
+    pauseElapsed()
+    elapsedRef.current.clock.reset()
+  }, [pauseElapsed])
 
   /* ── The background sound, while a session is running ── */
 
@@ -424,6 +494,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const finish = useCallback(
     (status: SessionStatus, notice: string | null) => {
+      statusRef.current = status
       speechRef.current?.stop()
       musicRef.current?.stop()
       brainwaveRef.current?.stop()
@@ -431,6 +502,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       liveRef.current = false
       pendingSoundRef.current = false
       stopElapsed()
+      listeningRef.current = {
+        recordedSeconds: 0,
+        counted: false,
+        startedAt: 0,
+      }
       releaseWakeLock()
       setSession((current) => ({
         ...current,
@@ -460,6 +536,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const timer = timerRef.current
       if (!bus || !music || !speech || !timer) return
 
+      if (liveRef.current) finish('idle', null)
+
       const settings: LoopSettings = source
         ? normaliseSettings(source)
         : draft.settings
@@ -468,6 +546,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       // Reach for audio permission while we are still inside the tap.
       bus.ensure()
+      bus.beginGentleStart()
       music.unlock()
 
       const started = speech.start(
@@ -481,6 +560,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           pitch: settings.pitch,
           volume: settings.voiceVolume,
           repeatPauseMs: settings.repeatPauseSeconds * 1000,
+          initialDelayMs: 420,
           loop: true,
         },
         {
@@ -496,6 +576,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!started) return
 
       liveRef.current = true
+      statusRef.current = 'playing'
+      const startedAt = Date.now()
+      listeningRef.current = {
+        recordedSeconds: 0,
+        counted: false,
+        startedAt,
+      }
+      const loopId = source?.id ?? draft.id
+      if (loopId) void touchLoop(loopId)
       setSession({
         ...EMPTY_SESSION,
         status: 'playing',
@@ -504,7 +593,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         remainingSeconds:
           settings.timerMinutes != null ? settings.timerMinutes * 60 : null,
       })
-      startElapsed()
+      startElapsed(true)
       void requestWakeLock()
 
       music.setHandlers({
@@ -535,32 +624,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         })
       }
     },
-    [draft, finish, requestWakeLock, startElapsed, voices],
+    [draft, finish, requestWakeLock, startElapsed, touchLoop, voices],
   )
 
   const pause = useCallback(() => {
+    if (statusRef.current !== 'playing') return
+    statusRef.current = 'paused'
     speechRef.current?.pause()
     musicRef.current?.suspend()
     busRef.current?.suspend()
     timerRef.current?.pause()
-    stopElapsed()
+    pauseElapsed()
     releaseWakeLock()
-    // Freeze the countdown where it stopped rather than letting it drift.
     const remaining = speechRef.current?.delayRemainingSeconds ?? null
     setSession((current) => ({
       ...current,
       status: 'paused',
       delayRemaining: remaining == null ? null : Math.ceil(remaining),
     }))
-  }, [releaseWakeLock, stopElapsed])
+  }, [pauseElapsed, releaseWakeLock])
 
   const resume = useCallback(() => {
+    if (statusRef.current !== 'paused') return
+    statusRef.current = 'playing'
     busRef.current?.ensure()
     musicRef.current?.unlock()
 
-    // A sound chosen while paused arrives now, in place of the one that was
-    // holding its position — rather than resuming the old one first and
-    // crossfading away from it a moment later.
     if (pendingSoundRef.current) {
       pendingSoundRef.current = false
       applyLiveSound(draft.settings)
@@ -571,7 +660,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     speechRef.current?.resume()
     timerRef.current?.resume()
     setSession((current) => ({ ...current, status: 'playing' }))
-    startElapsed()
+    startElapsed(false)
     void requestWakeLock()
   }, [applyLiveSound, draft.settings, requestWakeLock, startElapsed])
 
@@ -763,13 +852,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       beat()
       if (session.status === 'playing') speechRef.current?.recover()
     }
+    const persist = () => flushListening()
     document.addEventListener('visibilitychange', recover)
     window.addEventListener('pageshow', recover)
+    window.addEventListener('pagehide', persist)
     return () => {
       document.removeEventListener('visibilitychange', recover)
       window.removeEventListener('pageshow', recover)
+      window.removeEventListener('pagehide', persist)
     }
-  }, [requestWakeLock, session.status])
+  }, [flushListening, requestWakeLock, session.status])
 
   useEffect(() => {
     const speech = speechRef.current
@@ -790,6 +882,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SessionContextValue>(
     () => ({
+      ready,
       draft,
       updateDraft,
       updateSettings,
@@ -818,6 +911,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLiveSound,
     }),
     [
+      ready,
       draft,
       updateDraft,
       updateSettings,

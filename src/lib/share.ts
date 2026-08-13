@@ -1,33 +1,28 @@
-/**
- * Handing something to the rest of the device.
- *
- * The Web Share API is the only place Manifester passes anything outside its
- * own tab, and it is always the user who starts it: a share sheet opens, they
- * choose where it goes, and the app never learns what they picked. Nothing is
- * uploaded, and there is no link to anywhere — a shared loop is its words, and
- * a shared file is the file itself.
- *
- * Support is uneven (Firefox on the desktop has no share sheet, and file
- * sharing is narrower still), so every path here degrades rather than
- * disappearing: the clipboard when there is no share sheet, and `execCommand`
- * when the page is not in a secure context and the async clipboard is missing.
- */
+/** User-initiated sharing. Nothing is uploaded; links carry the loop in their hash. */
 
-export type ShareOutcome =
-  /** The device's share sheet took it. */
-  | 'shared'
-  /** No share sheet, so the words went to the clipboard instead. */
-  | 'copied'
-  /** The share sheet opened and the user backed out. Say nothing. */
-  | 'dismissed'
-  | 'failed'
+import { findAmbientPreset } from './ambient'
+import { createId } from './format'
+import { normaliseSettings } from './loops'
+import type { LoopSettings, SavedLoop, SoundConfig } from './types'
+
+export type ShareOutcome = 'shared' | 'copied' | 'dismissed' | 'failed'
 
 export interface SharePayload {
   title: string
-  text: string
+  text?: string
+  url?: string
 }
 
-/** A loop as a message worth pasting somewhere: its title, then its words. */
+interface SharedLoopDocument {
+  v: 1
+  title: string
+  text: string
+  settings: LoopSettings
+}
+
+const MAX_SHARED_TEXT = 8_000
+const MAX_TOKEN_LENGTH = 16_000
+
 export function loopShareText(title: string, text: string): string {
   const heading = title.trim()
   const words = text.trim()
@@ -36,16 +31,10 @@ export function loopShareText(title: string, text: string): string {
   return `${heading}\n\n${words}`
 }
 
-/** Whether this browser has a share sheet at all. */
 export function canShare(): boolean {
   return typeof navigator !== 'undefined' && typeof navigator.share === 'function'
 }
 
-/**
- * Whether this browser will share *these* files. Chrome on Windows and Safari
- * on iOS both take audio; several browsers with `navigator.share` take text
- * only, and answering that honestly is the whole point of `canShare(data)`.
- */
 export function canShareFiles(files: File[]): boolean {
   if (!canShare() || typeof navigator.canShare !== 'function') return false
   try {
@@ -55,27 +44,23 @@ export function canShareFiles(files: File[]): boolean {
   }
 }
 
-/** Share the words, falling back to the clipboard where there is no sheet. */
 export async function shareText(payload: SharePayload): Promise<ShareOutcome> {
   if (canShare()) {
     try {
-      await navigator.share({ title: payload.title, text: payload.text })
+      await navigator.share({
+        title: payload.title,
+        ...(payload.text ? { text: payload.text } : {}),
+        ...(payload.url ? { url: payload.url } : {}),
+      })
       return 'shared'
     } catch (error) {
       if (wasDismissed(error)) return 'dismissed'
-      /* Anything else falls through to the clipboard. */
     }
   }
-  return (await copyText(payload.text)) ? 'copied' : 'failed'
+  const fallback = payload.url ?? payload.text ?? ''
+  return fallback && (await copyText(fallback)) ? 'copied' : 'failed'
 }
 
-/**
- * Share a rendered audio file.
- *
- * On a phone this is usually better than a download: iOS has no visible
- * downloads folder for a web app, but its share sheet will put the file
- * straight into Files, Voice Memos or a message.
- */
 export async function shareFile(file: File, title: string): Promise<ShareOutcome> {
   if (!canShareFiles([file])) return 'failed'
   try {
@@ -98,29 +83,121 @@ export async function copyText(text: string): Promise<boolean> {
   return legacyCopy(text)
 }
 
-/**
- * Backing out of the share sheet rejects with an `AbortError`, and it is not a
- * failure — the user changed their mind, and the app should say nothing at all.
- * Some older WebKit builds reject with a plain "canceled" message instead.
- */
+/** Create a backend-free link. Device-specific voices and local media are omitted. */
+export function createLoopShareUrl(loop: SavedLoop, currentUrl?: string): string {
+  const token = encodeSharedLoop(loop)
+  const base = new URL(
+    currentUrl ??
+      (typeof window !== 'undefined'
+        ? window.location.href
+        : 'https://cvree.github.io/Manifester/'),
+  )
+  base.hash = `/share?loop=${encodeURIComponent(token)}`
+  return base.toString()
+}
+
+export function encodeSharedLoop(loop: SavedLoop): string {
+  if (!loop.text.trim() || loop.text.length > MAX_SHARED_TEXT) {
+    throw new Error('This loop is too long to share as a link.')
+  }
+  const settings = normaliseSettings(loop)
+  const document: SharedLoopDocument = {
+    v: 1,
+    title: loop.title.trim().slice(0, 80) || 'Shared loop',
+    text: loop.text,
+    settings: {
+      ...settings,
+      voiceURI: null,
+      voiceName: null,
+      recordingId: null,
+      sound: shareableSound(settings.sound),
+    },
+  }
+  const token = base64UrlEncode(JSON.stringify(document))
+  if (token.length > MAX_TOKEN_LENGTH) {
+    throw new Error('This loop is too long to share as a link.')
+  }
+  return token
+}
+
+export function decodeSharedLoop(token: string): SavedLoop {
+  if (!token || token.length > MAX_TOKEN_LENGTH) throw new Error('This shared link is not valid.')
+  let raw: unknown
+  try {
+    raw = JSON.parse(base64UrlDecode(token))
+  } catch {
+    throw new Error('This shared link is not valid.')
+  }
+  if (!raw || typeof raw !== 'object') throw new Error('This shared link is not valid.')
+  const value = raw as Partial<SharedLoopDocument>
+  if (value.v !== 1 || typeof value.text !== 'string' || !value.text.trim()) {
+    throw new Error('This shared link is incomplete.')
+  }
+  if (value.text.length > MAX_SHARED_TEXT) throw new Error('This shared loop is too large.')
+  const now = Date.now()
+  const settings = normaliseSettings(value.settings ?? {})
+  return {
+    ...settings,
+    voiceURI: null,
+    voiceName: null,
+    recordingId: null,
+    sound: shareableSound(settings.sound),
+    id: createId('loop'),
+    title:
+      typeof value.title === 'string' && value.title.trim()
+        ? value.title.trim().slice(0, 80)
+        : 'Shared loop',
+    text: value.text,
+    createdAt: now,
+    updatedAt: now,
+    lastPlayedAt: null,
+  }
+}
+
+function shareableSound(sound: SoundConfig): SoundConfig {
+  if (sound.mode === 'off') return { ...sound, playlist: [] }
+  if (sound.mode === 'single') {
+    return sound.trackId && findAmbientPreset(sound.trackId)
+      ? { ...sound, playlist: [] }
+      : { ...sound, mode: 'off', trackId: null, playlist: [] }
+  }
+  const playlist = sound.playlist.filter((id) => findAmbientPreset(id) != null)
+  return playlist.length > 0
+    ? { ...sound, playlist }
+    : { ...sound, mode: 'off', trackId: null, playlist: [] }
+}
+
+function base64UrlEncode(value: string): string {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+function base64UrlDecode(value: string): string {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (value.length % 4)) % 4)
+  const binary = atob(padded)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+  return new TextDecoder().decode(bytes)
+}
+
 function wasDismissed(error: unknown): boolean {
   if (!(error instanceof Error)) return false
   return error.name === 'AbortError' || /abort|cancel/i.test(error.message)
 }
 
-/** `document.execCommand` is deprecated, and it is still the only fallback. */
 function legacyCopy(text: string): boolean {
   if (typeof document === 'undefined') return false
-
   const field = document.createElement('textarea')
   field.value = text
   field.setAttribute('readonly', '')
-  // Off-screen rather than hidden: a hidden field cannot be selected.
   field.style.position = 'fixed'
   field.style.top = '-1000px'
   field.style.opacity = '0'
   document.body.appendChild(field)
-
   try {
     field.select()
     return document.execCommand('copy')

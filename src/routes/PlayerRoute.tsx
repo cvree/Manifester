@@ -30,8 +30,9 @@ import {
 } from '../components/Icons'
 import { cx } from '../lib/cx'
 import { primeBreathAudio } from '../lib/breathAudio'
-import { cue, primeFeedback } from '../lib/feedback'
+import { cue } from '../lib/feedback'
 import { countWords, formatClock } from '../lib/format'
+import { listeningSentence } from '../lib/listening'
 import { useReducedMotion } from '../lib/motion'
 import { affirmationLines, soundName } from '../lib/summaries'
 import { useBackgroundMix } from '../lib/useBackgroundMix'
@@ -63,7 +64,7 @@ export function PlayerRoute() {
     dismissNotice,
   } = useSession()
   const { preferences } = usePreferences()
-  const { allTracks } = useLibrary()
+  const { allTracks, listeningStats } = useLibrary()
   const { expanded, setExpanded } = useStage()
   const [sheet, setSheet] = useState<PanelKey | 'adjust' | null>(null)
   const reducedMotion = useReducedMotion()
@@ -74,6 +75,7 @@ export function PlayerRoute() {
   const playing = session.status === 'playing'
   const paused = session.status === 'paused'
   const complete = session.status === 'complete'
+  const lifetime = listeningSentence(listeningStats)
 
   const { stageRef, slotRef, toggle, instant } = useStageExpansion({
     expanded,
@@ -176,9 +178,7 @@ export function PlayerRoute() {
       resume()
     } else {
       prime()
-      primeFeedback()
       primeBreathAudio()
-      cue('start')
       start()
     }
   }
@@ -250,6 +250,7 @@ export function PlayerRoute() {
                     {session.cycles} {session.cycles === 1 ? 'pass' : 'passes'}.
                     Take a breath before you move on.
                   </p>
+                  {lifetime && <p className="type-meta mt-3">{lifetime}</p>}
                   <div className="mt-7 flex flex-wrap justify-center gap-3">
                     <Button variant="primary" size="lg" onClick={() => start()}>
                       Listen again

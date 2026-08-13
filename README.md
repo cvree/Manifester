@@ -39,6 +39,13 @@ app.
 
 ## What it does
 
+**Returning is intentionally one step.** Manifester restores the most recently
+played saved loop on launch, so the common path is open → play. The Library can
+export and safely merge a local backup, share a loop in a backend-free link, and
+create an optional calendar event. Listening totals stay on the device and are
+shown without streaks or goals.
+
+
 **Create**
 
 - A **ritual-building workspace**: on a desktop the editor sits on the left and a

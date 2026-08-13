@@ -3,10 +3,14 @@ import {
   canShare,
   canShareFiles,
   copyText,
+  createLoopShareUrl,
+  decodeSharedLoop,
+  encodeSharedLoop,
   loopShareText,
   shareFile,
   shareText,
 } from './share'
+import { DEFAULT_SETTINGS, type SavedLoop } from './types'
 
 /** A `navigator` with only the bits a given test cares about. */
 function stubNavigator(parts: Record<string, unknown>) {
@@ -166,5 +170,38 @@ describe('copyText', () => {
       clipboard: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
     })
     await expect(copyText('words')).resolves.toBe(false)
+  })
+})
+
+describe('loop links', () => {
+  const loop: SavedLoop = {
+    ...DEFAULT_SETTINGS,
+    id: 'loop-1',
+    title: 'Night calm',
+    text: 'I am safe.\nI can rest.',
+    createdAt: 1,
+    updatedAt: 2,
+    lastPlayedAt: 3,
+    voiceURI: 'device-only',
+    voiceName: 'Only here',
+    recordingId: 'recording-only-here',
+  }
+
+  it('round-trips the words and portable settings without local-only ids', () => {
+    const restored = decodeSharedLoop(encodeSharedLoop(loop))
+    expect(restored.title).toBe('Night calm')
+    expect(restored.text).toBe(loop.text)
+    expect(restored.rate).toBe(loop.rate)
+    expect(restored.voiceURI).toBeNull()
+    expect(restored.recordingId).toBeNull()
+  })
+
+  it('creates a HashRouter link that opens the import route', () => {
+    const url = createLoopShareUrl(loop, 'https://example.com/Manifester/#/library')
+    expect(url).toContain('#/share?loop=')
+  })
+
+  it('rejects malformed or outdated links without inventing a loop', () => {
+    expect(() => decodeSharedLoop('not-base64')).toThrow('not valid')
   })
 })

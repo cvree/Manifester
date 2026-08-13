@@ -1,8 +1,6 @@
 /**
- * The user's local library: saved loops and imported sounds.
- *
- * Everything lives in IndexedDB on this device. There is no sync, no server,
- * and no export path other than the one the user drives themselves.
+ * The user's local library: saved loops, imported sounds, recordings and the
+ * quiet total that reflects time spent listening. Everything stays local.
  */
 
 import {
@@ -16,7 +14,19 @@ import {
 } from 'react'
 import { AMBIENT_PRESETS } from '../lib/ambient'
 import { readAudioDuration } from '../lib/audio'
+import {
+  createLibraryBackupJson,
+  parseLibraryBackup,
+  prepareRestore,
+} from '../lib/backup'
 import { createId } from '../lib/format'
+import {
+  addListening,
+  mergeListeningStats,
+  readListeningStats,
+  writeListeningStats,
+  type ListeningStats,
+} from '../lib/listening'
 import * as storage from '../lib/storage'
 import { MAX_TRACK_BYTES, type SavedLoop, type TrackMeta } from '../lib/types'
 
@@ -35,6 +45,7 @@ interface LibraryContextValue {
   loops: SavedLoop[]
   ready: boolean
   storageError: string | null
+  listeningStats: ListeningStats
   findTrack: (id: string) => TrackMeta | undefined
   importTracks: (files: FileList | File[]) => Promise<{ added: number; skipped: string[] }>
   renameTrack: (id: string, name: string) => Promise<void>
@@ -43,6 +54,9 @@ interface LibraryContextValue {
   removeLoop: (id: string) => Promise<void>
   duplicateLoop: (id: string) => Promise<SavedLoop | null>
   touchLoop: (id: string) => Promise<void>
+  recordListening: (seconds: number, countSession: boolean, startedAt: number) => void
+  createBackup: () => Promise<string>
+  restoreBackup: (text: string) => Promise<{ added: number; skipped: number }>
 }
 
 const LibraryContext = createContext<LibraryContextValue | null>(null)
@@ -52,10 +66,10 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const [loops, setLoops] = useState<SavedLoop[]>([])
   const [ready, setReady] = useState(false)
   const [storageError, setStorageError] = useState<string | null>(null)
+  const [listeningStats, setListeningStats] = useState(readListeningStats)
 
   useEffect(() => {
     let cancelled = false
-
     async function load() {
       try {
         const [tracks, savedLoops] = await Promise.all([
@@ -74,7 +88,6 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setReady(true)
       }
     }
-
     void load()
     return () => {
       cancelled = true
@@ -96,7 +109,6 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const list = Array.from(files)
       const skipped: string[] = []
       const added: TrackMeta[] = []
-
       for (const file of list) {
         if (!file.type.startsWith('audio/') && !/\.(mp3|m4a|aac|wav|ogg|oga|flac|webm)$/i.test(file.name)) {
           skipped.push(`${file.name} — not an audio file`)
@@ -106,7 +118,6 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           skipped.push(`${file.name} — larger than 40 MB`)
           continue
         }
-
         const durationSeconds = await readAudioDuration(file)
         const track: storage.StoredTrack = {
           id: createId('track'),
@@ -118,7 +129,6 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           createdAt: Date.now(),
           blob: file,
         }
-
         try {
           await storage.putCustomTrack(track)
           added.push(stripBlob(track))
@@ -126,7 +136,6 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           skipped.push(`${file.name} — this device ran out of storage room`)
         }
       }
-
       if (added.length > 0) setCustomTracks((current) => [...current, ...added])
       return { added: added.length, skipped }
     },
@@ -165,12 +174,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     async (id) => {
       const source = loops.find((loop) => loop.id === id)
       if (!source) return null
+      const now = Date.now()
       const copy: SavedLoop = {
         ...source,
         id: createId('loop'),
         title: `${source.title} (copy)`,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: now,
+        updatedAt: now,
         lastPlayedAt: null,
       }
       await storage.putLoop(copy)
@@ -191,6 +201,66 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [loops],
   )
 
+  const recordListening = useCallback<LibraryContextValue['recordListening']>(
+    (seconds, countSession, startedAt) => {
+      setListeningStats((current) => {
+        const next = addListening(current, seconds, countSession, startedAt)
+        writeListeningStats(next)
+        return next
+      })
+    },
+    [],
+  )
+
+  const createBackup = useCallback(async () => {
+    const [storedTracks, recordings] = await Promise.all([
+      storage.listCustomTracks(),
+      storage.listRecordings(),
+    ])
+    return createLibraryBackupJson({
+      loops,
+      customTracks: storedTracks,
+      recordings,
+      listening: listeningStats,
+    })
+  }, [listeningStats, loops])
+
+  const restoreBackup = useCallback<LibraryContextValue['restoreBackup']>(
+    async (text) => {
+      const incoming = parseLibraryBackup(text)
+      const [storedTracks, recordings] = await Promise.all([
+        storage.listCustomTracks(),
+        storage.listRecordings(),
+      ])
+      const bundle = prepareRestore(incoming, {
+        loops,
+        customTracks: storedTracks,
+        recordings,
+      })
+      await storage.importLibrarySnapshot(bundle)
+      const nextListening = mergeListeningStats(listeningStats, bundle.listening)
+      writeListeningStats(nextListening)
+      setListeningStats(nextListening)
+      if (bundle.customTracks.length > 0) {
+        setCustomTracks((current) => [
+          ...current,
+          ...bundle.customTracks.map(stripBlob),
+        ])
+      }
+      if (bundle.loops.length > 0) {
+        setLoops((current) =>
+          [...bundle.loops, ...current].sort((a, b) => b.updatedAt - a.updatedAt),
+        )
+      }
+      return {
+        added:
+          bundle.loops.length + bundle.customTracks.length + bundle.recordings.length,
+        skipped: bundle.skipped,
+      }
+    },
+    [listeningStats, loops],
+  )
+
   const value = useMemo<LibraryContextValue>(
     () => ({
       builtinTracks: BUILTIN_TRACKS,
@@ -199,6 +269,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       loops,
       ready,
       storageError,
+      listeningStats,
       findTrack,
       importTracks,
       renameTrack,
@@ -207,6 +278,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       removeLoop,
       duplicateLoop,
       touchLoop,
+      recordListening,
+      createBackup,
+      restoreBackup,
     }),
     [
       customTracks,
@@ -214,6 +288,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       loops,
       ready,
       storageError,
+      listeningStats,
       findTrack,
       importTracks,
       renameTrack,
@@ -222,6 +297,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       removeLoop,
       duplicateLoop,
       touchLoop,
+      recordListening,
+      createBackup,
+      restoreBackup,
     ],
   )
 

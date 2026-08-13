@@ -80,12 +80,13 @@ const DEFAULTS: Preferences = {
   breathingEnabled: true,
   breathPattern: DEFAULT_PATTERN,
   breathStyle: DEFAULT_STYLE,
-  breathSound: 'chime',
+  // Silent by default; sound remains an explicit choice inside Breathing.
+  breathSound: 'off',
   breathSoundVolume: DEFAULT_BREATH_VOLUME,
   breathHapticCues: true,
   backgroundVisualizer: true,
   backgroundMode: DEFAULT_BACKGROUND_CHOICE,
-  uiSounds: true,
+  uiSounds: false,
   uiHaptics: true,
   aiEnabled: true,
 }
