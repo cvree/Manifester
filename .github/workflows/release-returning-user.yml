@@ -36,10 +36,12 @@ jobs:
             scripts/apply-returning-user.mjs \
             scripts/apply-returning-user.mjs.gz \
             scripts/apply-returning-user.part* \
-            scripts/fix-returning-user-tests.mjs \
-            .github/typecheck-diagnostic.txt \
-            .github/workflows/apply-returning-user.yml \
-            .github/workflows/release-returning-user.yml
+            scripts/fix-returning-user-tests.mjs
+
+          # Materialize product source only. Workflow cleanup is performed by
+          # the authenticated release client after this commit is attached to
+          # main, avoiding GitHub's special workflow-token restrictions.
+          git checkout HEAD -- .github
 
       - name: Install dependencies
         run: npm ci
@@ -69,7 +71,7 @@ jobs:
           done
           grep -q '<div id="root"></div>' /tmp/manifester.html
 
-      - name: Confirm release surface
+      - name: Confirm product release surface
         run: |
           test -f src/routes/LaunchRoute.tsx
           test -f src/routes/SharedLoopRoute.tsx
@@ -79,18 +81,13 @@ jobs:
           test -f src/lib/sessionClock.ts
           test -f src/lib/share.ts
           test -f src/lib/backup.ts
-          test -f .github/workflows/deploy.yml
-          test -f .github/workflows/quality.yml
-          test ! -f .github/workflows/apply-returning-user.yml
-          test ! -f .github/workflows/release-returning-user.yml
           test ! -f scripts/fix-returning-user-tests.mjs
-          test ! -f .github/typecheck-diagnostic.txt
           if find scripts -maxdepth 1 -name 'apply-returning-user*' -print -quit | grep -q .; then
             echo "Temporary apply files remain." >&2
             exit 1
           fi
 
-      - name: Create verified commit object
+      - name: Create verified product commit object
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -101,7 +98,12 @@ jobs:
           first=1
 
           while IFS= read -r -d '' path; do
-            blob=$(base64 -w0 "$path" | jq -Rs '{content:., encoding:"base64"}' | gh api "repos/${GITHUB_REPOSITORY}/git/blobs" --method POST --input - --jq .sha)
+            payload=$(base64 -w0 "$path" | jq -Rs '{content:., encoding:"base64"}')
+            if ! response=$(printf '%s' "$payload" | gh api "repos/${GITHUB_REPOSITORY}/git/blobs" --method POST --input - 2>&1); then
+              echo "::error title=BLOB_CREATE_FAILED::${path}: ${response}"
+              exit 1
+            fi
+            blob=$(printf '%s' "$response" | jq -r .sha)
             if [ "$first" -eq 0 ]; then printf ',' >> /tmp/tree.json; fi
             first=0
             jq -cn --arg path "$path" --arg sha "$blob" '{path:$path,mode:"100644",type:"blob",sha:$sha}' >> /tmp/tree.json
@@ -114,12 +116,20 @@ jobs:
           done < <(git diff --cached --name-only --diff-filter=D -z)
 
           printf ']}' >> /tmp/tree.json
-          tree_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/trees" --method POST --input /tmp/tree.json --jq .sha)
+          if ! tree_response=$(gh api "repos/${GITHUB_REPOSITORY}/git/trees" --method POST --input /tmp/tree.json 2>&1); then
+            echo "::error title=TREE_CREATE_FAILED::${tree_response}"
+            exit 1
+          fi
+          tree_sha=$(printf '%s' "$tree_response" | jq -r .sha)
+
           jq -n \
             --arg message 'Make returning sessions effortless and calm' \
             --arg tree "$tree_sha" \
             --arg parent "$GITHUB_SHA" \
             '{message:$message,tree:$tree,parents:[$parent]}' > /tmp/commit.json
-          commit_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/commits" --method POST --input /tmp/commit.json --jq .sha)
-          gh api "repos/${GITHUB_REPOSITORY}/git/commits/${commit_sha}" > /dev/null
+          if ! commit_response=$(gh api "repos/${GITHUB_REPOSITORY}/git/commits" --method POST --input /tmp/commit.json 2>&1); then
+            echo "::error title=COMMIT_CREATE_FAILED::${commit_response}"
+            exit 1
+          fi
+          commit_sha=$(printf '%s' "$commit_response" | jq -r .sha)
           echo "::notice title=FINAL_COMMIT_SHA::${commit_sha}"
