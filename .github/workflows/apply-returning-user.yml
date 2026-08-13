@@ -1,4 +1,4 @@
-name: Build returning-user source artifact
+name: Export verified returning-user patch
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  apply-verify-package:
+  apply-verify-export:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -46,16 +46,12 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Package verified source
+      - name: Export compressed patch as annotations
         run: |
           git diff --binary HEAD > /tmp/returning-user.patch
-          tar --exclude=.git --exclude=node_modules --exclude=dist -czf /tmp/returning-user-source.tar.gz .
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: returning-user-source
-          path: |
-            /tmp/returning-user-source.tar.gz
-            /tmp/returning-user.patch
-          if-no-files-found: error
-          retention-days: 1
+          gzip -c -9 /tmp/returning-user.patch | base64 -w0 > /tmp/returning-user.patch.b64
+          split -b 4000 -d -a 2 /tmp/returning-user.patch.b64 /tmp/patch_
+          for chunk in /tmp/patch_*; do
+            number="${chunk##*_}"
+            echo "::notice title=PATCH_${number}::$(cat "$chunk")"
+          done
