@@ -23,3 +23,13 @@ replaceOnce(
   "expect(pickLaunchLoop([make('blank', 1, null), { ...make('blank-2', 2, null), text: '   ' }])).toBeNull()",
   "expect(\n      pickLaunchLoop([\n        { ...make('blank', 1, null), text: '   ' },\n        { ...make('blank-2', 2, null), text: '   ' },\n      ]),\n    ).toBeNull()",
 )
+replaceOnce(
+  'src/lib/timer.test.ts',
+  "    vi.setSystemTime(3_000)\n    vi.advanceTimersByTime(3_000)",
+  "    vi.advanceTimersByTime(3_000)",
+)
+replaceOnce(
+  'src/lib/timer.test.ts',
+  "    vi.setSystemTime(30_000)\n    vi.advanceTimersByTime(10_000)\n    expect(timer.remainingSeconds).toBe(held)\n    expect(complete).not.toHaveBeenCalled()\n\n    timer.resume()\n    vi.setSystemTime(37_000)\n    vi.advanceTimersByTime(7_100)",
+  "    vi.advanceTimersByTime(30_000)\n    expect(timer.remainingSeconds).toBe(held)\n    expect(complete).not.toHaveBeenCalled()\n\n    timer.resume()\n    vi.advanceTimersByTime(held * 1000 + 300)",
+)
