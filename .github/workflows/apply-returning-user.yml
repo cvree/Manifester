@@ -33,7 +33,7 @@ jobs:
           cat scripts/apply-returning-user.part* | base64 --decode | gunzip > /tmp/apply-returning-user.mjs
           node /tmp/apply-returning-user.mjs
           node scripts/fix-returning-user-tests.mjs
-          rm -f scripts/apply-returning-user.part* scripts/fix-returning-user-tests.mjs .github/workflows/apply-returning-user.yml
+          rm -f scripts/apply-returning-user.part* scripts/fix-returning-user-tests.mjs .github/workflows/apply-returning-user.yml .github/typecheck-diagnostic.log
 
       - name: Whitespace check
         run: git diff --check
@@ -48,9 +48,12 @@ jobs:
           status=$?
           cat /tmp/typecheck.log
           if [ $status -ne 0 ]; then
-            grep -E 'error TS|error:' /tmp/typecheck.log | head -100 | while IFS= read -r line; do
-              echo "::error::$line"
-            done
+            cp /tmp/typecheck.log .github/typecheck-diagnostic.log
+            git config user.name "cvree"
+            git config user.email "iscvree@gmail.com"
+            git add .github/typecheck-diagnostic.log
+            git commit -m "Record type-check diagnostics"
+            git push origin HEAD:agent/returning-user-calm
           fi
           exit $status
 
