@@ -29,15 +29,12 @@ jobs:
         run: |
           set -euo pipefail
           if [ ! -f src/lib/listening.ts ]; then
-            if [ -f scripts/apply-returning-user.part00 ]; then
-              cat \
-                scripts/apply-returning-user.part00 \
-                scripts/apply-returning-user.part01 \
-                scripts/apply-returning-user.part02 \
-                scripts/apply-returning-user.part03 \
-                scripts/apply-returning-user.part04 \
-                | base64 --decode | gunzip > /tmp/apply-returning-user.mjs
+            if compgen -G 'scripts/apply-returning-user.part*' > /dev/null; then
+              cat scripts/apply-returning-user.part* | base64 --decode | gunzip > /tmp/apply-returning-user.mjs
               node /tmp/apply-returning-user.mjs
+              if [ -f scripts/fix-returning-user-tests.mjs ]; then
+                node scripts/fix-returning-user-tests.mjs
+              fi
             elif [ -f scripts/apply-returning-user.mjs ]; then
               node scripts/apply-returning-user.mjs
             else
@@ -50,12 +47,16 @@ jobs:
             scripts/apply-returning-user.mjs \
             scripts/apply-returning-user.mjs.gz \
             scripts/apply-returning-user.part* \
+            scripts/fix-returning-user-tests.mjs \
+            .github/typecheck-diagnostic.txt \
             .github/workflows/apply-returning-user.yml
 
           python3 - <<'PY'
           from pathlib import Path
           for filename in ('.github/workflows/deploy.yml', '.github/workflows/quality.yml'):
               path = Path(filename)
+              if not path.exists():
+                  continue
               text = path.read_text()
               header = text.split('\njobs:', 1)[0]
               if 'workflow_dispatch:' not in header:
@@ -102,6 +103,8 @@ jobs:
           test -f src/lib/share.ts
           test -f src/lib/backup.ts
           test ! -f .github/workflows/apply-returning-user.yml
+          test ! -f scripts/fix-returning-user-tests.mjs
+          test ! -f .github/typecheck-diagnostic.txt
           if find scripts -maxdepth 1 -name 'apply-returning-user*' -print -quit | grep -q .; then
             echo "Temporary apply files remain." >&2
             exit 1
