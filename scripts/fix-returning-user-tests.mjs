@@ -16,7 +16,7 @@ replaceOnce(
 replaceOnce(
   'src/lib/timer.test.ts',
   "afterEach(() => {\n  vi.useRealTimers()\n})",
-  "beforeEach(() => {\n  vi.stubGlobal('window', {\n    setInterval,\n    clearInterval,\n    setTimeout,\n    clearTimeout,\n    addEventListener: vi.fn(),\n    removeEventListener: vi.fn(),\n  })\n  vi.stubGlobal('document', {\n    addEventListener: vi.fn(),\n    removeEventListener: vi.fn(),\n  })\n})\n\nafterEach(() => {\n  vi.useRealTimers()\n  vi.unstubAllGlobals()\n})",
+  "beforeEach(() => {\n  vi.useFakeTimers()\n  vi.setSystemTime(0)\n  vi.stubGlobal('window', {\n    setInterval,\n    clearInterval,\n    setTimeout,\n    clearTimeout,\n    addEventListener: vi.fn(),\n    removeEventListener: vi.fn(),\n  })\n  vi.stubGlobal('document', {\n    addEventListener: vi.fn(),\n    removeEventListener: vi.fn(),\n  })\n})\n\nafterEach(() => {\n  vi.useRealTimers()\n  vi.unstubAllGlobals()\n})",
 )
 replaceOnce(
   'src/lib/loops.test.ts',
@@ -32,4 +32,15 @@ replaceOnce(
   'src/lib/timer.test.ts',
   "    vi.setSystemTime(30_000)\n    vi.advanceTimersByTime(10_000)\n    expect(timer.remainingSeconds).toBe(held)\n    expect(complete).not.toHaveBeenCalled()\n\n    timer.resume()\n    vi.setSystemTime(37_000)\n    vi.advanceTimersByTime(7_100)",
   "    vi.advanceTimersByTime(30_000)\n    expect(timer.remainingSeconds).toBe(held)\n    expect(complete).not.toHaveBeenCalled()\n\n    timer.resume()\n    vi.advanceTimersByTime(held * 1000 + 300)",
+)
+
+replaceOnce(
+  'src/lib/timer.test.ts',
+  "  it('does not advance while paused and completes once', () => {\n    vi.useFakeTimers()\n    vi.setSystemTime(0)",
+  "  it('does not advance while paused and completes once', () => {",
+)
+replaceOnce(
+  'src/lib/timer.test.ts',
+  "  it('makes repeated pause and resume calls harmless', () => {\n    vi.useFakeTimers()\n    vi.setSystemTime(0)",
+  "  it('makes repeated pause and resume calls harmless', () => {",
 )
