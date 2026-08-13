@@ -5,6 +5,7 @@ on:
     branches: [agent/returning-user-calm]
     paths:
       - scripts/apply-returning-user.part*
+      - scripts/fix-returning-user-tests.mjs
       - .github/workflows/apply-returning-user.yml
 
 permissions:
@@ -31,7 +32,8 @@ jobs:
         run: |
           cat scripts/apply-returning-user.part* | base64 --decode | gunzip > /tmp/apply-returning-user.mjs
           node /tmp/apply-returning-user.mjs
-          rm -f scripts/apply-returning-user.part* .github/workflows/apply-returning-user.yml
+          node scripts/fix-returning-user-tests.mjs
+          rm -f scripts/apply-returning-user.part* scripts/fix-returning-user-tests.mjs .github/workflows/apply-returning-user.yml
 
       - name: Whitespace check
         run: git diff --check
