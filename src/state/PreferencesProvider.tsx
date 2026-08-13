@@ -23,12 +23,14 @@ import {
 import {
   DEFAULT_PATTERN,
   DEFAULT_STYLE,
+  isLivingStyle,
   type BreathPattern,
   type BreathStyleId,
 } from '../lib/breathing'
 import {
   DEFAULT_BACKGROUND_CHOICE,
   isBackgroundChoice,
+  isLivingBackgroundChoice,
   type BackgroundChoice,
 } from '../lib/environment'
 import { setHapticsEnabled, setSoundEnabled } from '../lib/feedback'
@@ -75,33 +77,13 @@ export interface Preferences {
 }
 
 const DEFAULTS: Preferences = {
-  // The guide is the visual centre of both the preview and the player, so it
-  // is on by default.
   breathingEnabled: true,
   breathPattern: DEFAULT_PATTERN,
   breathStyle: DEFAULT_STYLE,
-  /*
-   * A chime rather than one of the continuous voices. The guide is no use to
-   * anyone with their eyes shut unless it makes a sound, so silence is the
-   * wrong default — but a bed of noise arriving unasked would be startling,
-   * and a bell that rings twice a breath will not be mistaken for a fault.
-   */
   breathSound: 'chime',
   breathSoundVolume: DEFAULT_BREATH_VOLUME,
   breathHapticCues: true,
-  /*
-   * On, because at the depth it is drawn at most people feel it before they
-   * notice it — which is the whole design. A percent or two of scale and a few
-   * percent of light is not an effect anyone has to opt into; it is what stops
-   * the orb reading as a widget sitting on a page.
-   */
   backgroundVisualizer: true,
-  /*
-   * Atmosphere: the room this app has always had. A first session should look
-   * the way the app is described rather than opening on whichever of six rooms
-   * the developer liked best that week — the other five are one tap away, and
-   * "drift between all of them" is one tap further.
-   */
   backgroundMode: DEFAULT_BACKGROUND_CHOICE,
   uiSounds: true,
   uiHaptics: true,
@@ -134,22 +116,10 @@ function load(): Preferences {
       breathPattern: { ...DEFAULTS.breathPattern, ...parsed.breathPattern },
     }
 
-    /*
-     * The old setting was a single on/off for "a soft tone at each change of
-     * phase", which is exactly what the chime is. Someone who had turned it
-     * off had made a decision, and upgrading the app is not a reason to
-     * overrule it.
-     */
     if (parsed.breathSound == null && typeof parsed.breathSoundCues === 'boolean') {
       merged.breathSound = parsed.breathSoundCues ? 'chime' : 'off'
     }
 
-    /*
-     * The room used to be called Background breathing and was only ever the
-     * *movement* of the atmosphere. It is now the atmosphere itself, and it
-     * has a switch of its own — but someone who had turned the old one off had
-     * turned the room off, and that decision carries.
-     */
     if (
       parsed.backgroundVisualizer == null &&
       typeof parsed.backgroundBreathing === 'boolean'
@@ -157,12 +127,17 @@ function load(): Preferences {
       merged.backgroundVisualizer = parsed.backgroundBreathing
     }
 
-    /*
-     * A room that no longer exists — a build where one was renamed, or a
-     * hand-edited value — falls back to the default rather than to a class
-     * name nothing in the stylesheet answers to and an empty screen.
-     */
     if (!isBackgroundChoice(merged.backgroundMode)) {
+      merged.backgroundMode = DEFAULT_BACKGROUND_CHOICE
+    }
+
+    // Cathedral and Moonpool are retained internally for future experiments,
+    // but they are not part of the product's current visualizer choices. Move
+    // anyone who saved one while they were public back onto the stable defaults.
+    if (isLivingStyle(merged.breathStyle)) {
+      merged.breathStyle = DEFAULT_STYLE
+    }
+    if (isLivingBackgroundChoice(merged.backgroundMode)) {
       merged.backgroundMode = DEFAULT_BACKGROUND_CHOICE
     }
 
@@ -179,7 +154,6 @@ function load(): Preferences {
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState<Preferences>(load)
 
-  // Keep the feedback module in step; it is called from non-React code.
   useEffect(() => {
     setSoundEnabled(preferences.uiSounds)
     setHapticsEnabled(preferences.uiHaptics || preferences.breathHapticCues)

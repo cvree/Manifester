@@ -22,10 +22,7 @@ import {
   type BreathStyleId,
 } from '../lib/breathing'
 import { cx } from '../lib/cx'
-import {
-  BACKGROUND_MODES,
-  LIVING_BACKGROUND_MODES,
-} from '../lib/environment'
+import { BACKGROUND_MODES } from '../lib/environment'
 import { cue, hapticsSupported } from '../lib/feedback'
 import { revealSection } from '../lib/scroll'
 import { useBreathing } from '../lib/useBreathing'
@@ -161,29 +158,6 @@ export function BreathingSettings({
                 }}
               >
                 <BackgroundSceneThumbnail mode={mode.id} />
-              </RoomTile>
-            ))}
-
-            {LIVING_BACKGROUND_MODES.map((mode) => (
-              <RoomTile
-                key={mode.id}
-                name={mode.name}
-                description={mode.description}
-                selected={preferences.backgroundMode === mode.id}
-                onSelect={() => {
-                  onChange({ backgroundMode: mode.id })
-                  cue('select')
-                  advanceFrom('room')
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  className="flex h-28 items-center justify-center overflow-hidden rounded-xl bg-[var(--bg-0)]"
-                >
-                  <span className="scale-[1.7]">
-                    <BreathStyleThumbnail style={mode.id} />
-                  </span>
-                </span>
               </RoomTile>
             ))}
 
@@ -343,7 +317,9 @@ export function BreathingSettings({
               aria-label="Breathing guide form"
               className="grid grid-cols-2 gap-2"
             >
-              {BREATH_STYLES.map((style) => (
+              {BREATH_STYLES.filter(
+                (style) => style.id !== 'cathedral' && style.id !== 'moonpool',
+              ).map((style) => (
                 <StyleTile
                   key={style.id}
                   id={style.id}
