@@ -13,7 +13,6 @@ import {
   cycleSeconds,
   describePattern,
   findPreset,
-  findStyle,
   formatSeconds,
   isLivingStyle,
   isPatternValid,
@@ -94,6 +93,7 @@ export function BreathingSettings({
   const { breathPattern: pattern } = preferences
   const activePreset = findPreset(pattern)
   const valid = isPatternValid(pattern)
+  const livingStyle = isLivingStyle(preferences.breathStyle)
 
   // A silent, purely visual guide: this one is a picture of the choice.
   const preview = useBreathing({
@@ -188,75 +188,101 @@ export function BreathingSettings({
         }}
       />
 
-      {/*
-        The rooms, under the switch that turns them on.
-
-        Every tile is the room itself at a fixed half-open pose — the same
-        markup and the same stylesheet as the thing behind the player, not a
-        drawing of it — so what you pick from cannot quietly stop resembling
-        what you get.
-      */}
-      {/*
-        Unless the form has already answered the question.
-
-        Ink Cathedral and Moonpool are not shapes drawn inside a room, they are
-        rooms, and with the visualiser on they fill the screen themselves. So
-        the six tiles would be a control that changes nothing — which is a
-        worse thing to show someone than one sentence saying why it is not
-        there. Choosing any other form brings it straight back, with whatever
-        was picked last still picked.
-      */}
-      {preferences.backgroundVisualizer && isLivingStyle(preferences.breathStyle) && (
-        <div>
-          <FieldLabel hint="Behind the player">The room</FieldLabel>
-          <p className="type-meta -mt-1">
-            {findStyle(preferences.breathStyle).name} is the room as well as the
-            guide: it reaches past the orb to the edges of the screen. Pick
-            another form to choose a room again.
-          </p>
-        </div>
-      )}
-
-      {preferences.backgroundVisualizer && !isLivingStyle(preferences.breathStyle) && (
+      {preferences.backgroundVisualizer && (
         <div>
           <FieldLabel hint="Behind the player">The room</FieldLabel>
           <div
             role="radiogroup"
             aria-label="Background visualiser room"
-            className="grid grid-cols-2 gap-2"
+            className="space-y-4"
           >
-            {BACKGROUND_MODES.map((mode) => (
-              <RoomTile
-                key={mode.id}
-                name={mode.name}
-                description={mode.description}
-                selected={preferences.backgroundMode === mode.id}
-                onSelect={() => {
-                  onChange({ backgroundMode: mode.id })
-                  cue('select')
-                  advanceFrom('room')
-                }}
-              >
-                <BackgroundSceneThumbnail mode={mode.id} />
-              </RoomTile>
-            ))}
-            <RoomTile
-              name="Drifting"
-              description="All six in turn, crossfading every minute or so. Held still if you have asked for reduced motion."
-              selected={preferences.backgroundMode === 'random'}
-              onSelect={() => {
-                onChange({ backgroundMode: 'random' })
-                cue('select')
-                advanceFrom('room')
-              }}
-              className="col-span-2"
-            >
-              <span className="player-scene-drift" aria-hidden="true">
-                {BACKGROUND_MODES.slice(0, 3).map((mode) => (
-                  <BackgroundSceneThumbnail key={mode.id} mode={mode.id} />
+            <div>
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <p className="type-meta font-semibold tracking-[0.08em] uppercase">
+                  Immersive worlds
+                </p>
+                <span className="type-meta text-ink-faint">Guide + room</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {BREATH_STYLES.filter((style) => isLivingStyle(style.id)).map(
+                  (style) => (
+                    <RoomTile
+                      key={style.id}
+                      name={style.name}
+                      description={style.description}
+                      selected={preferences.breathStyle === style.id}
+                      onSelect={() => {
+                        onChange({ breathStyle: style.id })
+                        cue('select')
+                        advanceFrom('room')
+                      }}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="flex h-28 items-center justify-center overflow-hidden rounded-xl bg-[var(--bg-0)]"
+                      >
+                        <span className="scale-[1.7]">
+                          <BreathStyleThumbnail style={style.id} />
+                        </span>
+                      </span>
+                    </RoomTile>
+                  ),
+                )}
+              </div>
+              <p className="type-meta mt-2 px-1">
+                These become the breathing form and the whole environment
+                together, so the scene stays coherent from the orb to the edge
+                of the screen.
+              </p>
+            </div>
+
+            <div>
+              <p className="type-meta mb-2 font-semibold tracking-[0.08em] uppercase">
+                Ambient rooms
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {BACKGROUND_MODES.map((mode) => (
+                  <RoomTile
+                    key={mode.id}
+                    name={mode.name}
+                    description={mode.description}
+                    selected={!livingStyle && preferences.backgroundMode === mode.id}
+                    onSelect={() => {
+                      onChange(
+                        livingStyle
+                          ? { backgroundMode: mode.id, breathStyle: 'bloom' }
+                          : { backgroundMode: mode.id },
+                      )
+                      cue('select')
+                      advanceFrom('room')
+                    }}
+                  >
+                    <BackgroundSceneThumbnail mode={mode.id} />
+                  </RoomTile>
                 ))}
-              </span>
-            </RoomTile>
+                <RoomTile
+                  name="Drifting"
+                  description="All six in turn, crossfading every minute or so. Held still if you have asked for reduced motion."
+                  selected={!livingStyle && preferences.backgroundMode === 'random'}
+                  onSelect={() => {
+                    onChange(
+                      livingStyle
+                        ? { backgroundMode: 'random', breathStyle: 'bloom' }
+                        : { backgroundMode: 'random' },
+                    )
+                    cue('select')
+                    advanceFrom('room')
+                  }}
+                  className="col-span-2"
+                >
+                  <span className="player-scene-drift" aria-hidden="true">
+                    {BACKGROUND_MODES.slice(0, 3).map((mode) => (
+                      <BackgroundSceneThumbnail key={mode.id} mode={mode.id} />
+                    ))}
+                  </span>
+                </RoomTile>
+              </div>
+            </div>
           </div>
         </div>
       )}
