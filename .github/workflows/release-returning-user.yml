@@ -39,8 +39,7 @@ jobs:
             scripts/fix-returning-user-tests.mjs
 
           # Materialize product source only. Workflow cleanup is performed by
-          # the authenticated release client after this commit is attached to
-          # main, avoiding GitHub's special workflow-token restrictions.
+          # the authenticated release client after the source commit lands.
           git checkout HEAD -- .github
 
       - name: Install dependencies
@@ -87,49 +86,26 @@ jobs:
             exit 1
           fi
 
-      - name: Create verified product commit object
+      - name: Publish verified blob descriptor
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git add -A
-          base_tree=$(git rev-parse HEAD^{tree})
-          printf '{"base_tree":"%s","tree":[' "$base_tree" > /tmp/tree.json
-          first=1
+          : > /tmp/entries.txt
 
           while IFS= read -r -d '' path; do
             payload=$(base64 -w0 "$path" | jq -Rs '{content:., encoding:"base64"}')
-            if ! response=$(printf '%s' "$payload" | gh api "repos/${GITHUB_REPOSITORY}/git/blobs" --method POST --input - 2>&1); then
-              echo "::error title=BLOB_CREATE_FAILED::${path}: ${response}"
-              exit 1
-            fi
+            response=$(printf '%s' "$payload" | gh api "repos/${GITHUB_REPOSITORY}/git/blobs" --method POST --input -)
             blob=$(printf '%s' "$response" | jq -r .sha)
-            if [ "$first" -eq 0 ]; then printf ',' >> /tmp/tree.json; fi
-            first=0
-            jq -cn --arg path "$path" --arg sha "$blob" '{path:$path,mode:"100644",type:"blob",sha:$sha}' >> /tmp/tree.json
+            printf '%s\t%s\n' "$blob" "$path" >> /tmp/entries.txt
           done < <(git diff --cached --name-only --diff-filter=ACMRTUXB -z)
 
           while IFS= read -r -d '' path; do
-            if [ "$first" -eq 0 ]; then printf ',' >> /tmp/tree.json; fi
-            first=0
-            jq -cn --arg path "$path" '{path:$path,mode:"100644",type:"blob",sha:null}' >> /tmp/tree.json
+            printf 'DELETE\t%s\n' "$path" >> /tmp/entries.txt
           done < <(git diff --cached --name-only --diff-filter=D -z)
 
-          printf ']}' >> /tmp/tree.json
-          if ! tree_response=$(gh api "repos/${GITHUB_REPOSITORY}/git/trees" --method POST --input /tmp/tree.json 2>&1); then
-            echo "::error title=TREE_CREATE_FAILED::${tree_response}"
-            exit 1
-          fi
-          tree_sha=$(printf '%s' "$tree_response" | jq -r .sha)
-
-          jq -n \
-            --arg message 'Make returning sessions effortless and calm' \
-            --arg tree "$tree_sha" \
-            --arg parent "$GITHUB_SHA" \
-            '{message:$message,tree:$tree,parents:[$parent]}' > /tmp/commit.json
-          if ! commit_response=$(gh api "repos/${GITHUB_REPOSITORY}/git/commits" --method POST --input /tmp/commit.json 2>&1); then
-            echo "::error title=COMMIT_CREATE_FAILED::${commit_response}"
-            exit 1
-          fi
-          commit_sha=$(printf '%s' "$commit_response" | jq -r .sha)
-          echo "::notice title=FINAL_COMMIT_SHA::${commit_sha}"
+          descriptor_payload=$(base64 -w0 /tmp/entries.txt | jq -Rs '{content:., encoding:"base64"}')
+          descriptor_response=$(printf '%s' "$descriptor_payload" | gh api "repos/${GITHUB_REPOSITORY}/git/blobs" --method POST --input -)
+          descriptor_sha=$(printf '%s' "$descriptor_response" | jq -r .sha)
+          echo "::notice title=TREE_DESCRIPTOR_SHA::${descriptor_sha}"
