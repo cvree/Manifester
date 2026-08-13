@@ -42,7 +42,17 @@ jobs:
         run: npm test
 
       - name: Type check
-        run: npm run typecheck
+        run: |
+          set +e
+          npm run typecheck > /tmp/typecheck.log 2>&1
+          status=$?
+          cat /tmp/typecheck.log
+          if [ $status -ne 0 ]; then
+            grep -E 'error TS|error:' /tmp/typecheck.log | head -100 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+          fi
+          exit $status
 
       - name: Production build
         run: npm run build
