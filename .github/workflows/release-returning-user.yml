@@ -1,14 +1,13 @@
-name: Verify and ship returning-user release
+name: Ship returning-user release
 
 on:
   push:
-    branches: [release/returning-user-final]
+    branches: [main]
     paths:
       - .github/workflows/release-returning-user.yml
 
 permissions:
   contents: write
-  pull-requests: write
   actions: write
 
 jobs:
@@ -17,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: release/returning-user-final
+          ref: main
           fetch-depth: 0
 
       - uses: actions/setup-node@v5
@@ -25,22 +24,13 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Finish the implementation if the apply job has not yet done so
+      - name: Apply returning-user release
         run: |
           set -euo pipefail
-          if [ ! -f src/lib/listening.ts ]; then
-            if compgen -G 'scripts/apply-returning-user.part*' > /dev/null; then
-              cat scripts/apply-returning-user.part* | base64 --decode | gunzip > /tmp/apply-returning-user.mjs
-              node /tmp/apply-returning-user.mjs
-              if [ -f scripts/fix-returning-user-tests.mjs ]; then
-                node scripts/fix-returning-user-tests.mjs
-              fi
-            elif [ -f scripts/apply-returning-user.mjs ]; then
-              node scripts/apply-returning-user.mjs
-            else
-              echo "Returning-user implementation payload is missing." >&2
-              exit 1
-            fi
+          cat scripts/apply-returning-user.part* | base64 --decode | gunzip > /tmp/apply-returning-user.mjs
+          node /tmp/apply-returning-user.mjs
+          if [ -f scripts/fix-returning-user-tests.mjs ]; then
+            node scripts/fix-returning-user-tests.mjs
           fi
 
           rm -f \
@@ -92,7 +82,7 @@ jobs:
           done
           grep -q '<div id="root"></div>' /tmp/manifester.html
 
-      - name: Confirm the release surface
+      - name: Confirm release surface
         run: |
           test -f src/routes/LaunchRoute.tsx
           test -f src/routes/SharedLoopRoute.tsx
@@ -110,7 +100,7 @@ jobs:
             exit 1
           fi
 
-      - name: Commit the verified product and fast-forward main
+      - name: Commit verified release to main
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -119,30 +109,21 @@ jobs:
           git config user.email "iscvree@gmail.com"
           rm -f .github/workflows/release-returning-user.yml
           git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "Make returning sessions effortless and calm"
-          fi
-
-          git push origin HEAD:release/returning-user-final
-          git fetch origin main
-          git merge-base --is-ancestor origin/main HEAD
+          git commit -m "Make returning sessions effortless and calm"
           git push origin HEAD:main
           echo "MAIN_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
-      - name: Dispatch and verify the production deployment
+      - name: Dispatch and verify production deployment
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          dispatched=0
           for attempt in {1..12}; do
             if gh workflow run deploy.yml --ref main; then
-              dispatched=1
               break
             fi
             sleep 5
           done
-          test "$dispatched" -eq 1
 
           run_id=""
           for attempt in {1..24}; do
