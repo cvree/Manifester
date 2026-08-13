@@ -48,7 +48,10 @@ jobs:
 
       - name: Export verified changed source as annotations
         run: |
-          git diff --name-only --diff-filter=ACMRT HEAD > /tmp/changed-files.txt
+          {
+            git diff --name-only --diff-filter=ACMRT HEAD
+            git ls-files --others --exclude-standard
+          } | grep -v '^\.github/workflows/apply-returning-user\.yml$' | sort -u > /tmp/changed-files.txt
           tar -czf /tmp/changed-source.tar.gz -T /tmp/changed-files.txt
           base64 -w0 /tmp/changed-source.tar.gz > /tmp/changed-source.b64
           split -b 12000 -d -a 2 /tmp/changed-source.b64 /tmp/source_
