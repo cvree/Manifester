@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   verify-and-ship:
@@ -38,21 +37,12 @@ jobs:
             scripts/apply-returning-user.mjs.gz \
             scripts/apply-returning-user.part* \
             scripts/fix-returning-user-tests.mjs \
-            .github/typecheck-diagnostic.txt \
-            .github/workflows/apply-returning-user.yml
+            .github/typecheck-diagnostic.txt
 
-          python3 - <<'PY'
-          from pathlib import Path
-          for filename in ('.github/workflows/deploy.yml', '.github/workflows/quality.yml'):
-              path = Path(filename)
-              if not path.exists():
-                  continue
-              text = path.read_text()
-              header = text.split('\njobs:', 1)[0]
-              if 'workflow_dispatch:' not in header:
-                  text = text.replace('on:\n  push:', 'on:\n  workflow_dispatch:\n  push:', 1)
-                  path.write_text(text)
-          PY
+          # GitHub's Actions token cannot update workflow files. Keep the
+          # currently committed workflows unchanged; they are cleaned up in a
+          # separate user-authenticated commit after the product source lands.
+          git checkout HEAD -- .github/workflows
 
       - name: Install dependencies
         run: npm ci
@@ -92,7 +82,6 @@ jobs:
           test -f src/lib/sessionClock.ts
           test -f src/lib/share.ts
           test -f src/lib/backup.ts
-          test ! -f .github/workflows/apply-returning-user.yml
           test ! -f scripts/fix-returning-user-tests.mjs
           test ! -f .github/typecheck-diagnostic.txt
           if find scripts -maxdepth 1 -name 'apply-returning-user*' -print -quit | grep -q .; then
@@ -100,9 +89,7 @@ jobs:
             exit 1
           fi
 
-      - name: Commit verified release to main
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Commit verified product source to main
         run: |
           set -euo pipefail
           git config user.name "cvree"
@@ -110,34 +97,3 @@ jobs:
           git add -A
           git commit -m "Make returning sessions effortless and calm"
           git push origin HEAD:main
-          echo "MAIN_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
-
-      - name: Dispatch and verify production deployment
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          for attempt in {1..12}; do
-            if gh workflow run deploy.yml --ref main; then
-              break
-            fi
-            sleep 5
-          done
-
-          run_id=""
-          for attempt in {1..24}; do
-            run_id=$(gh run list \
-              --workflow deploy.yml \
-              --branch main \
-              --event workflow_dispatch \
-              --limit 20 \
-              --json databaseId,headSha \
-              --jq ".[] | select(.headSha == \"${MAIN_SHA}\") | .databaseId" \
-              | head -n 1)
-            if [ -n "$run_id" ]; then
-              break
-            fi
-            sleep 5
-          done
-          test -n "$run_id"
-          gh run watch "$run_id" --exit-status
