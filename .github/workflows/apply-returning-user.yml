@@ -54,7 +54,7 @@ jobs:
           } | grep -v '^\.github/workflows/apply-returning-user\.yml$' | sort -u > /tmp/changed-files.txt
           tar -czf /tmp/changed-source.tar.gz -T /tmp/changed-files.txt
           base64 -w0 /tmp/changed-source.tar.gz > /tmp/changed-source.b64
-          split -b 12000 -d -a 2 /tmp/changed-source.b64 /tmp/source_
+          split -b 4000 -d -a 2 /tmp/changed-source.b64 /tmp/source_
           echo "::notice title=SOURCE_MANIFEST::$(base64 -w0 /tmp/changed-files.txt)"
           for chunk in /tmp/source_*; do
             number="${chunk##*_}"
