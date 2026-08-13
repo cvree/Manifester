@@ -2,7 +2,7 @@ name: Verify and ship returning-user release
 
 on:
   push:
-    branches: [agent/returning-user-calm]
+    branches: [release/returning-user-final]
     paths:
       - .github/workflows/release-returning-user.yml
 
@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: agent/returning-user-calm
+          ref: release/returning-user-final
           fetch-depth: 0
 
       - uses: actions/setup-node@v5
@@ -123,7 +123,7 @@ jobs:
             git commit -m "Make returning sessions effortless and calm"
           fi
 
-          git push origin HEAD:agent/returning-user-calm
+          git push origin HEAD:release/returning-user-final
           git fetch origin main
           git merge-base --is-ancestor origin/main HEAD
           git push origin HEAD:main
