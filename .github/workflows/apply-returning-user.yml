@@ -1,4 +1,4 @@
-name: Apply returning-user release
+name: Build returning-user source artifact
 
 on:
   push:
@@ -7,10 +7,10 @@ on:
       - .github/workflows/apply-returning-user.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply-and-verify:
+  apply-verify-package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -46,13 +46,16 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Commit verified release locally
+      - name: Package verified source
         run: |
-          git config user.name "cvree"
-          git config user.email "iscvree@gmail.com"
-          git status --short
-          git add -A
-          git commit -m "Make returning sessions effortless and calm"
+          git diff --binary HEAD > /tmp/returning-user.patch
+          tar --exclude=.git --exclude=node_modules --exclude=dist -czf /tmp/returning-user-source.tar.gz .
 
-      - name: Push verified release
-        run: git push origin HEAD:agent/returning-user-calm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: returning-user-source
+          path: |
+            /tmp/returning-user-source.tar.gz
+            /tmp/returning-user.patch
+          if-no-files-found: error
+          retention-days: 1
