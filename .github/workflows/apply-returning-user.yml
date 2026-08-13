@@ -31,8 +31,6 @@ jobs:
           cat scripts/apply-returning-user.part* | base64 --decode | gunzip > /tmp/apply-returning-user.mjs
           node /tmp/apply-returning-user.mjs
           node scripts/fix-returning-user-tests.mjs
-          # The one-time patch script removes its own workflow. Restore this
-          # file for the verified push; it will be removed separately afterward.
           git checkout HEAD -- .github/workflows/apply-returning-user.yml
           rm -f scripts/apply-returning-user.part* scripts/fix-returning-user-tests.mjs .github/typecheck-diagnostic.txt
 
@@ -48,10 +46,13 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Commit verified release
+      - name: Commit verified release locally
         run: |
           git config user.name "cvree"
           git config user.email "iscvree@gmail.com"
+          git status --short
           git add -A
           git commit -m "Make returning sessions effortless and calm"
-          git push origin HEAD:agent/returning-user-calm
+
+      - name: Push verified release
+        run: git push origin HEAD:agent/returning-user-calm
