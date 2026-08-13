@@ -33,7 +33,6 @@ replaceOnce(
   "    vi.setSystemTime(30_000)\n    vi.advanceTimersByTime(10_000)\n    expect(timer.remainingSeconds).toBe(held)\n    expect(complete).not.toHaveBeenCalled()\n\n    timer.resume()\n    vi.setSystemTime(37_000)\n    vi.advanceTimersByTime(7_100)",
   "    vi.advanceTimersByTime(30_000)\n    expect(timer.remainingSeconds).toBe(held)\n    expect(complete).not.toHaveBeenCalled()\n\n    timer.resume()\n    vi.advanceTimersByTime(held * 1000 + 300)",
 )
-
 replaceOnce(
   'src/lib/timer.test.ts',
   "  it('does not advance while paused and completes once', () => {\n    vi.useFakeTimers()\n    vi.setSystemTime(0)",
@@ -43,4 +42,24 @@ replaceOnce(
   'src/lib/timer.test.ts',
   "  it('makes repeated pause and resume calls harmless', () => {\n    vi.useFakeTimers()\n    vi.setSystemTime(0)",
   "  it('makes repeated pause and resume calls harmless', () => {",
+)
+
+fs.writeFileSync(
+  'src/lib/launch.ts',
+  `import { pickLaunchLoop } from './loops'\nimport type { SavedLoop } from './types'\n\nexport function launchDestination(loops: SavedLoop[]): '/player' | '/create' {\n  return pickLaunchLoop(loops) ? '/player' : '/create'\n}\n`,
+)
+replaceOnce(
+  'src/routes/LaunchRoute.tsx',
+  "import { pickLaunchLoop } from '../lib/loops'\nimport type { SavedLoop } from '../lib/types'",
+  "import { launchDestination } from '../lib/launch'",
+)
+replaceOnce(
+  'src/routes/LaunchRoute.tsx',
+  "\nexport function launchDestination(loops: SavedLoop[]): '/player' | '/create' {\n  return pickLaunchLoop(loops) ? '/player' : '/create'\n}\n",
+  '',
+)
+replaceOnce(
+  'src/routes/LaunchRoute.test.ts',
+  "import { launchDestination } from './LaunchRoute'",
+  "import { launchDestination } from '../lib/launch'",
 )
