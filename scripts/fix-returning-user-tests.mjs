@@ -16,7 +16,7 @@ replaceOnce(
 replaceOnce(
   'src/lib/timer.test.ts',
   "afterEach(() => {\n  vi.useRealTimers()\n})",
-  "beforeEach(() => {\n  vi.stubGlobal('window', globalThis)\n})\n\nafterEach(() => {\n  vi.useRealTimers()\n  vi.unstubAllGlobals()\n})",
+  "beforeEach(() => {\n  vi.stubGlobal('window', {\n    setInterval,\n    clearInterval,\n    setTimeout,\n    clearTimeout,\n    addEventListener: vi.fn(),\n    removeEventListener: vi.fn(),\n  })\n  vi.stubGlobal('document', {\n    addEventListener: vi.fn(),\n    removeEventListener: vi.fn(),\n  })\n})\n\nafterEach(() => {\n  vi.useRealTimers()\n  vi.unstubAllGlobals()\n})",
 )
 replaceOnce(
   'src/lib/loops.test.ts',
