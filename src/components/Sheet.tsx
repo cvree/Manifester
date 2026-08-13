@@ -53,6 +53,12 @@ export function Sheet({
     onClose()
   }, [onClose])
 
+  // Breathing has enough visual choices to benefit from a true desktop layout.
+  // Keep every other sheet narrow and focused, but let this one use the space a
+  // PC actually has. Its root settings stack is promoted to a two-column grid
+  // at the same breakpoint, without changing the phone layout at all.
+  const wide = title === 'Breathing'
+
   // Lock the page behind the sheet and give focus to the panel.
   useEffect(() => {
     if (!open) return
@@ -128,7 +134,8 @@ export function Sheet({
         tabIndex={-1}
         className={cx(
           'surface-sheet animate-sheet-in relative flex max-h-[88dvh] w-full flex-col',
-          'rounded-t-[1.75rem] md:max-h-[82dvh] md:max-w-lg md:rounded-[1.75rem]',
+          'rounded-t-[1.75rem] md:max-h-[82dvh] md:rounded-[1.75rem]',
+          wide ? 'md:max-w-5xl' : 'md:max-w-lg',
         )}
       >
         {/* Drag handle: a phone affordance only. */}
@@ -165,7 +172,11 @@ export function Sheet({
         */}
         <div
           data-lenis-prevent
-          className="scroll-quiet min-h-0 grow overflow-y-auto overscroll-contain px-6 pb-6"
+          className={cx(
+            'scroll-quiet min-h-0 grow overflow-y-auto overscroll-contain px-6 pb-6',
+            wide &&
+              'md:[&>div]:grid md:[&>div]:grid-cols-2 md:[&>div]:items-start md:[&>div]:gap-x-8 md:[&>div]:gap-y-7 md:[&>div]:space-y-0',
+          )}
         >
           {children}
         </div>
