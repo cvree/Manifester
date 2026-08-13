@@ -14,7 +14,6 @@ import {
   describePattern,
   findPreset,
   formatSeconds,
-  isLivingStyle,
   isPatternValid,
   MOOD_LABEL,
   MOOD_ORDER,
@@ -23,7 +22,10 @@ import {
   type BreathStyleId,
 } from '../lib/breathing'
 import { cx } from '../lib/cx'
-import { BACKGROUND_MODES } from '../lib/environment'
+import {
+  BACKGROUND_MODES,
+  LIVING_BACKGROUND_MODES,
+} from '../lib/environment'
 import { cue, hapticsSupported } from '../lib/feedback'
 import { revealSection } from '../lib/scroll'
 import { useBreathing } from '../lib/useBreathing'
@@ -51,41 +53,16 @@ const PHASES: Array<{ key: keyof BreathPattern; label: string }> = [
   { key: 'holdOut', label: 'Rest' },
 ]
 
-/** The four questions this panel asks, in the order it asks them. */
 type Step = 'room' | 'pattern' | 'form' | 'sound'
 
-/**
- * Where answering each question takes you. Sound is the last one that leads
- * anywhere — after it the volume slider opens in place, and vibration is a
- * single toggle already in view, so there is nothing left to walk to.
- *
- * Choosing a room is an answer like any other, so it hands you the next
- * question too. If the guide is switched off there is no next question — the
- * pattern, form and sound sections are not on screen — and `revealSection`
- * takes a missing section as "stay where you are", which is the right answer
- * rather than a special case.
- */
 const NEXT_STEP: Partial<Record<Step, Step>> = {
   room: 'pattern',
   pattern: 'form',
   form: 'sound',
 }
 
-/**
- * Long enough that the tile you just pressed has visibly taken the selection,
- * and that tapping between two options to compare them resets the wait instead
- * of dragging you down the panel mid-comparison.
- */
 const ADVANCE_DELAY = 420
 
-/**
- * Everything about the guide, in the order it matters: is it on, what shape
- * is the breath, what does it look like, what does it sound like.
- *
- * The panel breathes while you are in it. Choosing a form or a voice without
- * seeing and hearing the result is choosing from a list of words, so the
- * picker at the top is a live guide and every voice has an audition button.
- */
 export function BreathingSettings({
   preferences,
   onChange,
@@ -93,9 +70,7 @@ export function BreathingSettings({
   const { breathPattern: pattern } = preferences
   const activePreset = findPreset(pattern)
   const valid = isPatternValid(pattern)
-  const livingStyle = isLivingStyle(preferences.breathStyle)
 
-  // A silent, purely visual guide: this one is a picture of the choice.
   const preview = useBreathing({
     pattern,
     active: preferences.breathingEnabled && valid,
@@ -103,21 +78,8 @@ export function BreathingSettings({
 
   const [auditioning, setAuditioning] = useState<BreathSound | null>(null)
 
-  // Never leave a voice ringing behind a closed sheet.
   useEffect(() => () => stopAudition(), [])
 
-  /*
-   * Answering a question hands you the next one.
-   *
-   * Pick a pattern and the panel walks down to Form; pick a form and it walks
-   * down to Breath sound. The alternative is a long sheet where every answer
-   * leaves you scrolling to find what you were meant to decide next.
-   *
-   * The nonce is what makes the wait restartable: pressing a second tile while
-   * the first is still pending replaces the entry, the effect tears down its
-   * timer and starts a fresh one, so comparing two options never yanks the
-   * panel out from under you.
-   */
   const sections = useRef<Partial<Record<Step, HTMLDivElement | null>>>({})
   const [pending, setPending] = useState<{ step: Step; nonce: number } | null>(
     null,
@@ -164,16 +126,6 @@ export function BreathingSettings({
         }}
       />
 
-      {/*
-        Under the guide's own switch, but not inside it.
-
-        The room rides on the guide's clock, so with the guide off it has no
-        breath to follow — but it is still a room: lit, coloured and deep, and
-        simply still. Hiding this switch whenever the guide was off would make
-        the whole environment vanish with no way to ask for it back, which is a
-        worse answer than a description that tells the truth about what it will
-        do right now.
-      */}
       <Toggle
         label="Background visualiser"
         description={
@@ -194,102 +146,70 @@ export function BreathingSettings({
           <div
             role="radiogroup"
             aria-label="Background visualiser room"
-            className="space-y-4"
+            className="grid grid-cols-2 gap-2"
           >
-            <div>
-              <div className="mb-2 flex items-baseline justify-between gap-3">
-                <p className="type-meta font-semibold tracking-[0.08em] uppercase">
-                  Immersive worlds
-                </p>
-                <span className="type-meta text-ink-faint">Guide + room</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {BREATH_STYLES.filter((style) => isLivingStyle(style.id)).map(
-                  (style) => (
-                    <RoomTile
-                      key={style.id}
-                      name={style.name}
-                      description={style.description}
-                      selected={preferences.breathStyle === style.id}
-                      onSelect={() => {
-                        onChange({ breathStyle: style.id })
-                        cue('select')
-                        advanceFrom('room')
-                      }}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="flex h-28 items-center justify-center overflow-hidden rounded-xl bg-[var(--bg-0)]"
-                      >
-                        <span className="scale-[1.7]">
-                          <BreathStyleThumbnail style={style.id} />
-                        </span>
-                      </span>
-                    </RoomTile>
-                  ),
-                )}
-              </div>
-              <p className="type-meta mt-2 px-1">
-                These become the breathing form and the whole environment
-                together, so the scene stays coherent from the orb to the edge
-                of the screen.
-              </p>
-            </div>
+            {BACKGROUND_MODES.map((mode) => (
+              <RoomTile
+                key={mode.id}
+                name={mode.name}
+                description={mode.description}
+                selected={preferences.backgroundMode === mode.id}
+                onSelect={() => {
+                  onChange({ backgroundMode: mode.id })
+                  cue('select')
+                  advanceFrom('room')
+                }}
+              >
+                <BackgroundSceneThumbnail mode={mode.id} />
+              </RoomTile>
+            ))}
 
-            <div>
-              <p className="type-meta mb-2 font-semibold tracking-[0.08em] uppercase">
-                Ambient rooms
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {BACKGROUND_MODES.map((mode) => (
-                  <RoomTile
-                    key={mode.id}
-                    name={mode.name}
-                    description={mode.description}
-                    selected={!livingStyle && preferences.backgroundMode === mode.id}
-                    onSelect={() => {
-                      onChange(
-                        livingStyle
-                          ? { backgroundMode: mode.id, breathStyle: 'bloom' }
-                          : { backgroundMode: mode.id },
-                      )
-                      cue('select')
-                      advanceFrom('room')
-                    }}
-                  >
-                    <BackgroundSceneThumbnail mode={mode.id} />
-                  </RoomTile>
-                ))}
-                <RoomTile
-                  name="Drifting"
-                  description="All six in turn, crossfading every minute or so. Held still if you have asked for reduced motion."
-                  selected={!livingStyle && preferences.backgroundMode === 'random'}
-                  onSelect={() => {
-                    onChange(
-                      livingStyle
-                        ? { backgroundMode: 'random', breathStyle: 'bloom' }
-                        : { backgroundMode: 'random' },
-                    )
-                    cue('select')
-                    advanceFrom('room')
-                  }}
-                  className="col-span-2"
+            {LIVING_BACKGROUND_MODES.map((mode) => (
+              <RoomTile
+                key={mode.id}
+                name={mode.name}
+                description={mode.description}
+                selected={preferences.backgroundMode === mode.id}
+                onSelect={() => {
+                  onChange({ backgroundMode: mode.id })
+                  cue('select')
+                  advanceFrom('room')
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex h-28 items-center justify-center overflow-hidden rounded-xl bg-[var(--bg-0)]"
                 >
-                  <span className="player-scene-drift" aria-hidden="true">
-                    {BACKGROUND_MODES.slice(0, 3).map((mode) => (
-                      <BackgroundSceneThumbnail key={mode.id} mode={mode.id} />
-                    ))}
+                  <span className="scale-[1.7]">
+                    <BreathStyleThumbnail style={mode.id} />
                   </span>
-                </RoomTile>
-              </div>
-            </div>
+                </span>
+              </RoomTile>
+            ))}
+
+            <RoomTile
+              name="Drifting"
+              description="The six ambient rooms in turn, crossfading every minute or so. Held still if you have asked for reduced motion."
+              selected={preferences.backgroundMode === 'random'}
+              onSelect={() => {
+                onChange({ backgroundMode: 'random' })
+                cue('select')
+                advanceFrom('room')
+              }}
+              className="col-span-2"
+            >
+              <span className="player-scene-drift" aria-hidden="true">
+                {BACKGROUND_MODES.slice(0, 3).map((mode) => (
+                  <BackgroundSceneThumbnail key={mode.id} mode={mode.id} />
+                ))}
+              </span>
+            </RoomTile>
           </div>
         </div>
       )}
 
       {preferences.breathingEnabled && (
         <>
-          {/* ── The live picture of every choice below ── */}
           <div className="flex flex-col items-center rounded-[1.5rem] border border-[var(--quiet-border)] bg-[var(--quiet)] py-5">
             <BreathingVisualizer
               runtime={preview}
@@ -303,7 +223,6 @@ export function BreathingSettings({
             </p>
           </div>
 
-          {/* ── Pattern ── */}
           <div
             ref={(node) => {
               sections.current.pattern = node
@@ -413,7 +332,6 @@ export function BreathingSettings({
             </Disclosure>
           </div>
 
-          {/* ── Form ── */}
           <div
             ref={(node) => {
               sections.current.form = node
@@ -442,7 +360,6 @@ export function BreathingSettings({
             </div>
           </div>
 
-          {/* ── Sound ── */}
           <div
             ref={(node) => {
               sections.current.sound = node
@@ -508,7 +425,6 @@ export function BreathingSettings({
             )}
           </div>
 
-          {/* ── Touch ── */}
           <Toggle
             label="Gentle vibration"
             description={
@@ -529,13 +445,6 @@ export function BreathingSettings({
   )
 }
 
-/**
- * A form's own name and a thumbnail of the shape it makes.
- *
- * The thumbnail is the same markup the real guide uses, frozen at a
- * comfortable half-open pose — so what you are choosing between is six
- * pictures rather than six adjectives.
- */
 function StyleTile({
   id,
   name,
@@ -573,10 +482,6 @@ function StyleTile({
   )
 }
 
-/**
- * One room in the picker. Wider than a form tile because the picture is the
- * point: you are choosing a place, and a 3.5rem swatch of it is not a choice.
- */
 function RoomTile({
   name,
   description,
