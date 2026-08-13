@@ -1,4 +1,4 @@
-name: Ship returning-user release
+name: Materialize verified returning-user release
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  verify-and-ship:
+  materialize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -37,12 +37,9 @@ jobs:
             scripts/apply-returning-user.mjs.gz \
             scripts/apply-returning-user.part* \
             scripts/fix-returning-user-tests.mjs \
-            .github/typecheck-diagnostic.txt
-
-          # GitHub's Actions token cannot update workflow files. Keep the
-          # currently committed workflows unchanged; they are cleaned up in a
-          # separate user-authenticated commit after the product source lands.
-          git checkout HEAD -- .github/workflows
+            .github/typecheck-diagnostic.txt \
+            .github/workflows/apply-returning-user.yml \
+            .github/workflows/release-returning-user.yml
 
       - name: Install dependencies
         run: npm ci
@@ -82,6 +79,10 @@ jobs:
           test -f src/lib/sessionClock.ts
           test -f src/lib/share.ts
           test -f src/lib/backup.ts
+          test -f .github/workflows/deploy.yml
+          test -f .github/workflows/quality.yml
+          test ! -f .github/workflows/apply-returning-user.yml
+          test ! -f .github/workflows/release-returning-user.yml
           test ! -f scripts/fix-returning-user-tests.mjs
           test ! -f .github/typecheck-diagnostic.txt
           if find scripts -maxdepth 1 -name 'apply-returning-user*' -print -quit | grep -q .; then
@@ -89,11 +90,36 @@ jobs:
             exit 1
           fi
 
-      - name: Commit verified product source to main
+      - name: Create verified commit object
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          git config user.name "cvree"
-          git config user.email "iscvree@gmail.com"
           git add -A
-          git commit -m "Make returning sessions effortless and calm"
-          git push origin HEAD:main
+          base_tree=$(git rev-parse HEAD^{tree})
+          printf '{"base_tree":"%s","tree":[' "$base_tree" > /tmp/tree.json
+          first=1
+
+          while IFS= read -r -d '' path; do
+            blob=$(base64 -w0 "$path" | jq -Rs '{content:., encoding:"base64"}' | gh api "repos/${GITHUB_REPOSITORY}/git/blobs" --method POST --input - --jq .sha)
+            if [ "$first" -eq 0 ]; then printf ',' >> /tmp/tree.json; fi
+            first=0
+            jq -cn --arg path "$path" --arg sha "$blob" '{path:$path,mode:"100644",type:"blob",sha:$sha}' >> /tmp/tree.json
+          done < <(git diff --cached --name-only --diff-filter=ACMRTUXB -z)
+
+          while IFS= read -r -d '' path; do
+            if [ "$first" -eq 0 ]; then printf ',' >> /tmp/tree.json; fi
+            first=0
+            jq -cn --arg path "$path" '{path:$path,mode:"100644",type:"blob",sha:null}' >> /tmp/tree.json
+          done < <(git diff --cached --name-only --diff-filter=D -z)
+
+          printf ']}' >> /tmp/tree.json
+          tree_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/trees" --method POST --input /tmp/tree.json --jq .sha)
+          jq -n \
+            --arg message 'Make returning sessions effortless and calm' \
+            --arg tree "$tree_sha" \
+            --arg parent "$GITHUB_SHA" \
+            '{message:$message,tree:$tree,parents:[$parent]}' > /tmp/commit.json
+          commit_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/commits" --method POST --input /tmp/commit.json --jq .sha)
+          gh api "repos/${GITHUB_REPOSITORY}/git/commits/${commit_sha}" > /dev/null
+          echo "::notice title=FINAL_COMMIT_SHA::${commit_sha}"
