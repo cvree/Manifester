@@ -28,6 +28,7 @@ import { countWords } from '../lib/format'
 import { draftToLoop } from '../lib/loops'
 import { useReducedMotion } from '../lib/motion'
 import { SmoothScroll, scrollToCentre } from '../lib/smoothScroll'
+import { STARTER_LINES } from '../lib/tts/knownPhrases'
 import {
   affirmationLines,
   brainwaveSummary,
@@ -47,14 +48,15 @@ import { useLibrary } from '../state/LibraryProvider'
 import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
 
-/** Gentle starting points — supportive phrasing, no promises attached. */
-const STARTERS = [
-  'I am allowed to move at my own pace.',
-  'I meet today with a steady, open heart.',
-  'I trust myself to handle what this day brings.',
-  'I am becoming someone I am proud of.',
-  'Rest is part of the work, not a break from it.',
-]
+/**
+ * Gentle starting points — supportive phrasing, no promises attached.
+ *
+ * They live beside the speech layer rather than here because they are also
+ * one of the few things this app knows it might say before anybody says it:
+ * the pre-generation script speaks all of them at build time, so tapping one
+ * and pressing play is instant even on a device that has never been here.
+ */
+const STARTERS = STARTER_LINES
 
 /** Long enough for the button to settle before the route changes. */
 const START_TRANSITION_MS = 320

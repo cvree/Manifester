@@ -31,6 +31,13 @@ jobs:
         run: npm ci
 
       - name: Type-check and build
+        # There is no speech backend behind GitHub Pages, and saying so is
+        # better than letting the app discover it: an empty endpoint means the
+        # page never makes a request that can only 404, plays whatever
+        # `npm run speech` committed under `public/speech`, and uses the
+        # device's own voice for anything else. See `src/lib/tts/config.ts`.
+        env:
+          VITE_TTS_ENDPOINT: ''
         run: npm run build
 
       - uses: actions/configure-pages@v5

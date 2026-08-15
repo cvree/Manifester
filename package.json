@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "server": "node server/index.mjs",
+    "speech": "node scripts/generate-speech.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",

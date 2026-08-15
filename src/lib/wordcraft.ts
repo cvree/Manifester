@@ -697,6 +697,20 @@ const UNIVERSAL: string[] = [
 
 const MAX_ADDED = 3
 
+/**
+ * Every line this helper is capable of offering, in one flat list.
+ *
+ * Nothing in the app reads it — the helper picks from the themes directly —
+ * but the speech pre-generation script does. These are, by definition, the
+ * words most likely to be spoken by somebody who has just arrived, so they are
+ * exactly the ones worth having already made, already encoded, and already
+ * sitting next to the JavaScript on the CDN. See `scripts/generate-speech.mjs`.
+ */
+export const SUGGESTION_LINES: string[] = [
+  ...THEMES.flatMap((theme) => theme.lines),
+  ...UNIVERSAL,
+]
+
 function normalise(line: string): string {
   return line
     .toLowerCase()

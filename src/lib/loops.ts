@@ -64,6 +64,20 @@ export function normaliseSettings(settings: Partial<LoopSettings>): LoopSettings
   return {
     ...DEFAULT_SETTINGS,
     ...settings,
+    /*
+     * Loops saved before the studio voice existed have no `voiceSource` at
+     * all, and they get `studio` from the defaults above — which is the right
+     * answer rather than a convenient one. A loop saved on a phone whose best
+     * device voice was a 2011 formant synth was never asking for *that* voice
+     * specifically; it was asking for a feminine one. It gets a better one.
+     * Anyone who did choose an exact voice still has `voiceURI` set, and the
+     * line below keeps them on it.
+     */
+    voiceSource:
+      settings.voiceSource === 'device' ||
+      (settings.voiceSource == null && settings.voiceURI)
+        ? 'device'
+        : 'studio',
     voiceVolume: clampVoiceVolume(
       settings.voiceVolume ?? DEFAULT_SETTINGS.voiceVolume,
     ),

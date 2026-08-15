@@ -37,11 +37,27 @@ export interface TrackMeta {
 /** Everything needed to recreate a listening session. */
 export interface LoopSettings {
   /**
-   * The headline choice. Resolves to the best-ranked voice of that style that
-   * the device actually has.
+   * The headline choice.
+   *
+   * With the studio voice it names one specific person — `female_1` or
+   * `male_1`, the same on every device. With a device voice it resolves to the
+   * best-ranked voice of that style the device happens to have, which is what
+   * it has always meant and why the two are worth telling apart.
    */
   voiceStyle: 'feminine' | 'masculine'
-  /** Manual override. When null, the ranked pick for `voiceStyle` wins. */
+  /**
+   * Who is reading: the app's own voice, or the platform's.
+   *
+   * `studio` is the default and is the same voice everywhere — it is
+   * synthesised by this project's own service and cached as audio. `device`
+   * is the browser's built-in speech, which differs on every phone and is also
+   * what `studio` quietly falls back to when the service cannot be reached.
+   */
+  voiceSource: 'studio' | 'device'
+  /**
+   * Manual override for a device voice. When null, the ranked pick for
+   * `voiceStyle` wins. Ignored entirely while `voiceSource` is `studio`.
+   */
   voiceURI: string | null
   voiceName: string | null
   /**
@@ -97,6 +113,7 @@ export const DEFAULT_SOUND: SoundConfig = {
 
 export const DEFAULT_SETTINGS: LoopSettings = {
   voiceStyle: 'feminine',
+  voiceSource: 'studio',
   voiceURI: null,
   voiceName: null,
   recordingId: null,

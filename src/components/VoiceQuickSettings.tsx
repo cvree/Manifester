@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { cx } from '../lib/cx'
+import { VOICE_PROFILES, voiceForStyle } from '../lib/tts'
 import type { LoopSettings } from '../lib/types'
 import type { RankedVoice } from '../lib/voiceRanking'
 import { Disclosure } from './Disclosure'
@@ -15,6 +16,7 @@ interface VoiceQuickSettingsProps {
     voiceURI: string | null
     voiceName: string | null
     voiceStyle?: LoopSettings['voiceStyle']
+    voiceSource?: LoopSettings['voiceSource']
   }) => void
   onRateChange: (rate: number) => void
   onPitchChange: (pitch: number) => void
@@ -23,10 +25,15 @@ interface VoiceQuickSettingsProps {
   className?: string
 }
 
-/** The two answers that are not a particular voice. */
+/** The four answers that are not one particular device voice. */
 const AUTO = {
   feminine: 'auto:feminine',
   masculine: 'auto:masculine',
+} as const
+
+const STUDIO = {
+  feminine: 'studio:feminine',
+  masculine: 'studio:masculine',
 } as const
 
 /**
@@ -71,15 +78,22 @@ export function VoiceQuickSettings({
     return near
   }, [voices, settings.voiceURI])
 
-  const value = settings.voiceURI ?? AUTO[settings.voiceStyle]
+  const usingStudio = settings.voiceSource === 'studio'
+  const studioName = VOICE_PROFILES[voiceForStyle(settings.voiceStyle)].label
 
-  const summary = voicesReady
-    ? `${settings.voiceName ?? resolved?.name ?? 'System voice'} · ${settings.rate.toFixed(2)}×`
-    : 'Loading voices…'
+  const value = usingStudio
+    ? STUDIO[settings.voiceStyle]
+    : (settings.voiceURI ?? AUTO[settings.voiceStyle])
+
+  const summary = usingStudio
+    ? `${studioName} · ${settings.rate.toFixed(2)}×`
+    : voicesReady
+      ? `${settings.voiceName ?? resolved?.name ?? 'System voice'} · ${settings.rate.toFixed(2)}×`
+      : 'Loading voices…'
 
   return (
     <Disclosure
-      title="Voice, speed and pitch"
+      title={usingStudio ? 'Voice and speed' : 'Voice, speed and pitch'}
       summary={summary}
       className={cx('shadow-none', className)}
     >
@@ -91,20 +105,42 @@ export function VoiceQuickSettings({
           value={value}
           onChange={(event) => {
             const next = event.target.value
+            if (next === STUDIO.feminine || next === STUDIO.masculine) {
+              onVoiceChange({
+                voiceURI: null,
+                voiceName: null,
+                voiceSource: 'studio',
+                voiceStyle: next === STUDIO.feminine ? 'feminine' : 'masculine',
+              })
+              return
+            }
             if (next === AUTO.feminine || next === AUTO.masculine) {
               onVoiceChange({
                 voiceURI: null,
                 voiceName: null,
+                voiceSource: 'device',
                 voiceStyle: next === AUTO.feminine ? 'feminine' : 'masculine',
               })
               return
             }
             const voice = voices.find((item) => item.voiceURI === next)
-            onVoiceChange({ voiceURI: next, voiceName: voice?.name ?? null })
+            onVoiceChange({
+              voiceURI: next,
+              voiceName: voice?.name ?? null,
+              voiceSource: 'device',
+            })
           }}
           className="min-h-12 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-sunken)] px-4 text-[1rem] text-ink transition-colors focus:border-[var(--border-strong)]"
         >
-          <optgroup label="Chosen for you">
+          <optgroup label="Studio — the same on every device">
+            <option value={STUDIO.feminine}>
+              {VOICE_PROFILES.female_1.label} · feminine
+            </option>
+            <option value={STUDIO.masculine}>
+              {VOICE_PROFILES.male_1.label} · masculine
+            </option>
+          </optgroup>
+          <optgroup label="Chosen for you, on this device">
             <option value={AUTO.feminine}>Best feminine voice</option>
             <option value={AUTO.masculine}>Best masculine voice</option>
           </optgroup>
@@ -130,20 +166,25 @@ export function VoiceQuickSettings({
         onChange={onRateChange}
       />
 
-      <Slider
-        label="Pitch"
-        min={0.5}
-        max={1.5}
-        step={0.05}
-        value={settings.pitch}
-        display={settings.pitch.toFixed(2)}
-        onChange={onPitchChange}
-      />
+      {/* Studio clips are audio: their pitch is fixed. See `VoiceSettings`. */}
+      {!usingStudio && (
+        <Slider
+          label="Pitch"
+          min={0.5}
+          max={1.5}
+          step={0.05}
+          value={settings.pitch}
+          display={settings.pitch.toFixed(2)}
+          onChange={onPitchChange}
+        />
+      )}
 
       <p className="type-meta -mt-1">
         {live
           ? 'Each of these takes effect on the next line.'
-          : 'Some voices ignore pitch. If nothing changes, that is why.'}
+          : usingStudio
+            ? 'Studio voices sound the same on every device.'
+            : 'Some voices ignore pitch. If nothing changes, that is why.'}
       </p>
     </Disclosure>
   )

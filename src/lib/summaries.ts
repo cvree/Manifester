@@ -24,6 +24,7 @@ import {
 } from './brainwaveAudio'
 import { backgroundChoiceName, type BackgroundChoice } from './environment'
 import { hapticsSupported } from './feedback'
+import { VOICE_PROFILES, voiceForStyle } from './tts/voices'
 import type { LoopSettings, TrackMeta } from './types'
 import type { RankedVoice } from './voiceRanking'
 
@@ -31,6 +32,15 @@ export function voiceSummary(
   settings: LoopSettings,
   resolved: RankedVoice | null,
 ): string {
+  /*
+   * The studio voice has a name of its own, which is most of why it exists:
+   * "Ivy · 0.90×" is a description of a loop that will read the same way for
+   * anybody who plays it, and "Samantha · 0.90×" was only ever a description
+   * of one phone.
+   */
+  if (settings.voiceSource === 'studio') {
+    return `${VOICE_PROFILES[voiceForStyle(settings.voiceStyle)].label} · ${settings.rate.toFixed(2)}×`
+  }
   const name =
     settings.voiceName ??
     resolved?.name ??

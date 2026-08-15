@@ -167,7 +167,7 @@ const SETTINGS: Array<{
     icon: VoiceIcon,
     name: 'Voice',
     where: 'Create → Customize, and Player → Levels',
-    what: 'Which of your device’s voices reads the words, how fast, and how high. On the Player it can be changed mid-session, and lands on the next line.',
+    what: 'Who reads the words, and how fast. Manifester’s own studio voices — Ivy and Fen — sound the same on every device; your phone’s own voices are there too if you prefer one. On the Player it can be changed mid-session, and lands on the next line.',
   },
   {
     icon: WaveIcon,
@@ -242,10 +242,12 @@ const TROUBLE: Array<{ question: string; answer: ReactNode }> = [
     question: 'The voice sounds flat and robotic.',
     answer: (
       <>
-        Your device is falling back to an old synthesiser. The Voice panel
-        labels it <em className="not-italic text-ink">Basic</em> when that
-        happens, and <SectionLink id="voices">Getting the best voice</SectionLink>{' '}
-        below has the free fix for each platform.
+        A studio voice never does, so this means the words are being read by
+        your device instead — either because you chose one of its voices, or
+        because the studio voice could not be reached and Manifester carried on
+        rather than going quiet. The Voice panel says which is happening, and{' '}
+        <SectionLink id="voices">Getting the best voice</SectionLink> below has
+        the free fix for each platform if you are staying on a device voice.
       </>
     ),
   },
@@ -547,10 +549,21 @@ export function AboutRoute() {
 
           <Card data-rise id="voices" className="scroll-mt-6" title="Getting the best voice">
             <p className="type-body">
-              Manifester automatically picks the nicest voice your device has, and
-              labels how good it is. If that label says <em className="not-italic text-ink">Basic</em>,
-              your device is falling back to an old robotic synthesiser — and there is
-              a free fix.
+              Manifester reads your words in one of its own voices —{' '}
+              <strong className="text-ink">Ivy</strong> or{' '}
+              <strong className="text-ink">Fen</strong> — and they sound the same
+              on a phone, a tablet and a laptop. A line you have already heard is
+              kept on the device, so it plays again instantly and offline.
+            </p>
+            <p className="type-body mt-3">
+              You can choose one of your device's own voices instead, under{' '}
+              <em className="not-italic text-ink">Choose an exact voice</em>, and
+              that is also what Manifester falls back to if the studio voice
+              cannot be reached. Device voices vary enormously, and Manifester
+              labels how good each one is. If that label says{' '}
+              <em className="not-italic text-ink">Basic</em>, your device is
+              falling back to an old robotic synthesiser — and there is a free
+              fix.
             </p>
             <p className="type-body mt-3">
               On iPhone: <strong className="text-ink">Settings → Accessibility → Spoken

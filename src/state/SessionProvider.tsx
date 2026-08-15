@@ -31,12 +31,14 @@ import { loopToDraft, normaliseSettings, pickLaunchLoop, type Draft } from '../l
 import { ActiveTimeClock } from '../lib/sessionClock'
 import { soundPlaybackChanged } from '../lib/soundChoice'
 import {
-  LIVE_VOICE_VOLUME_CAP,
-  SpeechLooper,
   clampVoiceVolume,
   isSpeechSupported,
   loadVoices,
 } from '../lib/speech'
+import { tts } from '../lib/tts'
+import { voiceForStyle } from '../lib/tts/voices'
+import { VOICE_SAMPLE } from '../lib/tts/knownPhrases'
+import { VoiceLooper } from '../lib/voiceLoop'
 import * as storage from '../lib/storage'
 import { SessionTimer } from '../lib/timer'
 import {
@@ -73,6 +75,16 @@ interface SessionSnapshot {
   notice: string | null
   /** Seconds left in the delay between loops, or `null` while speaking. */
   delayRemaining: number | null
+  /**
+   * True while a line is being fetched or synthesised.
+   *
+   * Nearly always false for long enough to be invisible — a cached line is
+   * ready in a millisecond — and true for a second or two the first time
+   * somebody plays words nobody has ever played before. Saying so is the
+   * difference between a considered pause and an app that appears to have
+   * ignored the button.
+   */
+  voicePreparing: boolean
 }
 
 interface SessionContextValue {
@@ -124,6 +136,7 @@ interface SessionContextValue {
     voiceURI: string | null
     voiceName: string | null
     voiceStyle?: LoopSettings['voiceStyle']
+    voiceSource?: LoopSettings['voiceSource']
   }) => void
   /** Change the brainwave rhythm, taking effect at once during a session. */
   setBrainwave: (patch: Partial<BrainwaveSettings>) => void
@@ -152,6 +165,7 @@ const EMPTY_SESSION: SessionSnapshot = {
   trackName: null,
   notice: null,
   delayRemaining: null,
+  voicePreparing: false,
 }
 
 function newDraft(): Draft {
@@ -184,7 +198,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     useState<SessionContextValue['previewState']>('idle')
 
   const busRef = useRef<AudioBus | null>(null)
-  const speechRef = useRef<SpeechLooper | null>(null)
+  const speechRef = useRef<VoiceLooper | null>(null)
   const musicRef = useRef<MusicEngine | null>(null)
   const brainwaveRef = useRef<BrainwaveVoice | null>(null)
   const timerRef = useRef<SessionTimer | null>(null)
@@ -221,7 +235,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const speechSupported = useMemo(isSpeechSupported, [])
 
   if (!busRef.current) busRef.current = new AudioBus()
-  if (!speechRef.current) speechRef.current = new SpeechLooper()
+  if (!speechRef.current) speechRef.current = new VoiceLooper()
+  /*
+   * The voice plays through the app's own audio graph now, so it needs the
+   * app's own `AudioContext` — the same one the ambience and the breath cues
+   * use. One context per page is not a tidiness preference: on iOS a second
+   * one is a second thing that can be interrupted, suspended, and left quietly
+   * not running, and `AudioBus` already carries every workaround for keeping
+   * one alive. Attaching is idempotent.
+   */
+  tts.attach(busRef.current)
   if (!musicRef.current) musicRef.current = new MusicEngine(busRef.current)
   if (!brainwaveRef.current) brainwaveRef.current = new BrainwaveVoice(busRef.current)
   if (!timerRef.current) timerRef.current = new SessionTimer()
@@ -234,8 +257,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async function pull() {
       const list = await loadVoices()
       if (cancelled) return
-      speechRef.current?.setVoices(list)
-      setVoices(rankVoices(list))
+      const ranked = rankVoices(list)
+      // The device voices are now the emergency fallback rather than the main
+      // event, so they are handed to the voice layer rather than to a speech
+      // loop — but they are still loaded exactly as eagerly, because the one
+      // moment they are needed is the moment something else has failed.
+      tts.setDeviceVoices(list, ranked)
+      setVoices(ranked)
       setVoicesReady(true)
     }
 
@@ -325,51 +353,64 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   /* ── Voice preview ── */
 
+  /**
+   * Hear the voice, now.
+   *
+   * The one place in the app where somebody is waiting on a single line rather
+   * than listening to a session, which is why it is also the one place with a
+   * visible loading state: a studio line that has to be synthesised takes a
+   * moment the first time, and a button that says nothing for a second reads
+   * as a button that did not work.
+   *
+   * Reached from a tap, so the hardware is opened here rather than assumed.
+   */
   const previewVoice = useCallback(
     (style?: 'feminine' | 'masculine', text?: string) => {
       const settings = draft.settings
       const wantedStyle = style ?? settings.voiceStyle
+      const sample = text?.trim() || VOICE_SAMPLE
 
-      if (!isSpeechSupported()) return
-      window.speechSynthesis.cancel()
+      busRef.current?.ensure()
+      tts.unlock()
 
-      const synth = window.speechSynthesis
-      const sample = text?.trim() || 'This is how your words will sound.'
-      // Long drafts would tie up the preview for a minute; one line is enough
-      // to hear the voice.
-      const utterance = new SpeechSynthesisUtterance(
-        sample.length > 180 ? `${sample.slice(0, 180)}…` : sample,
-      )
-      const target =
-        (settings.voiceURI && !style
-          ? voices.find((item) => item.voiceURI === settings.voiceURI)
-          : null) ?? pickBestVoice(voices, wantedStyle)
-
-      const match = target
-        ? synth.getVoices().find((item) => item.voiceURI === target.voiceURI)
-        : undefined
-      if (match) {
-        utterance.voice = match
-        utterance.lang = match.lang
-      }
-      utterance.rate = settings.rate
-      utterance.pitch = settings.pitch
-      // Belt and braces: the setting cannot exceed this any more, but the
-      // engine's own ceiling is the thing that must never be exceeded.
-      utterance.volume = Math.min(LIVE_VOICE_VOLUME_CAP, settings.voiceVolume)
-      utterance.onend = () => setPreviewState('idle')
-      utterance.onerror = () => setPreviewState('idle')
-
-      setPreviewState('playing')
-      synth.speak(utterance)
+      setPreviewState('loading')
+      void tts
+        .speak(sample.length > 180 ? `${sample.slice(0, 180)}…` : sample, {
+          voice: voiceForStyle(wantedStyle),
+          speed: settings.rate,
+          pitch: settings.pitch,
+          volume: settings.voiceVolume,
+          prefer: settings.voiceSource === 'device' ? 'device' : 'studio',
+          // An explicitly chosen device voice is only honoured when the person
+          // is auditioning that voice, not when they are comparing the two
+          // studio ones from the style cards.
+          deviceVoiceURI: style ? null : settings.voiceURI,
+          onStart: () => setPreviewState('playing'),
+        })
+        .then(() => setPreviewState('idle'))
+        .catch(() => setPreviewState('idle'))
     },
-    [draft.settings, voices],
+    [draft.settings],
   )
 
   const stopPreview = useCallback(() => {
-    if (isSpeechSupported()) window.speechSynthesis.cancel()
+    tts.stop()
     setPreviewState('idle')
   }, [])
+
+  /* ── What the voice is doing, for the player's status line ── */
+
+  useEffect(
+    () =>
+      tts.subscribe((status) => {
+        setSession((current) =>
+          current.voicePreparing === status.loading
+            ? current
+            : { ...current, voicePreparing: status.loading },
+        )
+      }),
+    [],
+  )
 
   /* ── Screen wake lock: speech stops when a phone sleeps ── */
 
@@ -526,6 +567,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const prime = useCallback(() => {
     busRef.current?.ensure()
     musicRef.current?.unlock()
+    // Opens the audio path for the voice and asks the speech service whether
+    // it is there, so the first line does not spend a round trip finding out.
+    tts.unlock()
   }, [])
 
   const start = useCallback(
@@ -548,11 +592,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       bus.ensure()
       bus.beginGentleStart()
       music.unlock()
+      tts.unlock()
 
       const started = speech.start(
         {
           text,
-          voiceURI:
+          voice: voiceForStyle(settings.voiceStyle),
+          preferDevice: settings.voiceSource === 'device',
+          deviceVoiceURI:
             settings.voiceURI ??
             pickBestVoice(voices, settings.voiceStyle)?.voiceURI ??
             null,
@@ -705,21 +752,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   )
 
   const setLiveVoice = useCallback<SessionContextValue['setLiveVoice']>(
-    ({ voiceURI, voiceName, voiceStyle }) => {
+    ({ voiceURI, voiceName, voiceStyle, voiceSource }) => {
+      const style = voiceStyle ?? draft.settings.voiceStyle
+      const source = voiceSource ?? draft.settings.voiceSource
       updateSettings({
         voiceURI,
         voiceName,
         ...(voiceStyle ? { voiceStyle } : {}),
+        ...(voiceSource ? { voiceSource } : {}),
       })
+      /*
+       * Changing who is reading takes effect on the next line rather than in
+       * the middle of this one. The loop re-preloads under the new voice as
+       * soon as it is told — see `updateOptions` — so the change is heard one
+       * line later even when that line has to be synthesised from scratch.
+       */
       speechRef.current?.updateOptions({
-        voiceURI:
-          voiceURI ??
-          pickBestVoice(voices, voiceStyle ?? draft.settings.voiceStyle)
-            ?.voiceURI ??
-          null,
+        voice: voiceForStyle(style),
+        preferDevice: source === 'device',
+        deviceVoiceURI:
+          voiceURI ?? pickBestVoice(voices, style)?.voiceURI ?? null,
       })
     },
-    [updateSettings, voices, draft.settings.voiceStyle],
+    [updateSettings, voices, draft.settings.voiceStyle, draft.settings.voiceSource],
   )
 
   const setBrainwave = useCallback<SessionContextValue['setBrainwave']>(
@@ -871,6 +926,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const bus = busRef.current
     return () => {
       speech?.stop()
+      // Everything in flight is abandoned rather than merely stopped: the app
+      // is going away, so a synthesis that has not landed has nowhere to land.
+      tts.cancelAll()
       music?.dispose()
       brainwave?.dispose()
       timer?.stop()

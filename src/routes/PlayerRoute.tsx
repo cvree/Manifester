@@ -161,7 +161,9 @@ export function PlayerRoute() {
       : playing
         ? session.delayRemaining != null
           ? `Resting · ${session.delayRemaining}s`
-          : 'Now looping'
+          : session.voicePreparing
+            ? 'Preparing the voice…'
+            : 'Now looping'
         : 'Ready when you are'
 
   const passProgress =
@@ -412,7 +414,9 @@ export function PlayerRoute() {
                       <span className="type-meta">
                         {session.delayRemaining != null
                           ? `Next pass in ${session.delayRemaining}s`
-                          : session.chunkTotal > 0
+                          : session.voicePreparing && session.chunkTotal === 0
+                            ? 'Preparing the voice…'
+                            : session.chunkTotal > 0
                             ? `${session.chunkTotal === lines.length ? 'Line' : 'Part'} ${
                                 session.chunkIndex + 1
                               } of ${session.chunkTotal}`

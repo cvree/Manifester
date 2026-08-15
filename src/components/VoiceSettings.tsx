@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { cx } from '../lib/cx'
 import { MAX_VOICE_VOLUME } from '../lib/speech'
+import { VOICE_PROFILES, voiceForStyle } from '../lib/tts'
+import { useTTSStatus } from '../lib/tts/useTTSStatus'
 import type { LoopSettings } from '../lib/types'
 import type { RankedVoice, VoiceTier } from '../lib/voiceRanking'
 import { BetterVoicesPanel } from './BetterVoicesPanel'
@@ -39,9 +41,29 @@ export function VoiceSettings({
   previewState,
 }: VoiceSettingsProps) {
   const [showAllVoices, setShowAllVoices] = useState(false)
+  const status = useTTSStatus()
+  const usingStudio = settings.voiceSource === 'studio'
 
-  /** What each style card will actually sound like on this device. */
+  /**
+   * What each style card will actually sound like.
+   *
+   * Two different questions behind one control, and the difference is the
+   * whole point of the studio voice. With it, the card names one specific
+   * person who sounds the same on every device anybody plays this loop on.
+   * Without it, the honest answer is still "whatever this phone happens to
+   * have", which is what it always was.
+   */
   const describeStyle = (style: 'feminine' | 'masculine') => {
+    if (usingStudio) {
+      const profile = VOICE_PROFILES[voiceForStyle(style)]
+      return {
+        name: profile.label,
+        detail: profile.description,
+        tier: 'neural' as VoiceTier,
+        badge: 'Studio',
+      }
+    }
+
     const manual = style === settings.voiceStyle && settings.voiceURI
     const best = manual
       ? resolvedDeviceVoice
@@ -55,9 +77,15 @@ export function VoiceSettings({
         name: 'System voice',
         detail: 'Whatever this device provides.',
         tier: 'standard' as VoiceTier,
+        badge: null,
       }
     }
-    return { name: best.name, detail: best.tierLabel, tier: best.tier }
+    return {
+      name: best.name,
+      detail: best.tierLabel,
+      tier: best.tier,
+      badge: null,
+    }
   }
 
   const selectStyle = (style: 'feminine' | 'masculine') => {
@@ -68,7 +96,15 @@ export function VoiceSettings({
   return (
     <div className="space-y-6">
       <div>
-        <FieldLabel hint={voicesReady ? `${voices.length} on this device` : 'Loading…'}>
+        <FieldLabel
+          hint={
+            usingStudio
+              ? 'Studio voice'
+              : voicesReady
+                ? `${voices.length} on this device`
+                : 'Loading…'
+          }
+        >
           Voice
         </FieldLabel>
 
@@ -76,7 +112,9 @@ export function VoiceSettings({
           {(['feminine', 'masculine'] as const).map((style) => {
             const info = describeStyle(style)
             const selected = settings.voiceStyle === style
-            const badge = TIER_BADGE[info.tier]
+            const badge = info.badge
+              ? { label: info.badge, tone: TIER_BADGE.neural.tone }
+              : TIER_BADGE[info.tier]
 
             return (
               <button
@@ -126,20 +164,32 @@ export function VoiceSettings({
         </button>
 
         <p className="mt-2.5 text-[0.82rem] leading-snug text-ink-faint">
-          Voices come from your phone or browser, not from Manifester, so the list
-          differs on every device. Feminine and masculine are a best guess from the
-          voice name — there is no gender field to read.
+          {usingStudio
+            ? 'Studio voices are Manifester’s own, and they sound the same on every phone, tablet and computer. They are free, they run on our server rather than a paid service, and clips you have already heard play again with no connection at all.'
+            : 'Device voices come from your phone or browser, not from Manifester, so the list differs on every device. Feminine and masculine are a best guess from the voice name — there is no gender field to read.'}
         </p>
+
+        {usingStudio && status.degraded && (
+          <p className="mt-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-sunken)] p-3 text-[0.82rem] leading-snug text-ink-muted">
+            The studio voice cannot be reached from here, so this device’s own
+            voice is reading instead. Anything already saved to this device
+            still plays in the studio voice.
+          </p>
+        )}
       </div>
 
-      <BetterVoicesPanel current={resolvedDeviceVoice} voicesReady={voicesReady} />
+      {!usingStudio && (
+        <BetterVoicesPanel current={resolvedDeviceVoice} voicesReady={voicesReady} />
+      )}
 
       <Disclosure
         title="Choose an exact voice"
         summary={
-          settings.voiceURI
-            ? (settings.voiceName ?? 'Custom voice')
-            : `Automatic — ${resolvedDeviceVoice?.name ?? 'system default'}`
+          usingStudio
+            ? `Studio — ${VOICE_PROFILES[voiceForStyle(settings.voiceStyle)].label}`
+            : settings.voiceURI
+              ? (settings.voiceName ?? 'Custom voice')
+              : `This device — ${resolvedDeviceVoice?.name ?? 'system default'}`
         }
       >
         <div className="space-y-3">
@@ -155,16 +205,39 @@ export function VoiceSettings({
 
           <select
             aria-label="Choose a voice"
-            value={settings.voiceURI ?? ''}
+            value={usingStudio ? 'studio' : (settings.voiceURI ?? '')}
             onChange={(event) => {
-              const voiceURI = event.target.value || null
-              const voice = voices.find((item) => item.voiceURI === voiceURI)
-              onChange({ voiceURI, voiceName: voice?.name ?? null })
+              const next = event.target.value
+              /*
+               * One control, three answers, and the third is the reason it is
+               * shaped like this: "the studio voice", "the best voice this
+               * device has", and "this exact voice". Picking a device voice is
+               * a decision to stop using the studio one — anything else would
+               * leave somebody choosing Samantha and still hearing Ivy.
+               */
+              if (next === 'studio') {
+                onChange({ voiceSource: 'studio', voiceURI: null, voiceName: null })
+                return
+              }
+              if (!next) {
+                onChange({ voiceSource: 'device', voiceURI: null, voiceName: null })
+                return
+              }
+              const voice = voices.find((item) => item.voiceURI === next)
+              onChange({
+                voiceSource: 'device',
+                voiceURI: next,
+                voiceName: voice?.name ?? null,
+              })
             }}
             className="min-h-12 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-sunken)] px-4 text-[1rem] text-ink transition-colors focus:border-[var(--border-strong)]"
           >
+            <option value="studio">
+              Studio — {VOICE_PROFILES[voiceForStyle(settings.voiceStyle)].label}, the
+              same everywhere
+            </option>
             <option value="">
-              Automatic — best {settings.voiceStyle} voice on this device
+              This device — best {settings.voiceStyle} voice available
             </option>
             {voices
               .filter(
@@ -196,16 +269,26 @@ export function VoiceSettings({
         onChange={(rate) => onChange({ rate })}
       />
 
-      <Slider
-        label="Pitch"
-        min={0.5}
-        max={1.5}
-        step={0.05}
-        value={settings.pitch}
-        display={settings.pitch.toFixed(2)}
-        hint="Some voices ignore pitch. If nothing changes, that is why."
-        onChange={(pitch) => onChange({ pitch })}
-      />
+      {/*
+        Pitch belongs to device voices alone.
+
+        A studio clip is recorded audio, and the only way to raise its pitch
+        after the fact is to play it faster — which is the Speed control, under
+        a different name and with a worse result. A slider that silently does
+        nothing is worse than one that is not there, so it is not there.
+      */}
+      {!usingStudio && (
+        <Slider
+          label="Pitch"
+          min={0.5}
+          max={1.5}
+          step={0.05}
+          value={settings.pitch}
+          display={settings.pitch.toFixed(2)}
+          hint="Some voices ignore pitch. If nothing changes, that is why."
+          onChange={(pitch) => onChange({ pitch })}
+        />
+      )}
 
       <Slider
         label="Voice volume"
@@ -214,7 +297,11 @@ export function VoiceSettings({
         step={0.05}
         value={settings.voiceVolume}
         display={`${Math.round(settings.voiceVolume * 100)}%`}
-        hint="iOS often locks speech to the system volume. Use your phone’s volume buttons if this slider has no effect."
+        hint={
+          usingStudio
+            ? 'The studio voice plays through Manifester’s own mix, so this balances it against the sound underneath.'
+            : 'iOS often locks speech to the system volume. Use your phone’s volume buttons if this slider has no effect.'
+        }
         onChange={(voiceVolume) => onChange({ voiceVolume })}
       />
 

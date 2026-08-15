@@ -15,8 +15,26 @@ const base = process.env.MANIFESTER_BASE ?? '/Manifester/'
 const THEME_COLOR = '#EFE7DC'
 const BACKGROUND_COLOR = '#F7F1E8'
 
+/**
+ * Where the speech API is, while developing.
+ *
+ * `docker compose up` puts it on 8787, and the dev server proxies to it so
+ * that the browser only ever sees a same-origin `/api/tts` — the same path it
+ * will see in production, so there is no CORS in development that does not
+ * exist later, and no configuration difference to forget about.
+ */
+const ttsTarget = process.env.TTS_PROXY_TARGET ?? 'http://127.0.0.1:8787'
+
 export default defineConfig({
   base,
+  server: {
+    proxy: {
+      '/api/tts': {
+        target: ttsTarget,
+        changeOrigin: true,
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -56,6 +74,30 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        /*
+         * Pre-generated speech is cached when it is heard, not when the app is
+         * installed. There can be hundreds of clips in two encodings, and
+         * precaching all of them would turn a fast install into a several
+         * megabyte one to prepare for lines most people will never choose.
+         *
+         * `CacheFirst` with no expiry is exactly right for these and would be
+         * wrong for nearly anything else: the file name is a hash of the audio
+         * inside it, so a cached clip cannot become stale — only unwanted, and
+         * the entry limit is what eventually clears those out.
+         */
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) =>
+              url.pathname.includes('/speech/') &&
+              /\.(opus|mp3)$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'manifester-speech',
+              expiration: { maxEntries: 400 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
         /*
          * The three AI provider SDKs are deliberately left out of the offline
          * bundle. They are ~660 KB together — nearly doubling the install —
