@@ -49,7 +49,7 @@ export function SharedLoopRoute() {
     if (saving) return
     setSaving(true)
     try {
-      await saveLoop(loop)
+      await saveLoop({ ...loop, origin: 'kept' })
       loadIntoDraft(loop)
       navigate('/player')
     } finally {

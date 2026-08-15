@@ -91,6 +91,17 @@ export interface LoopSettings {
   brainwave: BrainwaveSettings
 }
 
+/**
+ * How a loop reached the library.
+ *
+ * `kept` means somebody pressed Save. `played` means the app captured it on
+ * its way to the player, so words you actually listened to are never lost
+ * just because you did not think to save them first. The two are told apart
+ * everywhere they are shown: kept loops come first, and a played one is only
+ * ever held for a while.
+ */
+export type LoopOrigin = 'kept' | 'played'
+
 export interface SavedLoop extends LoopSettings {
   id: string
   title: string
@@ -98,6 +109,11 @@ export interface SavedLoop extends LoopSettings {
   createdAt: number
   updatedAt: number
   lastPlayedAt: number | null
+  /**
+   * See `LoopOrigin`. Loops written before plays were captured are `kept`,
+   * because pressing Save was the only way they could have got there.
+   */
+  origin: LoopOrigin
 }
 
 /** The player's lifecycle. */

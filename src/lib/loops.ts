@@ -2,7 +2,22 @@ import { isRainCharacter } from './ambient'
 import { normaliseBrainwave } from './brainwaveAudio'
 import { createId } from './format'
 import { clampVoiceVolume } from './speech'
-import { DEFAULT_SETTINGS, type LoopSettings, type SavedLoop } from './types'
+import {
+  DEFAULT_SETTINGS,
+  type LoopOrigin,
+  type LoopSettings,
+  type SavedLoop,
+} from './types'
+
+/**
+ * How many captured plays the library holds. Enough that last week's session
+ * is still there, few enough that the section never becomes a log to scroll.
+ * Kept loops are never counted here and never pruned.
+ */
+export const MAX_PLAYED_LOOPS = 12
+
+/** Roughly one line of a card's title, before the ellipsis earns its place. */
+const TITLE_CHARS = 44
 
 /** The in-progress loop the Create tab edits. */
 export interface Draft {
@@ -13,7 +28,13 @@ export interface Draft {
   settings: LoopSettings
 }
 
-/** Turn the current draft into a storable loop. */
+/**
+ * Turn the current draft into a storable loop.
+ *
+ * Saving is also how a captured play graduates: whatever the record used to
+ * be, coming through this function makes it kept, and kept records are never
+ * pruned or reordered by a later play.
+ */
 export function draftToLoop(draft: Draft, existing?: SavedLoop | null): SavedLoop {
   const now = Date.now()
   return {
@@ -21,11 +42,12 @@ export function draftToLoop(draft: Draft, existing?: SavedLoop | null): SavedLoo
     sound: { ...draft.settings.sound },
     brainwave: { ...draft.settings.brainwave },
     id: draft.id ?? existing?.id ?? createId('loop'),
-    title: draft.title.trim() || 'Untitled loop',
+    title: draft.title.trim() || existing?.title || autoTitle(draft.text),
     text: draft.text,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
     lastPlayedAt: existing?.lastPlayedAt ?? null,
+    origin: 'kept',
   }
 }
 
@@ -38,9 +60,193 @@ export function loopToDraft(loop: SavedLoop): Draft {
     createdAt: _createdAt,
     updatedAt: _updatedAt,
     lastPlayedAt: _lastPlayedAt,
+    origin: _origin,
     ...settings
   } = loop
   return { id, title, text, settings: normaliseSettings(settings) }
+}
+
+/**
+ * A name for words nobody has named.
+ *
+ * Captured plays need a title the moment they are captured, and "Untitled
+ * loop" three times over is a list you cannot read. The opening words are
+ * what somebody would have called it themselves.
+ */
+export function autoTitle(text: string): string {
+  const line = text
+    .trim()
+    .split('\n')
+    .map((part) => part.trim())
+    .find((part) => part.length > 0)
+  if (!line) return 'Untitled loop'
+  const words = line.replace(/\s+/g, ' ').split(' ')
+  let title = ''
+  let used = 0
+  for (const word of words) {
+    const next = title ? `${title} ${word}` : word
+    if (title && next.length > TITLE_CHARS) break
+    title = next
+    used += 1
+    if (title.length >= TITLE_CHARS) break
+  }
+  const shortened = used < words.length || title.length > TITLE_CHARS
+  const trimmed = title.slice(0, TITLE_CHARS).replace(/[\s,;:—–-]+$/, '')
+  if (!trimmed) return 'Untitled loop'
+  return shortened ? `${trimmed}…` : trimmed
+}
+
+/** Fill in anything a loop saved by an older version is missing. */
+export function normaliseLoop(loop: SavedLoop): SavedLoop {
+  return {
+    ...loop,
+    ...normaliseSettings(loop),
+    origin: loop.origin === 'played' ? 'played' : 'kept',
+  }
+}
+
+/**
+ * Library order: what you chose to keep, then what you happened to play.
+ *
+ * Kept loops sort by when they were last edited, so saving one brings it to
+ * the front. Captured plays sort by when they were played, which is the only
+ * thing about them anyone is looking for.
+ */
+export function sortLibrary(loops: SavedLoop[]): SavedLoop[] {
+  return [...loops].sort((a, b) => {
+    const aKept = a.origin !== 'played'
+    const bKept = b.origin !== 'played'
+    if (aKept !== bKept) return aKept ? -1 : 1
+    if (aKept) return b.updatedAt - a.updatedAt
+    return playedAt(b) - playedAt(a)
+  })
+}
+
+/** The same order, split into the two groups the Loops section draws. */
+export function splitLibrary(loops: SavedLoop[]): {
+  kept: SavedLoop[]
+  played: SavedLoop[]
+} {
+  const sorted = sortLibrary(loops)
+  return {
+    kept: sorted.filter((loop) => loop.origin !== 'played'),
+    played: sorted.filter((loop) => loop.origin === 'played'),
+  }
+}
+
+/** Everything a play knows about itself as it starts. */
+export interface PlayRecord {
+  /** The library record this play is already bound to, when there is one. */
+  id: string | null
+  title: string
+  text: string
+  settings: LoopSettings
+}
+
+/** One library write: the record to store, and any stale captures to drop. */
+export interface PlayPlan {
+  save: SavedLoop
+  /** Ids of captured plays that have aged out of the history. */
+  drop: string[]
+  /** True when this play added a record rather than refreshing one. */
+  created: boolean
+  origin: LoopOrigin
+}
+
+/**
+ * What playing these words should do to the library.
+ *
+ * The words are the identity. Play something the library already holds and
+ * that record is simply marked as played again — no second copy, and a kept
+ * loop is never rewritten by a play, only stamped. Play something new and it
+ * is captured, so nothing anybody listened to is lost to a forgotten Save.
+ * Returns null when there is nothing worth keeping.
+ */
+export function planPlay(
+  loops: SavedLoop[],
+  play: PlayRecord,
+  at: number = Date.now(),
+): PlayPlan | null {
+  if (!play.text.trim()) return null
+  const key = textKey(play.text)
+  const existing =
+    loops.find((loop) => loop.id === play.id && textKey(loop.text) === key) ??
+    loops.find((loop) => textKey(loop.text) === key) ??
+    null
+
+  // Words already kept stay exactly as they were kept. Only the play time moves.
+  if (existing && existing.origin !== 'played') {
+    return {
+      save: { ...existing, lastPlayedAt: at },
+      drop: [],
+      created: false,
+      origin: 'kept',
+    }
+  }
+
+  /*
+   * A play whose words have moved on from the record it was bound to — an
+   * edit in Create that was never saved — is a new capture, never a write
+   * over the old record. Reusing the id here would let an unsaved edit
+   * silently replace the loop it started from.
+   */
+  const reusableId =
+    play.id != null && !loops.some((loop) => loop.id === play.id) ? play.id : null
+
+  const save: SavedLoop = {
+    ...play.settings,
+    sound: { ...play.settings.sound },
+    brainwave: { ...play.settings.brainwave },
+    id: existing?.id ?? reusableId ?? createId('loop'),
+    title: play.title.trim() || existing?.title || autoTitle(play.text),
+    text: play.text,
+    createdAt: existing?.createdAt ?? at,
+    updatedAt: at,
+    lastPlayedAt: at,
+    origin: 'played',
+  }
+
+  return {
+    save,
+    drop: expiredPlays(loops, save),
+    created: existing == null,
+    origin: 'played',
+  }
+}
+
+/** Captured plays past the history limit, oldest first out. */
+function expiredPlays(loops: SavedLoop[], keeping: SavedLoop): string[] {
+  const played = loops
+    .filter((loop) => loop.origin === 'played' && loop.id !== keeping.id)
+    .sort((a, b) => playedAt(b) - playedAt(a))
+  return played.slice(MAX_PLAYED_LOOPS - 1).map((loop) => loop.id)
+}
+
+function playedAt(loop: SavedLoop): number {
+  return loop.lastPlayedAt ?? loop.updatedAt
+}
+
+/** Two sets of words are the same loop when they read the same. */
+function textKey(text: string): string {
+  return text.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+/**
+ * Captures of words that have just been saved under another record.
+ *
+ * Saving absorbs its own shadow: the copy in Recent plays says nothing the
+ * saved loop above it does not already say, and leaving it there is how a
+ * library starts looking like a log.
+ */
+export function absorbedBySave(loops: SavedLoop[], saved: SavedLoop): string[] {
+  const key = textKey(saved.text)
+  if (!key) return []
+  return loops
+    .filter(
+      (loop) =>
+        loop.id !== saved.id && loop.origin === 'played' && textKey(loop.text) === key,
+    )
+    .map((loop) => loop.id)
 }
 
 /**

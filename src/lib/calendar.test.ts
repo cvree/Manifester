@@ -10,6 +10,7 @@ const loop: SavedLoop = {
   createdAt: 1,
   updatedAt: 1,
   lastPlayedAt: null,
+  origin: 'kept',
 }
 
 describe('calendar reminders', () => {

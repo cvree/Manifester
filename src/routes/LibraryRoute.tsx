@@ -36,8 +36,8 @@ export function LibraryRoute() {
       <header data-rise className="pt-2">
         <h1 className="type-display">Your library</h1>
         <p className="type-body mt-3 max-w-[52ch]">
-          The loops you have saved and the sounds they rest on. All of it stays
-          on this device.
+          The loops you have saved, everything you have played lately, and the
+          sounds they rest on. All of it stays on this device.
         </p>
         {total && <p className="type-meta mt-2">{total}</p>}
       </header>

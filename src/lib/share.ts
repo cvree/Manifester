@@ -151,6 +151,10 @@ export function decodeSharedLoop(token: string): SavedLoop {
     createdAt: now,
     updatedAt: now,
     lastPlayedAt: null,
+    // A link somebody opened is not yet a loop they kept. Pressing "Save to my
+    // library" here, or Save in Create, is what makes it one; playing it puts
+    // it under Recent plays like anything else.
+    origin: 'played',
   }
 }
 

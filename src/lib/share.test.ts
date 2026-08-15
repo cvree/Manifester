@@ -182,6 +182,7 @@ describe('loop links', () => {
     createdAt: 1,
     updatedAt: 2,
     lastPlayedAt: 3,
+    origin: 'kept',
     voiceURI: 'device-only',
     voiceName: 'Only here',
     recordingId: 'recording-only-here',

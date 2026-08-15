@@ -204,6 +204,8 @@ function parseLoop(value: unknown): SavedLoop {
     updatedAt: safeTimestamp(value.updatedAt),
     lastPlayedAt:
       value.lastPlayedAt == null ? null : safeTimestamp(value.lastPlayedAt),
+    // A backup written before plays were captured holds only kept loops.
+    origin: value.origin === 'played' ? 'played' : 'kept',
   }
 }
 

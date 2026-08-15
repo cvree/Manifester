@@ -22,6 +22,7 @@ import {
   DownloadIcon,
   PencilIcon,
   PlayIcon,
+  SeedIcon,
   ShareIcon,
   TrashIcon,
 } from './Icons'
@@ -35,6 +36,8 @@ interface SavedLoopCardProps {
   onRemind: () => void
   onDuplicate: () => void
   onDelete: () => void
+  /** Present only for a captured play: keep it for good. */
+  onKeep?: () => void
 }
 
 const NOTE_MS = 2600
@@ -47,6 +50,7 @@ export function SavedLoopCard({
   onRemind,
   onDuplicate,
   onDelete,
+  onKeep,
 }: SavedLoopCardProps) {
   const [confirming, setConfirming] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -99,7 +103,24 @@ export function SavedLoopCard({
     flash('Copy saved to your library')
   }
 
+  const keep = () => {
+    onKeep?.()
+    cue('save')
+    flash('Saved to your loops')
+  }
+
   const actions: MenuAction[] = [
+    ...(onKeep
+      ? [
+          {
+            id: 'keep',
+            label: 'Save to your loops',
+            hint: 'Moves it above Recent plays and keeps it for good',
+            icon: <SeedIcon />,
+            onSelect: keep,
+          },
+        ]
+      : []),
     {
       id: 'share-link',
       label: canShare() ? 'Share loop link' : 'Copy loop link',
@@ -184,7 +205,7 @@ export function SavedLoopCard({
         >
           {note ??
             (loop.lastPlayedAt
-              ? `Last played ${formatRelativeDate(loop.lastPlayedAt)}`
+              ? `${onKeep ? 'Played' : 'Last played'} ${formatRelativeDate(loop.lastPlayedAt)}`
               : `Saved ${formatRelativeDate(loop.createdAt)}`)}
         </span>
 
@@ -204,6 +225,16 @@ export function SavedLoopCard({
           </span>
         ) : (
           <span className="flex items-center gap-1.5">
+            {onKeep && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={keep}
+                leading={<SeedIcon className="text-[0.8rem]" />}
+              >
+                Save
+              </Button>
+            )}
             <IconButton
               label={`Edit ${loop.title}`}
               icon={<PencilIcon />}
@@ -212,7 +243,11 @@ export function SavedLoopCard({
             <Menu
               label={`More for ${loop.title}`}
               title={loop.title}
-              description="Share it, set one reminder, download it, or make another copy."
+              description={
+                onKeep
+                  ? 'Save it for good, share it, set one reminder, download it, or make another copy.'
+                  : 'Share it, set one reminder, download it, or make another copy.'
+              }
               actions={actions}
             />
           </span>
