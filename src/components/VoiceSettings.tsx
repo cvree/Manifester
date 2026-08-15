@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { cx } from '../lib/cx'
 import { MAX_VOICE_VOLUME } from '../lib/speech'
 import { VOICE_PROFILES, voiceForStyle } from '../lib/tts'
-import { useTTSStatus } from '../lib/tts/useTTSStatus'
+import { useStudioAvailable, useTTSStatus } from '../lib/tts/useTTSStatus'
 import type { LoopSettings } from '../lib/types'
 import type { RankedVoice, VoiceTier } from '../lib/voiceRanking'
 import { BetterVoicesPanel } from './BetterVoicesPanel'
@@ -42,7 +42,9 @@ export function VoiceSettings({
 }: VoiceSettingsProps) {
   const [showAllVoices, setShowAllVoices] = useState(false)
   const status = useTTSStatus()
-  const usingStudio = settings.voiceSource === 'studio'
+  const studioAvailable = useStudioAvailable()
+  // Chosen *and* available. See `useStudioAvailable`.
+  const usingStudio = settings.voiceSource === 'studio' && studioAvailable
 
   /**
    * What each style card will actually sound like.
@@ -169,11 +171,11 @@ export function VoiceSettings({
             : 'Device voices come from your phone or browser, not from Manifester, so the list differs on every device. Feminine and masculine are a best guess from the voice name — there is no gender field to read.'}
         </p>
 
-        {usingStudio && status.degraded && (
+        {settings.voiceSource === 'studio' && !studioAvailable && (
           <p className="mt-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-sunken)] p-3 text-[0.82rem] leading-snug text-ink-muted">
-            The studio voice cannot be reached from here, so this device’s own
-            voice is reading instead. Anything already saved to this device
-            still plays in the studio voice.
+            {status.degraded
+              ? 'The studio voice cannot be reached from here, so this device’s own voice is reading instead. Lines this device has already heard still play in the studio voice.'
+              : 'This copy of Manifester has no speech service behind it, so your device’s own voice reads anything that did not ship with the app. Everything else works exactly the same.'}
           </p>
         )}
       </div>

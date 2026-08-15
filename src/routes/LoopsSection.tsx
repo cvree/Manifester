@@ -9,6 +9,7 @@ import { ReminderPanel } from '../components/ReminderPanel'
 import { SavedLoopCard } from '../components/SavedLoopCard'
 import { Sheet } from '../components/Sheet'
 import { soundSummary, voiceSummary } from '../lib/summaries'
+import { useStudioAvailable } from '../lib/tts/useTTSStatus'
 import type { SavedLoop } from '../lib/types'
 import { pickBestVoice } from '../lib/voiceRanking'
 import { useLibrary } from '../state/LibraryProvider'
@@ -18,6 +19,7 @@ export function LoopsSection() {
   const navigate = useNavigate()
   const { loops, ready, allTracks, removeLoop, duplicateLoop } = useLibrary()
   const { loadIntoDraft, start, voices } = useSession()
+  const studioAvailable = useStudioAvailable()
   const [exporting, setExporting] = useState<SavedLoop | null>(null)
   const [reminding, setReminding] = useState<SavedLoop | null>(null)
 
@@ -92,6 +94,7 @@ export function LoopsSection() {
                 ? (voices.find((voice) => voice.voiceURI === exporting.voiceURI) ??
                   pickBestVoice(voices, exporting.voiceStyle))
                 : pickBestVoice(voices, exporting.voiceStyle),
+              studioAvailable,
             )}
           />
         )}

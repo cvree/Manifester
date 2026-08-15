@@ -257,7 +257,7 @@ class TTS {
    */
   async preload(text: string, options: SpeakSettings = {}): Promise<void> {
     const words = text?.trim()
-    if (!words || !this.engine) return
+    if (!words) return
     const settings = { ...DEFAULT_SPEAK, ...options }
     if (settings.prefer === 'device' || this.engineResting()) return
     await this.whenReady()
@@ -320,7 +320,24 @@ class TTS {
    * afterwards; a backend that is not there answers instantly with `false`.
    */
   private warmUp(): Promise<void> {
-    if (!this.engine) return Promise.resolve()
+    if (!this.engine) {
+      /*
+       * No service, but possibly a shelf full of speech.
+       *
+       * A static deployment ships whatever `npm run speech` generated, and
+       * those clips are the studio voice by every measure that matters. So the
+       * manifest is read at unlock and the answer to "which voice is this app
+       * speaking in?" is settled before anybody opens the Voice panel, rather
+       * than flipping from device to studio the moment a clip happens to be
+       * found.
+       */
+      if (!this.ready) {
+        this.ready = this.manifest.load().then(() => {
+          if (this.manifest.hasClips) this.publish({ engine: 'studio' })
+        })
+      }
+      return this.ready
+    }
     if (!this.ready) {
       this.ready = this.engine
         .probe()
@@ -360,8 +377,20 @@ class TTS {
     if (generation !== this.generation) return 'interrupted'
     if (settings.signal?.aborted) return 'interrupted'
 
-    const wantsDevice =
-      settings.prefer === 'device' || !this.engine || this.engineResting()
+    /*
+     * A build with no engine is not a build with no studio voice.
+     *
+     * Everything `npm run speech` generated ships as static files, and the
+     * client can resolve those out of memory, IndexedDB or the manifest
+     * without any service existing — which is exactly what the GitHub Pages
+     * deployment is. Skipping the studio path because there is no engine would
+     * throw all of that away and read pre-generated clips in a device voice.
+     *
+     * So the only reasons to go straight to the device are a deliberate
+     * preference and a studio voice that has just failed. Everything else
+     * tries, and a miss costs a few local lookups before falling through.
+     */
+    const wantsDevice = settings.prefer === 'device' || this.engineResting()
 
     if (!wantsDevice) {
       const outcome = await this.speakStudio(text, settings, generation)

@@ -71,6 +71,19 @@ export class StaticManifest {
     return this.loaded
   }
 
+  /** True once a manifest with clips in it has been read. */
+  get hasClips(): boolean {
+    return Object.keys(this.data.clips).length > 0
+  }
+
+  /**
+   * The model version the shipped clips were made with, once the manifest has
+   * been read. `null` before that, and on a build with no generated speech.
+   */
+  get modelVersion(): string | null {
+    return this.data.engine?.modelVersion ?? null
+  }
+
   /** The URL of a pre-generated clip, or `null` when it was not generated. */
   async urlFor(key: string, format: AudioFormat): Promise<string | null> {
     const manifest = await this.load()

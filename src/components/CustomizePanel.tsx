@@ -11,6 +11,7 @@ import {
   soundSummary,
   voiceSummary,
 } from '../lib/summaries'
+import { useStudioAvailable } from '../lib/tts/useTTSStatus'
 import { useLibrary } from '../state/LibraryProvider'
 import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
@@ -117,6 +118,7 @@ export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
   const { allTracks } = useLibrary()
   const { preferences, update: updatePreferences } = usePreferences()
   const credentials = useCredentials()
+  const studioAvailable = useStudioAvailable()
 
   const { settings } = draft
   const close = () => onOpenChange(null)
@@ -181,7 +183,7 @@ export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
           title={draft.title}
           hasRecording={settings.recordingId != null}
           soundLabel={soundSummary(settings, allTracks)}
-          voiceLabel={voiceSummary(settings, resolvedDeviceVoice)}
+          voiceLabel={voiceSummary(settings, resolvedDeviceVoice, studioAvailable)}
         />
       </Sheet>
 
@@ -241,6 +243,7 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
   const { allTracks } = useLibrary()
   const { preferences } = usePreferences()
   const credentials = useCredentials()
+  const studioAvailable = useStudioAvailable()
 
   const { settings } = draft
 
@@ -263,7 +266,7 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
           <SettingRow
             icon={<VoiceIcon />}
             title="Voice"
-            summary={voiceSummary(settings, resolvedDeviceVoice)}
+            summary={voiceSummary(settings, resolvedDeviceVoice, studioAvailable)}
             onClick={() => openPanel('voice')}
             accent
           />

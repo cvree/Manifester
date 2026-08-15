@@ -29,6 +29,7 @@ import { draftToLoop } from '../lib/loops'
 import { useReducedMotion } from '../lib/motion'
 import { SmoothScroll, scrollToCentre } from '../lib/smoothScroll'
 import { STARTER_LINES } from '../lib/tts/knownPhrases'
+import { useStudioAvailable } from '../lib/tts/useTTSStatus'
 import {
   affirmationLines,
   brainwaveSummary,
@@ -117,6 +118,9 @@ export function CreateRoute() {
   const { allTracks, loops, saveLoop, storageError } = useLibrary()
   const { preferences, update: updatePreferences } = usePreferences()
   const reducedMotion = useReducedMotion()
+  // The preview names the voice that will actually read the words. See
+  // `useStudioAvailable`.
+  const studioAvailable = useStudioAvailable()
 
   const [saved, setSaved] = useState(false)
   const [starting, setStarting] = useState(false)
@@ -610,7 +614,7 @@ export function CreateRoute() {
             settings={draft.settings}
             breathing={breathing}
             breathStyle={preferences.breathStyle}
-            voice={voiceSummary(draft.settings, resolvedDeviceVoice)}
+            voice={voiceSummary(draft.settings, resolvedDeviceVoice, studioAvailable)}
             sound={soundSummary(draft.settings, allTracks)}
             rhythm={
               draft.settings.brainwave.enabled

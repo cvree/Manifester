@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { cx } from '../lib/cx'
 import { VOICE_PROFILES, voiceForStyle } from '../lib/tts'
+import { useStudioAvailable } from '../lib/tts/useTTSStatus'
 import type { LoopSettings } from '../lib/types'
 import type { RankedVoice } from '../lib/voiceRanking'
 import { Disclosure } from './Disclosure'
@@ -78,7 +79,8 @@ export function VoiceQuickSettings({
     return near
   }, [voices, settings.voiceURI])
 
-  const usingStudio = settings.voiceSource === 'studio'
+  const studioAvailable = useStudioAvailable()
+  const usingStudio = settings.voiceSource === 'studio' && studioAvailable
   const studioName = VOICE_PROFILES[voiceForStyle(settings.voiceStyle)].label
 
   const value = usingStudio

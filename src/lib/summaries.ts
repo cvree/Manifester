@@ -31,6 +31,15 @@ import type { RankedVoice } from './voiceRanking'
 export function voiceSummary(
   settings: LoopSettings,
   resolved: RankedVoice | null,
+  /**
+   * Whether the studio voice can actually be had here.
+   *
+   * A summary is a promise about what will be heard, so it has to know: a
+   * build with no speech service behind it names the device voice that is
+   * genuinely going to read the words, even though the *setting* still says
+   * studio and will mean it again elsewhere.
+   */
+  studioAvailable = true,
 ): string {
   /*
    * The studio voice has a name of its own, which is most of why it exists:
@@ -38,7 +47,7 @@ export function voiceSummary(
    * anybody who plays it, and "Samantha · 0.90×" was only ever a description
    * of one phone.
    */
-  if (settings.voiceSource === 'studio') {
+  if (settings.voiceSource === 'studio' && studioAvailable) {
     return `${VOICE_PROFILES[voiceForStyle(settings.voiceStyle)].label} · ${settings.rate.toFixed(2)}×`
   }
   const name =

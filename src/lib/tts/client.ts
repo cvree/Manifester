@@ -23,6 +23,7 @@
  */
 
 import { cacheKey, clampSpeed, type CacheKeyInput } from './cacheKey'
+import { KOKORO_MODEL_VERSION } from './engines/kokoroModel'
 import { BrowserCache } from './browserCache'
 import { markFormatUnplayable, preferredFormat } from './formats'
 import { StaticManifest } from './manifest'
@@ -114,10 +115,33 @@ export class TTSClient {
       voiceVersion: VOICE_VERSION,
       speed: clampSpeed(options.speed),
       language: (options.language ?? this.language).toLowerCase(),
-      modelVersion: this.engine?.descriptor.modelVersion ?? 'none',
+      modelVersion: this.modelVersion(),
       pronunciationVersion: PRONUNCIATION_VERSION,
       audioVersion: AUDIO_VERSION,
     }
+  }
+
+  /**
+   * Which model version this build keys against.
+   *
+   * With an engine, whatever it says it is running. Without one — the static
+   * deployment, where there is no service to ask — the clips that shipped are
+   * the only clips there are, so the answer has to be whatever *made* them:
+   * the manifest's own declaration once it has been read, and the shipped
+   * default until then, which is the value the build script uses.
+   *
+   * Getting this wrong is not a small mistake. `'none'` was the first attempt,
+   * and it meant every key on the static build was a key nothing had ever been
+   * generated under: the manifest was fetched, every lookup missed, and a
+   * deployment carrying two thousand pre-generated clips read every line in
+   * the device's own voice.
+   */
+  private modelVersion(): string {
+    return (
+      this.engine?.descriptor.modelVersion ??
+      this.manifest.modelVersion ??
+      KOKORO_MODEL_VERSION
+    )
   }
 
   /**
