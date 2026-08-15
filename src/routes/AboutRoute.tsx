@@ -283,6 +283,18 @@ const TROUBLE: Array<{ question: string; answer: ReactNode }> = [
     ),
   },
   {
+    question: 'I played something and forgot to save it.',
+    answer: (
+      <>
+        It is in Your library. Anything you play is written there on its way to
+        the player, under <em className="not-italic text-ink">Recent plays</em>,
+        below everything you saved. The last twelve are held, so save the ones
+        you want to keep — that moves the same loop up into your saved ones
+        rather than making a copy of it.
+      </>
+    ),
+  },
+  {
     question: 'My saved loops have disappeared.',
     answer: (
       <>
@@ -390,7 +402,8 @@ export function AboutRoute() {
             <ul className="type-body mt-4 space-y-2.5">
               <Bullet>
                 Text, settings and imported audio are stored in your browser's own
-                storage.
+                storage — including the loops kept for you under Recent plays,
+                which never leave the device and can be cleared in one press.
               </Bullet>
               <Bullet>
                 <em className="not-italic text-ink">

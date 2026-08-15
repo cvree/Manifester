@@ -57,7 +57,7 @@ export function LibraryBackupPanel() {
       data-rise
       level="panel"
       title="Keep a backup"
-      description="One local file protects your saved loops, imported sounds, recordings and listening total. Restoring merges safely; it never replaces your current library."
+      description="One local file protects every loop in your library — saved and recently played — with your imported sounds, recordings and listening total. Restoring merges safely; it never replaces your current library."
     >
       <div className="flex flex-wrap gap-3">
         <Button

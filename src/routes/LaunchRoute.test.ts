@@ -11,6 +11,7 @@ function loop(text = 'I am here.'): SavedLoop {
     createdAt: 1,
     updatedAt: 2,
     lastPlayedAt: 3,
+    origin: 'kept',
   }
 }
 

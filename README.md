@@ -252,6 +252,22 @@ link to your sounds.
 
 *Loops*
 
+- **Nothing you play is lost.** Starting a session writes it to the library on
+  its way to the player, so words you listened to but never got round to saving
+  are waiting for you under **Recent plays** when you come back. The last
+  twelve are held; older captures fall off the end, and nothing you saved is
+  ever pruned.
+- **What you saved comes first.** The section is two groups, in one order that
+  never changes: **Saved** — the loops somebody pressed Save on — and then
+  **Recent plays** beneath them. Pressing **Save** on a captured play promotes
+  that same record rather than copying it: it moves up into Saved, keeps its
+  dates, and stops ageing out. **Clear recent plays** forgets the whole history
+  in one press, and asks first.
+- Captures name themselves from their own opening words rather than piling up
+  a column of *Untitled loop*, and playing the same words twice refreshes the
+  one entry instead of laying down another. Playing a loop you saved only
+  stamps it as played — a play never rewrites words you kept, and an unsaved
+  edit of a saved loop is captured alongside it, so both survive.
 - Every saved loop keeps its text, title, voice, speed, pitch, volumes, timer,
   sound selection, rain character, brainwave rhythm, playlist, repeat mode, and
   dates. A loop saved before a setting existed loads with it turned off rather

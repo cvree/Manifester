@@ -33,6 +33,7 @@ import { primeBreathAudio } from '../lib/breathAudio'
 import { cue } from '../lib/feedback'
 import { countWords, formatClock } from '../lib/format'
 import { listeningSentence } from '../lib/listening'
+import { autoTitle } from '../lib/loops'
 import { useReducedMotion } from '../lib/motion'
 import { affirmationLines, soundName } from '../lib/summaries'
 import { useBackgroundMix } from '../lib/useBackgroundMix'
@@ -313,7 +314,7 @@ export function PlayerRoute() {
                     {stateLabel}
                   </p>
                   <h1 className="stage__title mt-2 max-w-full truncate text-center font-display text-[1.75rem] leading-tight text-ink sm:text-[2rem]">
-                    {session.title || draft.title.trim() || 'Untitled loop'}
+                    {session.title || draft.title.trim() || autoTitle(draft.text)}
                   </h1>
                 </div>
 

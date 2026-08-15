@@ -16,6 +16,7 @@ const loop: SavedLoop = {
   createdAt: 1,
   updatedAt: 2,
   lastPlayedAt: 3,
+  origin: 'kept',
 }
 
 describe('library backup', () => {

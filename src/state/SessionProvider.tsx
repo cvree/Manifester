@@ -27,7 +27,13 @@ import {
   normaliseBrainwave,
   type BrainwaveSettings,
 } from '../lib/brainwaveAudio'
-import { loopToDraft, normaliseSettings, pickLaunchLoop, type Draft } from '../lib/loops'
+import {
+  autoTitle,
+  loopToDraft,
+  normaliseSettings,
+  pickLaunchLoop,
+  type Draft,
+} from '../lib/loops'
 import { ActiveTimeClock } from '../lib/sessionClock'
 import { soundPlaybackChanged } from '../lib/soundChoice'
 import {
@@ -186,7 +192,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const {
     loops,
     ready: libraryReady,
-    touchLoop,
+    recordPlay,
     recordListening,
   } = useLibrary()
   const [draft, setDraft] = useState<Draft>(newDraft)
@@ -586,7 +592,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         ? normaliseSettings(source)
         : draft.settings
       const text = source ? source.text : draft.text
-      const title = (source ? source.title : draft.title).trim() || 'Untitled loop'
+      /*
+       * The same name the library will file it under, rather than "Untitled
+       * loop" on the player and something better on the card.
+       */
+      const title = (source ? source.title : draft.title).trim() || autoTitle(text)
 
       // Reach for audio permission while we are still inside the tap.
       bus.ensure()
@@ -630,8 +640,42 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         counted: false,
         startedAt,
       }
-      const loopId = source?.id ?? draft.id
-      if (loopId) void touchLoop(loopId)
+      /*
+       * The library keeps whatever is played, whether or not anybody saved it.
+       * A loop started from the Create tab is captured here on its way out, so
+       * words somebody actually listened to are in Your library by the time
+       * they get back to it — under Recent plays, behind everything they chose
+       * to keep. The draft adopts the record it landed in, so tweaking and
+       * playing again refreshes that one entry instead of laying down another,
+       * and pressing Save later promotes it rather than copying it.
+       */
+      void recordPlay({
+        id: source?.id ?? draft.id,
+        title: source ? source.title : draft.title,
+        text,
+        settings,
+      }).then((loop) => {
+        if (!loop) return
+        draftTouchedRef.current = true
+        setDraft((current) => {
+          if (current.text !== text || current.id === loop.id) return current
+          /*
+           * The id, and only the id. A capture names itself from its own
+           * opening words, but writing that name into the Title box would
+           * leave it there — still attached when the words underneath it have
+           * been replaced by something else entirely.
+           */
+          if (current.id == null) return { ...current, id: loop.id }
+          /*
+           * The draft has been rewritten past the capture it came from, so it
+           * follows the capture its words are actually in. A loop somebody
+           * kept is never re-pointed: editing it and pressing Save has to keep
+           * meaning "update the loop I saved".
+           */
+          const bound = loops.find((item) => item.id === current.id)
+          return bound?.origin === 'played' ? { ...current, id: loop.id } : current
+        })
+      })
       setSession({
         ...EMPTY_SESSION,
         status: 'playing',
@@ -671,7 +715,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         })
       }
     },
-    [draft, finish, requestWakeLock, startElapsed, touchLoop, voices],
+    [draft, finish, loops, recordPlay, requestWakeLock, startElapsed, voices],
   )
 
   const pause = useCallback(() => {

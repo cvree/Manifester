@@ -1,6 +1,7 @@
 /**
- * The user's local library: saved loops, imported sounds, recordings and the
- * quiet total that reflects time spent listening. Everything stays local.
+ * The user's local library: saved loops, the plays captured on their way to
+ * the player, imported sounds, recordings and the quiet total that reflects
+ * time spent listening. Everything stays local.
  */
 
 import {
@@ -27,6 +28,13 @@ import {
   writeListeningStats,
   type ListeningStats,
 } from '../lib/listening'
+import {
+  absorbedBySave,
+  normaliseLoop,
+  planPlay,
+  sortLibrary,
+  type PlayRecord,
+} from '../lib/loops'
 import * as storage from '../lib/storage'
 import { MAX_TRACK_BYTES, type SavedLoop, type TrackMeta } from '../lib/types'
 
@@ -53,7 +61,16 @@ interface LibraryContextValue {
   saveLoop: (loop: SavedLoop) => Promise<void>
   removeLoop: (id: string) => Promise<void>
   duplicateLoop: (id: string) => Promise<SavedLoop | null>
-  touchLoop: (id: string) => Promise<void>
+  /**
+   * Capture a play. Returns the library record it belongs to, or null when
+   * there was nothing to capture or the device refused the write — playing
+   * must never fail because saving did.
+   */
+  recordPlay: (play: PlayRecord) => Promise<SavedLoop | null>
+  /** Promote a captured play to a kept loop. */
+  keepLoop: (id: string) => Promise<void>
+  /** Forget every captured play, leaving kept loops alone. */
+  clearPlayed: () => Promise<void>
   recordListening: (seconds: number, countSession: boolean, startedAt: number) => void
   createBackup: () => Promise<string>
   restoreBackup: (text: string) => Promise<{ added: number; skipped: number }>
@@ -78,7 +95,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         ])
         if (cancelled) return
         setCustomTracks(tracks.map(stripBlob))
-        setLoops(savedLoops)
+        setLoops(sortLibrary(savedLoops.map(normaliseLoop)))
       } catch {
         if (cancelled) return
         setStorageError(
@@ -157,13 +174,22 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     setCustomTracks((current) => current.filter((track) => track.id !== id))
   }, [])
 
-  const saveLoop = useCallback(async (loop: SavedLoop) => {
-    await storage.putLoop(loop)
-    setLoops((current) => {
-      const without = current.filter((item) => item.id !== loop.id)
-      return [loop, ...without].sort((a, b) => b.updatedAt - a.updatedAt)
-    })
-  }, [])
+  const saveLoop = useCallback<LibraryContextValue['saveLoop']>(
+    async (loop) => {
+      const shadows = absorbedBySave(loops, loop)
+      await storage.putLoop(loop)
+      setLoops((current) =>
+        sortLibrary([
+          loop,
+          ...current.filter(
+            (item) => item.id !== loop.id && !shadows.includes(item.id),
+          ),
+        ]),
+      )
+      await Promise.all(shadows.map((id) => storage.deleteLoop(id)))
+    },
+    [loops],
+  )
 
   const removeLoop = useCallback(async (id: string) => {
     await storage.deleteLoop(id)
@@ -182,24 +208,68 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         createdAt: now,
         updatedAt: now,
         lastPlayedAt: null,
+        // Asking for a copy is a deliberate act, so the copy is a kept loop
+        // even when what it was copied from was only ever played.
+        origin: 'kept',
       }
       await storage.putLoop(copy)
-      setLoops((current) => [copy, ...current])
+      setLoops((current) => sortLibrary([copy, ...current]))
       return copy
     },
     [loops],
   )
 
-  const touchLoop = useCallback(
-    async (id: string) => {
-      const source = loops.find((loop) => loop.id === id)
-      if (!source) return
-      const next = { ...source, lastPlayedAt: Date.now() }
-      await storage.putLoop(next)
-      setLoops((current) => current.map((loop) => (loop.id === id ? next : loop)))
+  /*
+   * Anything played lands in the library. The rules for what that means —
+   * which record it belongs to, whether it is a new capture, and which old
+   * captures age out — live in `planPlay`, so this only has to write.
+   *
+   * Storage failures are swallowed on purpose. A private-browsing window that
+   * cannot save is still a browser somebody is listening in, and the session
+   * has already started by the time this runs.
+   */
+  const recordPlay = useCallback<LibraryContextValue['recordPlay']>(
+    async (play) => {
+      const plan = planPlay(loops, play)
+      if (!plan) return null
+      setLoops((current) =>
+        sortLibrary([
+          plan.save,
+          ...current.filter(
+            (loop) => loop.id !== plan.save.id && !plan.drop.includes(loop.id),
+          ),
+        ]),
+      )
+      try {
+        await storage.putLoop(plan.save)
+        await Promise.all(plan.drop.map((id) => storage.deleteLoop(id)))
+      } catch {
+        // The library in memory is still right for this session.
+      }
+      return plan.save
     },
     [loops],
   )
+
+  const keepLoop = useCallback(
+    async (id: string) => {
+      const source = loops.find((loop) => loop.id === id)
+      if (!source || source.origin === 'kept') return
+      const next: SavedLoop = { ...source, origin: 'kept', updatedAt: Date.now() }
+      await storage.putLoop(next)
+      setLoops((current) =>
+        sortLibrary(current.map((loop) => (loop.id === id ? next : loop))),
+      )
+    },
+    [loops],
+  )
+
+  const clearPlayed = useCallback(async () => {
+    const doomed = loops.filter((loop) => loop.origin === 'played')
+    if (doomed.length === 0) return
+    setLoops((current) => current.filter((loop) => loop.origin !== 'played'))
+    await Promise.all(doomed.map((loop) => storage.deleteLoop(loop.id)))
+  }, [loops])
 
   const recordListening = useCallback<LibraryContextValue['recordListening']>(
     (seconds, countSession, startedAt) => {
@@ -277,7 +347,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       saveLoop,
       removeLoop,
       duplicateLoop,
-      touchLoop,
+      recordPlay,
+      keepLoop,
+      clearPlayed,
       recordListening,
       createBackup,
       restoreBackup,
@@ -296,7 +368,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       saveLoop,
       removeLoop,
       duplicateLoop,
-      touchLoop,
+      recordPlay,
+      keepLoop,
+      clearPlayed,
       recordListening,
       createBackup,
       restoreBackup,

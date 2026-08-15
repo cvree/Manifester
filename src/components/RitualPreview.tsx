@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
 import { formatApproxDuration, estimateSpokenSeconds } from '../lib/format'
+import { autoTitle } from '../lib/loops'
 import type { BreathStyleId } from '../lib/breathing'
 import { useReducedMotion } from '../lib/motion'
 import { affirmationLines } from '../lib/summaries'
@@ -171,7 +172,7 @@ export function RitualPreview({
         <p className="type-label">Your ritual</p>
 
         <h2 className="mt-2 max-w-full truncate text-center font-display text-[1.4rem] leading-tight text-ink">
-          {title.trim() || 'Untitled loop'}
+          {title.trim() || autoTitle(text)}
         </h2>
 
         <div className="my-6">
