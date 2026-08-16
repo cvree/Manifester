@@ -15,8 +15,9 @@
  * already going wrong.
  */
 
+import { applyDeviceVoice } from '../deviceVoice'
 import { isSpeechSupported } from '../speech'
-import { pickBestVoice, type RankedVoice } from '../voiceRanking'
+import type { RankedVoice } from '../voiceRanking'
 import type { SpeakOutcome } from './types'
 
 /** Chrome stops speaking after ~15 seconds unless the queue is nudged. */
@@ -33,6 +34,16 @@ export interface FallbackOptions {
   style: 'feminine' | 'masculine'
   /** An exact device voice, when the person has chosen one. */
   voiceURI?: string | null
+  /**
+   * The language of the words, as a BCP-47 tag.
+   *
+   * Passed down rather than inferred, and never omitted for English content.
+   * An utterance with no `lang` is resolved by the engine against the page or
+   * the platform's own locale, which is how English affirmations were being
+   * read aloud by a Chinese voice on a phone whose menus are in Chinese. See
+   * `voiceLanguage.ts`.
+   */
+  lang?: string | null
   rate: number
   pitch: number
   volume: number
@@ -78,16 +89,11 @@ export class FallbackVoice {
     const synth = window.speechSynthesis
     const utterance = new SpeechSynthesisUtterance(text)
 
-    const chosen =
-      (options.voiceURI
-        ? this.raw.find((voice) => voice.voiceURI === options.voiceURI)
-        : undefined) ??
-      this.rawFor(pickBestVoice(this.voices, options.style)?.voiceURI ?? null)
-
-    if (chosen) {
-      utterance.voice = chosen
-      utterance.lang = chosen.lang
-    }
+    applyDeviceVoice(utterance, this.raw, this.voices, {
+      voiceURI: options.voiceURI,
+      style: options.style,
+      lang: options.lang,
+    })
     utterance.rate = clamp(options.rate, 0.1, 4)
     utterance.pitch = clamp(options.pitch, 0, 2)
     utterance.volume = clamp(options.volume, 0, 1)
@@ -145,11 +151,6 @@ export class FallbackVoice {
   }
 
   /* ── internals ── */
-
-  private rawFor(voiceURI: string | null): SpeechSynthesisVoice | undefined {
-    if (!voiceURI) return undefined
-    return this.raw.find((voice) => voice.voiceURI === voiceURI)
-  }
 
   private cancel(): void {
     if (!this.supported) return

@@ -22,6 +22,7 @@ import {
   normaliseBrainwave,
   type BrainwavePresetId,
 } from './brainwaveAudio'
+import { effectiveLevel, primarySourceId } from './soundMixer'
 import type { LoopSettings } from './types'
 import * as storage from './storage'
 
@@ -142,15 +143,15 @@ async function renderAmbienceBed(
   settings: LoopSettings,
 ): Promise<Float32Array<ArrayBuffer>> {
   const { sound } = settings
-  if (sound.mode === 'off') return new Float32Array(0)
 
   const ids =
-    sound.mode === 'playlist'
-      ? sound.playlist
-      : sound.trackId
-        ? [sound.trackId]
-        : []
-  if (ids.length === 0) return new Float32Array(0)
+    sound.mode === 'off'
+      ? []
+      : sound.mode === 'playlist'
+        ? sound.playlist
+        : sound.trackId
+          ? [sound.trackId]
+          : []
 
   const segments: Float32Array<ArrayBuffer>[] = []
 
@@ -163,7 +164,7 @@ async function renderAmbienceBed(
         rainCharacter: sound.rainCharacter,
       })
       const rendered = await ctx.startRendering()
-      segments.push(toMono(rendered))
+      segments.push(scaled(toMono(rendered), effectiveLevel(sound, id)))
       continue
     }
 
@@ -171,16 +172,84 @@ async function renderAmbienceBed(
       const stored = await storage.getCustomTrack(id)
       if (!stored) continue
       const decoded = await decodeTrack(stored.blob)
-      if (decoded) segments.push(decoded)
+      if (decoded) segments.push(scaled(decoded, effectiveLevel(sound, id)))
     } catch {
       /* A track that will not decode is skipped rather than failing the export. */
     }
   }
 
+  /*
+   * A playlist plays end to end; the stacked layers play *at the same time*.
+   *
+   * So they are two different pieces of arithmetic, and the export has to do
+   * both — otherwise a mix somebody built in the mixer downloads as whatever
+   * one sound happened to be in the main slot, which is not the thing they
+   * were listening to.
+   */
+  const sequence = concatenate(segments)
+  const stacked = await renderLayerStack(sound, sequence.length)
+
+  if (sequence.length === 0) return stacked
+  if (stacked.length === 0) return sequence
+
+  const bed = new Float32Array(sequence.length)
+  for (let i = 0; i < bed.length; i += 1) {
+    // The layers loop under the sequence, exactly as they do live: a stacked
+    // ambience never ends, it is simply always there.
+    bed[i] = sequence[i] + stacked[i % stacked.length]
+  }
+  return bed
+}
+
+/** Every stacked layer, summed, at its own level. */
+async function renderLayerStack(
+  sound: LoopSettings['sound'],
+  matchLength: number,
+): Promise<Float32Array<ArrayBuffer>> {
+  const primary = primarySourceId(sound)
+  const ids = sound.layers.filter((id) => id !== primary)
+  if (ids.length === 0) return new Float32Array(0)
+
+  const length = matchLength > 0 ? matchLength : BED_SECONDS * EXPORT_SAMPLE_RATE
+  const stack = new Float32Array(length)
+
+  for (const id of ids) {
+    const preset = findAmbientPreset(id)
+    if (!preset) continue
+    const level = effectiveLevel(sound, id)
+    if (level <= 0) continue
+
+    const ctx = offlineContext(BED_SECONDS)
+    preset.build(ctx, ctx.destination, {
+      offlineSeconds: BED_SECONDS,
+      rainCharacter: sound.rainCharacter,
+    })
+    const rendered = toMono(await ctx.startRendering())
+    if (rendered.length === 0) continue
+    for (let i = 0; i < length; i += 1) {
+      stack[i] += rendered[i % rendered.length] * level
+    }
+  }
+
+  return stack
+}
+
+function scaled(
+  samples: Float32Array<ArrayBuffer>,
+  level: number,
+): Float32Array<ArrayBuffer> {
+  if (level === 1) return samples
+  const out = new Float32Array(samples.length)
+  for (let i = 0; i < samples.length; i += 1) out[i] = samples[i] * level
+  return out
+}
+
+function concatenate(
+  segments: Float32Array<ArrayBuffer>[],
+): Float32Array<ArrayBuffer> {
   if (segments.length === 0) return new Float32Array(0)
   if (segments.length === 1) return segments[0]
 
-  // A playlist becomes one long bed, played end to end and then looped.
   const total = segments.reduce((sum, segment) => sum + segment.length, 0)
   const bed = new Float32Array(total)
   let offset = 0

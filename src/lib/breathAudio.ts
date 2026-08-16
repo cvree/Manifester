@@ -157,6 +157,23 @@ export function breathContext(): AudioContext | null {
   return sharedContext
 }
 
+/**
+ * Open (or wake) the context that cues run on.
+ *
+ * Shared with the breath deliberately. A page wants as few `AudioContext`s as
+ * it can manage — on iOS each one is another thing that can be interrupted,
+ * suspended and left silently not running — and this app already justifies
+ * exactly two: the session bus, which a pause is allowed to freeze, and this
+ * one, which must keep answering while a session is paused. Interface cues
+ * belong on the second for precisely that reason: a tap on Resume has to make
+ * a sound *before* the thing it resumes does.
+ *
+ * See `feedback.ts`, which is the only other caller.
+ */
+export function openCueContext(): AudioContext | null {
+  return context()
+}
+
 const noiseCache = new WeakMap<AudioContext, AudioBuffer>()
 
 /**

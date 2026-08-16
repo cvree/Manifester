@@ -18,6 +18,37 @@ export interface SoundConfig {
   repeat: RepeatMode
   /** Density and brightness of Rain on Window, when that sound is chosen. */
   rainCharacter: RainCharacter
+  /**
+   * Generated ambiences playing *underneath* the main choice, all at once.
+   *
+   * The background used to be one sound at a time, and that is still what
+   * `mode`, `trackId` and `playlist` describe. These are extra: rain under a
+   * fire, a tide under a pad — the combinations nobody could reach before
+   * because the whole layer shared a single level and a single slot.
+   *
+   * Built-in soundscape ids only. An imported file plays through the one
+   * `HTMLAudioElement` this app owns, so files cannot be stacked; generated
+   * ambiences are just audio nodes and can be.
+   */
+  layers: string[]
+  /**
+   * Each source's own level, by track id, 0–1.
+   *
+   * A trim under the master ambience volume rather than a replacement for it,
+   * which is what makes the master a convenience and not a competitor: turning
+   * everything down still turns everything down, and the balance between the
+   * layers is preserved while it happens. Missing means 1 — a sound nobody has
+   * touched plays at full level, so adding a layer is never silently silent.
+   */
+  levels: Record<string, number>
+  /**
+   * Sources currently muted, by track id.
+   *
+   * Separate from a level of zero on purpose: mute has to be reversible
+   * without asking somebody to find the level they had before. See
+   * `soundMixer.ts`.
+   */
+  muted: string[]
 }
 
 /** A background sound the user can pick. */
@@ -125,6 +156,9 @@ export const DEFAULT_SOUND: SoundConfig = {
   playlist: [],
   repeat: 'all',
   rainCharacter: 'steady',
+  layers: [],
+  levels: {},
+  muted: [],
 }
 
 export const DEFAULT_SETTINGS: LoopSettings = {

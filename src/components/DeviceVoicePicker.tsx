@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
 import { auditionDeviceVoice, stopDeviceAudition } from '../lib/speech'
+import { contentLanguage, voiceSpeaks } from '../lib/voiceLanguage'
 import type { RankedVoice } from '../lib/voiceRanking'
 import { Button } from './Button'
 import { CheckIcon, PlayIcon } from './Icons'
@@ -70,6 +71,17 @@ interface DeviceVoicePickerProps {
   onPreview?: (voice: RankedVoice) => void
   /** Which end of the list to lead with. */
   style: 'feminine' | 'masculine'
+  /**
+   * The speaking settings the session will actually use.
+   *
+   * Passed in so an audition is a demonstration rather than an approximation:
+   * a voice that sounds right at 0.95× and wrong at the 0.7× somebody has
+   * chosen is a voice they will pick and then regret. Optional, because the
+   * onboarding screens ask this question before any of them have been set.
+   */
+  rate?: number
+  pitch?: number
+  volume?: number
   className?: string
 }
 
@@ -90,6 +102,9 @@ export function DeviceVoicePicker({
   onSelect,
   onPreview,
   style,
+  rate = 0.95,
+  pitch = 1,
+  volume = 1,
   className,
 }: DeviceVoicePickerProps) {
   const [all, setAll] = useState(false)
@@ -100,23 +115,47 @@ export function DeviceVoicePicker({
 
   const audition = (voice: RankedVoice) => {
     setHeard(voice.voiceURI)
-    auditionDeviceVoice(voice.voiceURI)
+    auditionDeviceVoice(voice.voiceURI, {
+      style,
+      rate,
+      pitch,
+      volume,
+      // The voice's own language, so a voice somebody has deliberately gone
+      // looking for is demonstrated as itself rather than forced into English.
+      lang: voice.lang,
+    })
     onPreview?.(voice)
   }
 
   /*
-   * The ones that match the style they chose first, then everything else.
+   * Voices that can read these words, then the style they chose, then
+   * everything else.
    *
-   * Not filtered to the style: a device may have exactly one good voice and it
-   * may be the other one, and hiding it to keep a category tidy would be
-   * choosing consistency over the person actually enjoying the next twenty
-   * minutes.
+   * The language sort is the load-bearing one, and it is new. This list used to
+   * be ranked by `navigator.language`, so on a phone whose interface is not
+   * English the first four rows — the only four shown before "Show every
+   * voice" — were all voices that cannot pronounce an English affirmation.
+   * Somebody would tap one, hear their words read as though they were Chinese,
+   * and have no way to know the English voice they had installed was three
+   * screens down.
+   *
+   * Within the language it is still ordered rather than filtered by style: a
+   * device may have exactly one good voice and it may be the other one, and
+   * hiding it to keep a category tidy would be choosing consistency over the
+   * person actually enjoying the next twenty minutes.
    */
   const ordered = useMemo(() => {
-    const matching = voices.filter((voice) => voice.style === style)
-    const rest = voices.filter((voice) => voice.style !== style)
-    return [...matching, ...rest]
+    const language = contentLanguage()
+    const rank = (voice: RankedVoice) =>
+      (voiceSpeaks(voice.lang, language) ? 0 : 2) + (voice.style === style ? 0 : 1)
+    return [...voices].sort((a, b) => rank(a) - rank(b))
   }, [voices, style])
+
+  /** True when the device has nothing at all that can read English. */
+  const noneInLanguage = useMemo(
+    () => voices.length > 0 && !voices.some((voice) => voiceSpeaks(voice.lang, contentLanguage())),
+    [voices],
+  )
 
   const shown = all ? ordered : ordered.slice(0, SHORTLIST)
 
@@ -140,6 +179,21 @@ export function DeviceVoicePicker({
 
   return (
     <div className={className}>
+      {/*
+        Said out loud rather than left to be discovered by ear. A device with
+        no English voice installed will read English words in whatever it does
+        have, and the result is unintelligible in a way that sounds like the
+        app is broken — so the app says which it is, and where the fix lives.
+      */}
+      {noneInLanguage && (
+        <p className="type-meta mb-2.5">
+          None of this device&rsquo;s voices speak English, so these will
+          mispronounce your words. Adding an English voice in your device&rsquo;s
+          accessibility or language settings fixes it — or use Ivy and Fen, who
+          are part of the app.
+        </p>
+      )}
+
       <ul className="space-y-1.5">
         {shown.map((voice) => {
           const chosen = voice.voiceURI === selected
@@ -203,6 +257,12 @@ export function DeviceVoicePicker({
                       )}
                     >
                       {voice.tierShort}
+                      {/*
+                        Only when it is not English. A row that says "Neural"
+                        and reads your affirmation as though it were Mandarin
+                        has withheld the one fact you needed.
+                      */}
+                      {!voiceSpeaks(voice.lang, contentLanguage()) && ` · ${voice.lang}`}
                       {heard === voice.voiceURI && ' · playing'}
                     </span>
                   </span>

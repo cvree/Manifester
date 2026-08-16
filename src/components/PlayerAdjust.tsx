@@ -1,6 +1,7 @@
 import { MAX_MUSIC_VOLUME } from '../lib/audioBus'
 import { cue } from '../lib/feedback'
 import { MAX_VOICE_VOLUME } from '../lib/speech'
+import { describeMix, mixerLayers } from '../lib/soundMixer'
 import {
   brainwaveSummary,
   breathingSummary,
@@ -12,7 +13,14 @@ import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
 import { Button } from './Button'
 import type { PanelKey } from './CustomizePanel'
-import { BreathIcon, MuteIcon, PulseIcon, TuneIcon, WaveIcon } from './Icons'
+import {
+  BreathIcon,
+  MixerIcon,
+  MuteIcon,
+  PulseIcon,
+  TuneIcon,
+  WaveIcon,
+} from './Icons'
 import { SettingRow } from './SettingRow'
 import { Sheet } from './Sheet'
 import { Slider } from './Slider'
@@ -30,6 +38,8 @@ interface PlayerAdjustProps {
    */
   onOpenPanel: (key: PanelKey) => void
   onEditWords: () => void
+  /** The mixer is not a settings panel; it has its own sheet. */
+  onOpenMixer: () => void
 }
 
 /**
@@ -60,6 +70,7 @@ export function PlayerAdjust({
   onClose,
   onOpenPanel,
   onEditWords,
+  onOpenMixer,
 }: PlayerAdjustProps) {
   const {
     draft,
@@ -79,6 +90,10 @@ export function PlayerAdjust({
   const { settings } = draft
   const idle = session.status === 'idle'
   const soundOn = settings.sound.mode !== 'off'
+  // What is actually in the bed, named. A row saying "Mixer · 2 layers" tells
+  // you a count; one saying "Rain on Window · Fireplace Glow" tells you what
+  // you are listening to.
+  const mixSummary = describeMix(mixerLayers(settings.sound, allTracks))
 
   const go = (key: PanelKey) => {
     cue('tap')
@@ -118,7 +133,8 @@ export function PlayerAdjust({
           />
           {!idle && (
             <p className="type-meta -mt-1">
-              Voice level takes effect on the next line. Sound changes at once.
+              Both are live. Every level here changes the sound you are
+              listening to as you drag it.
             </p>
           )}
         </div>
@@ -145,6 +161,22 @@ export function PlayerAdjust({
           is legible without opening anything.
         */}
         <div className="surface-panel overflow-hidden shadow-none">
+          {/*
+            First in the list, because it is the one people open mid-session.
+            The stage's own corner is still the shortest way in — this is here
+            so somebody already in Adjust does not have to close it to find the
+            mixer. See `AmbienceMixer`.
+          */}
+          <SettingRow
+            icon={<MixerIcon />}
+            title="Mixer"
+            summary={mixSummary}
+            onClick={() => {
+              cue('tap')
+              onOpenMixer()
+            }}
+            accent={soundOn || settings.brainwave.enabled}
+          />
           <SettingRow
             icon={soundOn ? <WaveIcon /> : <MuteIcon />}
             title="Background sound"
@@ -175,7 +207,7 @@ export function PlayerAdjust({
           />
           <SettingRow
             icon={<TuneIcon />}
-            title="Haptics"
+            title="Feedback"
             summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
             onClick={() => go('feel')}
           />

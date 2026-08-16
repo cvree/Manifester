@@ -4664,7 +4664,8 @@ html:not(.dark) .breath-aurora__veil {
  */
 .stage__play,
 .stage__toggle,
-.stage__sound {
+.stage__sound,
+.stage__mixer {
   transition:
     width var(--stage-travel) var(--ease-breath),
     height var(--stage-travel) var(--ease-breath),
@@ -4700,6 +4701,22 @@ html:not(.dark) .breath-aurora__veil {
   position: absolute;
   top: 0.75rem;
   left: 0.75rem;
+  z-index: 6;
+}
+
+/*
+ * The mixer, tucked in beside the sound.
+ *
+ * Deliberately in the corner rather than in Adjust. Balancing what you are
+ * hearing is the thing people reach for *while* they are listening, and a
+ * control for that which lives two sheets deep is a control nobody finds. It
+ * shares the sound button's clock and travel so the pair reads as one corner
+ * rather than as a button that turned up next to another one.
+ */
+.stage__mixer {
+  position: absolute;
+  top: 0.75rem;
+  left: 3.9rem;
   z-index: 6;
 }
 
@@ -4774,6 +4791,11 @@ html:not(.dark) .breath-aurora__veil {
   left: calc(env(safe-area-inset-left) + 0.9rem);
 }
 
+.stage--immersive .stage__mixer {
+  top: calc(env(safe-area-inset-top) + 0.9rem);
+  left: calc(env(safe-area-inset-left) + 4.05rem);
+}
+
 @media (min-width: 640px) {
   .stage--immersive .stage__toggle {
     top: 1.1rem;
@@ -4783,6 +4805,11 @@ html:not(.dark) .breath-aurora__veil {
   .stage--immersive .stage__sound {
     top: 1.1rem;
     left: 1.1rem;
+  }
+
+  .stage--immersive .stage__mixer {
+    top: 1.1rem;
+    left: 4.25rem;
   }
 }
 
@@ -5043,6 +5070,38 @@ html:not(.dark) .breath-aurora__veil {
   box-shadow:
     0 2px 8px rgb(58 50 44 / 0.22),
     0 0 0 7px color-mix(in oklab, var(--rose) 18%, transparent);
+}
+
+/*
+ * The mixer's faders.
+ *
+ * Bigger everywhere: a 52-pixel row, a 12-pixel track and a 30-pixel thumb.
+ * These are dragged one-handed, in the dark, ten minutes into a session, by
+ * somebody who does not want to look at the screen for longer than a second —
+ * so the target is larger than the 44-pixel minimum rather than exactly at it,
+ * and the track is thick enough to read the fill from the corner of an eye.
+ */
+.range-input--lg {
+  height: 52px;
+}
+
+.range-input--lg::-webkit-slider-runnable-track {
+  height: 12px;
+}
+
+.range-input--lg::-moz-range-track {
+  height: 12px;
+}
+
+.range-input--lg::-webkit-slider-thumb {
+  width: 30px;
+  height: 30px;
+  margin-top: -10px;
+}
+
+.range-input--lg::-moz-range-thumb {
+  width: 30px;
+  height: 30px;
 }
 
 /* Hide scrollbar on horizontal strips without losing the scroll. */

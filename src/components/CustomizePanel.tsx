@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { setStoredCredentials, useCredentials } from '../lib/ai/useCredentials'
-import { cue, hapticsSupported } from '../lib/feedback'
+import { cue, hapticsSupported, primeFeedback, soundSupported } from '../lib/feedback'
 import {
   brainwaveSummary,
   breathingSummary,
@@ -79,8 +79,8 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
     description: 'Render this loop as a file you can play anywhere.',
   },
   feel: {
-    title: 'Haptics',
-    description: 'Optional touch feedback on supported devices.',
+    title: 'Feedback',
+    description: 'How the interface answers when you touch it.',
   },
   ai: {
     title: 'AI writing help',
@@ -198,6 +198,24 @@ export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
 
       <Sheet open={open === 'feel'} onClose={close} {...TITLES.feel}>
         <div className="space-y-5">
+          <Toggle
+            label="Interface sound"
+            description={
+              soundSupported()
+                ? 'Soft, low cues under the words — a touch, a confirmation, and a chime when a loop completes. They always sit beneath the voice.'
+                : 'Not available in this browser.'
+            }
+            checked={preferences.uiSounds && soundSupported()}
+            disabled={!soundSupported()}
+            onChange={(uiSounds) => {
+              updatePreferences({ uiSounds })
+              // Answered by hearing it, which is the only useful answer.
+              if (uiSounds) {
+                primeFeedback()
+                cue('select')
+              }
+            }}
+          />
           <Toggle
             label="Haptics"
             description={
@@ -332,7 +350,7 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
           />
           <SettingRow
             icon={<TuneIcon />}
-            title="Haptics"
+            title="Feedback"
             summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
             onClick={() => openPanel('feel')}
           />

@@ -9,6 +9,8 @@
  * voice's private machinery — see `tts/` for the rest.
  */
 
+import { applyDeviceVoice, langForText } from './deviceVoice'
+
 /** Longer chunks are more natural; shorter chunks are more reliable. */
 const MAX_CHUNK_CHARS = 180
 
@@ -265,10 +267,31 @@ export function loadVoices(timeoutMs = 3000): Promise<SpeechSynthesisVoice[]> {
  * later is a picker people stop tapping, so this goes straight at
  * `speechSynthesis` rather than through the resolver, the cache and the audio
  * graph that a real line is worth putting through.
+ *
+ * What it does *not* do any more is resolve the voice its own way. Speed,
+ * pitch, volume, the chosen voice and — the one that was actually broken — the
+ * language all come from the same place a real line's do, so what you hear when
+ * you press a voice is what you will hear when you press play.
  */
+export interface AuditionOptions {
+  text?: string
+  /** Which end of the list to fall back to when no exact voice is given. */
+  style?: 'feminine' | 'masculine'
+  lang?: string | null
+  rate?: number
+  pitch?: number
+  volume?: number
+}
+
+/** What a voice says when you touch it. Short, and about the thing it is for. */
+export const DEVICE_AUDITION_LINE = 'This is how your own words will sound.'
+
+/** Close to the app's own default speaking rate, which is 0.9. */
+const DEFAULT_AUDITION_RATE = 0.95
+
 export function auditionDeviceVoice(
   voiceURI: string | null,
-  text = 'This is how your own words will sound.',
+  options: AuditionOptions = {},
 ): void {
   if (!isSpeechSupported()) return
   try {
@@ -277,19 +300,42 @@ export function auditionDeviceVoice(
     // asking any more.
     synth.cancel()
 
+    const text = options.text?.trim() || DEVICE_AUDITION_LINE
     const utterance = new SpeechSynthesisUtterance(text)
-    const match = synth
-      .getVoices()
-      .find((voice) => voice.voiceURI === voiceURI)
-    if (match) {
-      utterance.voice = match
-      utterance.lang = match.lang
-    }
-    utterance.rate = 0.95
+
+    /*
+     * The same resolver the session uses, not a second one.
+     *
+     * An audition that resolves its voice differently from real playback is
+     * worse than no audition: it is a demonstration of a voice you will not
+     * get. In particular this is where `lang` gets set — for a device whose
+     * interface is not English, an utterance with no `lang` is read in the
+     * interface language, so the picker used to sound wrong in exactly the way
+     * the session did. See `deviceVoice.ts`.
+     */
+    applyDeviceVoice(utterance, synth.getVoices(), [], {
+      voiceURI,
+      style: options.style ?? 'feminine',
+      lang: options.lang ?? langForText(text),
+    })
+
+    utterance.rate = clampRate(options.rate ?? DEFAULT_AUDITION_RATE)
+    utterance.pitch = clampPitch(options.pitch ?? 1)
+    utterance.volume = clampVoiceVolume(options.volume ?? 1)
     synth.speak(utterance)
   } catch {
     /* A browser that will not speak is not an error worth surfacing here. */
   }
+}
+
+function clampRate(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_AUDITION_RATE
+  return Math.min(4, Math.max(0.1, value))
+}
+
+function clampPitch(value: number): number {
+  if (!Number.isFinite(value)) return 1
+  return Math.min(2, Math.max(0, value))
 }
 
 /** Stop any audition started by `auditionDeviceVoice`. */
