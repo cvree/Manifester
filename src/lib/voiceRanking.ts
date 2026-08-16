@@ -25,15 +25,33 @@ export interface RankedVoice {
   tier: VoiceTier
   /** Higher is better. Only meaningful for comparison within one device. */
   score: number
-  /** Short, honest description shown in the picker. */
+  /** Short, honest description shown where there is room to explain. */
   tierLabel: string
+  /**
+   * One word, for a list somebody is choosing from by ear.
+   *
+   * "Basic — robotic, worth avoiding" is a true sentence and the wrong one to
+   * put beside a voice somebody is about to press. Once the list *speaks* when
+   * you touch it, the judgement is theirs to make in a second and the label's
+   * only job is to say which shelf a voice came off. Editorialising over the
+   * top of something the person can hear is noise, and on a device where
+   * everything is Basic it is three rows of discouragement.
+   */
+  tierShort: string
 }
 
 const TIER_LABEL: Record<VoiceTier, string> = {
   neural: 'Neural — the best this device has',
   enhanced: 'Enhanced quality',
   standard: 'Standard quality',
-  basic: 'Basic — robotic, worth avoiding',
+  basic: 'Basic — an older synthesiser',
+}
+
+const TIER_SHORT: Record<VoiceTier, string> = {
+  neural: 'Neural',
+  enhanced: 'Enhanced',
+  standard: 'Standard',
+  basic: 'Basic',
 }
 
 /* ── Name tables ─────────────────────────────────────────────────────────── */
@@ -161,6 +179,7 @@ export function rankVoice(
     tier,
     score,
     tierLabel: TIER_LABEL[tier],
+    tierShort: TIER_SHORT[tier],
   }
 }
 

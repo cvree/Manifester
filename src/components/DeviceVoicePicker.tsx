@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
+import { auditionDeviceVoice, stopDeviceAudition } from '../lib/speech'
 import type { RankedVoice } from '../lib/voiceRanking'
 import { Button } from './Button'
 import { CheckIcon, PlayIcon } from './Icons'
@@ -21,11 +22,21 @@ import { CheckIcon, PlayIcon } from './Icons'
  * voice installed is genuinely pleasant, and somebody who picks it themselves
  * knows exactly what they are listening to.
  *
- * The tiers are the ranking module's, shown rather than hidden. "Basic —
- * robotic, worth avoiding" is not a nice thing to put next to somebody's only
- * option, and it is still the right thing to put there: it is true, it
- * explains what they are hearing, and it is the reason the panel underneath it
- * offers to show them how to install a better one.
+ * ── It speaks when you touch it ─────────────────────────────────────────────
+ *
+ * Every voice in this list speaks the moment it is chosen, in the voice
+ * itself, saying what it is for: *this is how your own words will sound*. That
+ * is not a flourish, it is the entire point of the control. A list of
+ * operating-system voice names — "Microsoft David", "Microsoft Mark" — is
+ * unreadable to anybody who has not already heard them, so a picker that stays
+ * silent until a separate Play button is found is asking people to choose
+ * between three strings. Choosing by ear takes a second and the answer is
+ * theirs.
+ *
+ * It also changes what the labels should say. The tier used to read "Basic —
+ * robotic, worth avoiding", which is true, and which on a machine where every
+ * voice is Basic is three rows telling somebody their only options are bad. It
+ * is one word now. The person can hear it; they do not need to be told.
  */
 
 interface DeviceVoicePickerProps {
@@ -34,7 +45,14 @@ interface DeviceVoicePickerProps {
   /** The `voiceURI` currently chosen, if any. */
   selected: string | null
   onSelect: (voice: RankedVoice) => void
-  /** Speaks a line in the voice, so the choice can be heard before it is made. */
+  /**
+   * Extra work to do when a voice is auditioned.
+   *
+   * The audition itself is not this: the picker speaks by itself, because a
+   * silent list of system voice names is not a choice anybody can make. This
+   * is for a parent that wants to *also* do something — put the voice into a
+   * running session, say.
+   */
   onPreview?: (voice: RankedVoice) => void
   /** Which end of the list to lead with. */
   style: 'feminine' | 'masculine'
@@ -61,6 +79,16 @@ export function DeviceVoicePicker({
   className,
 }: DeviceVoicePickerProps) {
   const [all, setAll] = useState(false)
+  const [heard, setHeard] = useState<string | null>(null)
+
+  // A voice must never carry on talking over the screen that replaces this one.
+  useEffect(() => () => stopDeviceAudition(), [])
+
+  const audition = (voice: RankedVoice) => {
+    setHeard(voice.voiceURI)
+    auditionDeviceVoice(voice.voiceURI)
+    onPreview?.(voice)
+  }
 
   /*
    * The ones that match the style they chose first, then everything else.
@@ -116,6 +144,8 @@ export function DeviceVoicePicker({
                   onClick={() => {
                     cue('select')
                     onSelect(voice)
+                    // Chosen and heard in one press. See the note above.
+                    audition(voice)
                   }}
                   aria-pressed={chosen}
                   className="interactive flex min-w-0 grow items-center gap-2.5 rounded-[0.9rem] text-left"
@@ -141,24 +171,28 @@ export function DeviceVoicePicker({
                         TIER_TONE[voice.tier],
                       )}
                     >
-                      {voice.tierLabel}
+                      {voice.tierShort}
+                      {heard === voice.voiceURI && ' · playing'}
                     </span>
                   </span>
                 </button>
 
-                {onPreview && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      cue('tap')
-                      onPreview(voice)
-                    }}
-                    aria-label={`Hear ${voice.name}`}
-                    className="interactive flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] text-[0.8rem] text-ink-muted hover:text-ink"
-                  >
-                    <PlayIcon />
-                  </button>
-                )}
+                {/*
+                  Kept even though selecting already speaks, because hearing a
+                  voice a second time without re-committing to it is a
+                  different thing to want.
+                */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    cue('tap')
+                    audition(voice)
+                  }}
+                  aria-label={`Hear ${voice.name} again`}
+                  className="interactive flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] text-[0.8rem] text-ink-muted hover:text-ink"
+                >
+                  <PlayIcon />
+                </button>
               </div>
             </li>
           )

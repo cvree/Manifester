@@ -55,6 +55,49 @@ export type StudioRuntime =
  */
 export const RUNTIME_ORDER: StudioRuntime[] = ['bundled', 'cdn']
 
+/** Which processor to run the model on. */
+export type StudioDevice = 'webgpu' | 'wasm'
+
+export interface Attempt {
+  runtime: StudioRuntime
+  device: StudioDevice
+}
+
+/**
+ * Every way this app is willing to try to bring the voice up, in order.
+ *
+ * ── Why this is a list and not a loop inside the worker ─────────────────────
+ *
+ * Because ONNX Runtime initialises its WebAssembly exactly once per thread and
+ * refuses for ever afterwards — a second attempt in a worker where the first
+ * one failed throws an error about the first one. The old code looped WebGPU
+ * then WASM inside a single worker, which meant the CPU fallback was
+ * guaranteed to fail *precisely when it was needed*, and every such device
+ * ended up reading "this device could not start the voice engine".
+ *
+ * So each entry here gets a worker of its own, torn down before the next one
+ * starts. Nothing is re-downloaded between them: the weights are in the
+ * browser's cache after the first attempt, so a second or third costs a few
+ * seconds rather than another eighty-six megabytes.
+ *
+ * ── Why WebGPU is tried at all ──────────────────────────────────────────────
+ *
+ * When it works it is several times faster, and on a phone that is the
+ * difference between a line arriving before somebody gives up on it and after.
+ * When it does not work it fails at the first inference rather than silently,
+ * because the worker speaks one word before reporting ready — and the CPU
+ * attempt behind it is now a real fallback rather than a broken one.
+ */
+export function attemptsFor(webGpu: boolean): Attempt[] {
+  const attempts: Attempt[] = []
+  if (webGpu) attempts.push({ runtime: 'bundled', device: 'webgpu' })
+  attempts.push({ runtime: 'bundled', device: 'wasm' })
+  // And only then somebody else's server, for a device the bundled runtime
+  // could not satisfy at all.
+  attempts.push({ runtime: 'cdn', device: 'wasm' })
+  return attempts
+}
+
 /**
  * The version of `@huggingface/transformers` whose `dist/` carries a matching
  * ONNX Runtime build.

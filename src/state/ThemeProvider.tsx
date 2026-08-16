@@ -8,10 +8,12 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  DEFAULT_CHROMA,
   DEFAULT_HUE,
   DEFAULT_NIGHT_LIGHT,
   HUE_SWEEP_MS,
   nightLightFactor,
+  normaliseChroma,
   normaliseHue,
   normaliseNightLight,
 } from '../lib/hue'
@@ -26,6 +28,18 @@ interface ThemeContextValue {
   /** Degrees added to every hue in the palette. See `lib/hue.ts`. */
   hue: number
   setHue: (hue: number) => void
+  /**
+   * How saturated the palette is, as a multiplier on every chroma.
+   *
+   * The second half of the palette control, and the half that makes it feel
+   * like a real choice: hue alone rotates between fourteen equally-coloured
+   * rooms, while chroma is the difference between a graphite instrument and
+   * something lit from inside.
+   */
+  chroma: number
+  setChroma: (chroma: number) => void
+  /** Both at once, so a preset lands as a single animated change. */
+  setPalette: (palette: { hue: number; chroma: number }) => void
   /**
    * How much blue is taken out of the light, 0–100. Independent of day/night:
    * one is which palette is on screen, the other is the temperature of the
@@ -49,6 +63,11 @@ function initialTheme(): Theme {
 function initialHue(): number {
   const stored = readLocal('hue')
   return stored == null ? DEFAULT_HUE : normaliseHue(stored)
+}
+
+function initialChroma(): number {
+  const stored = readLocal('chroma')
+  return stored == null ? DEFAULT_CHROMA : normaliseChroma(stored)
 }
 
 function initialNightLight(): number {
@@ -107,19 +126,21 @@ function toHex(channels: [number, number, number]): string {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(initialTheme)
   const [hue, setHueState] = useState<number>(initialHue)
+  const [chroma, setChromaState] = useState<number>(initialChroma)
   const [nightLight, setNightLightState] = useState<number>(initialNightLight)
 
   useEffect(() => {
     const root = document.documentElement
     root.classList.toggle('dark', theme === 'night')
     root.style.setProperty('--hue-shift', String(hue))
+    root.style.setProperty('--chroma-scale', String(chroma))
     /*
      * As a fraction, because that is what the stylesheet's tint multiplies by
      * — and as a `0`/`1` flag, because a full-screen blended layer is worth
      * not having on the page at all while it would be a no-op.
      */
     root.style.setProperty('--night-light', String(nightLight / 100))
-  }, [theme, hue, nightLight])
+  }, [theme, hue, chroma, nightLight])
 
   /*
    * Remembering it is a separate question from showing it, and it is on a
@@ -136,10 +157,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const id = window.setTimeout(() => {
       writeLocal('theme', theme)
       writeLocal('hue', String(hue))
+      writeLocal('chroma', String(chroma))
       writeLocal('night-light', String(nightLight))
     }, 200)
     return () => window.clearTimeout(id)
-  }, [theme, hue, nightLight])
+  }, [theme, hue, chroma, nightLight])
 
   /*
    * Keep the browser chrome in step with the app surface.
@@ -193,7 +215,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(soon)
       window.clearTimeout(settled)
     }
-  }, [theme, hue, nightLight])
+  }, [theme, hue, chroma, nightLight])
 
   const toggleTheme = useCallback(
     () => setTheme((current) => (current === 'day' ? 'night' : 'day')),
@@ -202,6 +224,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setHue = useCallback(
     (next: number) => setHueState(normaliseHue(next)),
+    [],
+  )
+
+  const setChroma = useCallback(
+    (next: number) => setChromaState(normaliseChroma(next)),
+    [],
+  )
+
+  const setPalette = useCallback(
+    (palette: { hue: number; chroma: number }) => {
+      setHueState(normaliseHue(palette.hue))
+      setChromaState(normaliseChroma(palette.chroma))
+    },
     [],
   )
 
@@ -217,10 +252,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setTheme,
       hue,
       setHue,
+      chroma,
+      setChroma,
+      setPalette,
       nightLight,
       setNightLight,
     }),
-    [theme, toggleTheme, hue, setHue, nightLight, setNightLight],
+    [
+      theme,
+      toggleTheme,
+      hue,
+      setHue,
+      chroma,
+      setChroma,
+      setPalette,
+      nightLight,
+      setNightLight,
+    ],
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

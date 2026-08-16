@@ -198,6 +198,61 @@ describe('installing Studio Voice', () => {
     expect(engine.getSnapshot().failure).toBe('runtime')
   })
 
+  /**
+   * The bug this whole attempt matrix exists for.
+   *
+   * The GPU and CPU attempts used to happen inside one worker. ONNX Runtime
+   * initialises its WebAssembly once per thread and refuses afterwards, so the
+   * CPU fallback threw an error about the GPU failure that sent it there —
+   * which meant every device whose GPU could not run this graph was told its
+   * device could not start the voice engine, with nothing behind the message.
+   */
+  it('falls back from the GPU to the CPU in a brand new worker', async () => {
+    vi.stubGlobal('navigator', { gpu: {} })
+    const built = build()
+    const installing = built.engine.install()
+
+    expect(built.fake.sent[0]).toMatchObject({ type: 'install', backend: 'webgpu' })
+    expect(built.created).toBe(1)
+
+    built.fake.reply({
+      type: 'failed',
+      reason: 'unsupported',
+      message: 'webgpu: Could not find an implementation for ConvTranspose',
+    })
+    await Promise.resolve()
+
+    // A *second* worker, not the one that just failed.
+    expect(built.created).toBe(2)
+    expect(built.fake.sent.at(-1)).toMatchObject({
+      type: 'install',
+      backend: 'wasm',
+      runtime: 'bundled',
+    })
+    expect(built.engine.getSnapshot()).toMatchObject({ state: 'installing' })
+
+    built.fake.reply({ type: 'ready', backend: 'wasm' })
+    expect(await installing).toBe(true)
+    expect(built.engine.getSnapshot().backend).toBe('wasm')
+  })
+
+  it('keeps a readable trail of what every attempt said', async () => {
+    vi.stubGlobal('navigator', { gpu: {} })
+    const { engine, fake } = build()
+    const installing = engine.install()
+
+    fake.reply({ type: 'failed', reason: 'unsupported', message: 'webgpu: no kernel' })
+    await Promise.resolve()
+    fake.reply({ type: 'ready', backend: 'wasm' })
+    await installing
+
+    const trail = engine.getSnapshot().trail
+    expect(trail).toHaveLength(2)
+    expect(trail[0]).toContain('bundled/webgpu')
+    expect(trail[0]).toContain('no kernel')
+    expect(trail[1]).toBe('bundled/wasm: ready')
+  })
+
   it('tries the other engine once before giving up, and remembers what worked', async () => {
     const { engine, fake } = build()
     const installing = engine.install()

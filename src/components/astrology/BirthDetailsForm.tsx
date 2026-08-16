@@ -1,13 +1,12 @@
-import { useId, useMemo, useState } from 'react'
+import { useId, useState } from 'react'
 import type { BirthDetails } from '../../lib/astrology/profile'
 import { isBirthUsable } from '../../lib/astrology/profile'
-import { searchPlaces, type Place } from '../../lib/astrology/places'
-import { cx } from '../../lib/cx'
+import type { Place } from '../../lib/astrology/places'
 import { cue } from '../../lib/feedback'
 import { Button } from '../Button'
 import { FieldLabel } from '../Card'
-import { CheckIcon, CloseIcon } from '../Icons'
 import { TextField } from '../TextArea'
+import { PlaceField } from './PlaceField'
 
 /**
  * Three questions, and one of them is allowed to be answered with "I don't
@@ -56,12 +55,6 @@ export function BirthDetailsForm({
   const [time, setTime] = useState(initial?.time ?? '')
   const [knowsTime, setKnowsTime] = useState(initial ? initial.time != null : true)
   const [place, setPlace] = useState<Place | null>(initial?.place ?? null)
-  const [query, setQuery] = useState(initial ? `${initial.place.name}` : '')
-
-  const matches = useMemo(
-    () => (place && query === place.name ? [] : searchPlaces(query)),
-    [query, place],
-  )
 
   const birth: BirthDetails | null = place
     ? { date, time: knowsTime && time ? time : null, place }
@@ -127,79 +120,7 @@ export function BirthDetailsForm({
 
       <div>
         <FieldLabel htmlFor={`${ids}-place`}>Place of birth</FieldLabel>
-
-        {place ? (
-          <div className="flex items-center gap-2 rounded-2xl border border-[var(--sage)] bg-[var(--sage-soft)] px-4 py-3">
-            <CheckIcon
-              aria-hidden="true"
-              className="shrink-0 text-[0.9rem] text-[var(--sage)]"
-            />
-            <span className="min-w-0 grow">
-              <span className="block truncate text-[0.98rem] text-ink">
-                {place.name}, {place.country}
-              </span>
-              <span className="block truncate text-[0.78rem] text-ink-faint">
-                {place.timeZone.replace(/_/g, ' ')}
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                cue('tap')
-                setPlace(null)
-                setQuery('')
-              }}
-              aria-label="Choose a different place"
-              className="interactive flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-ink"
-            >
-              <CloseIcon />
-            </button>
-          </div>
-        ) : (
-          <>
-            <TextField
-              id={`${ids}-place`}
-              value={query}
-              autoComplete="off"
-              placeholder="The nearest city — Lisbon, Osaka, Detroit…"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            {matches.length > 0 && (
-              <ul className="mt-1.5 space-y-1">
-                {matches.map((match) => (
-                  <li key={`${match.name}-${match.country}`}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        cue('select')
-                        setPlace(match)
-                        setQuery(match.name)
-                      }}
-                      className={cx(
-                        'interactive w-full rounded-[1rem] border border-[var(--border)] bg-[var(--surface-sunken)] px-3.5 py-2.5 text-left',
-                        'hover:border-[var(--border-strong)]',
-                      )}
-                    >
-                      <span className="block text-[0.94rem] text-ink">
-                        {match.name}
-                      </span>
-                      <span className="block text-[0.78rem] text-ink-faint">
-                        {match.country}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {query.length >= 2 && matches.length === 0 && (
-              <p className="type-meta mt-1.5">
-                Not on the list. The nearest large city in the same time zone is
-                close enough — the chart moves by a fraction of a degree over
-                that distance.
-              </p>
-            )}
-          </>
-        )}
+        <PlaceField id={`${ids}-place`} place={place} onChange={setPlace} />
       </div>
 
       <p className="type-meta">

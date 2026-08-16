@@ -282,6 +282,226 @@ const PACKED = [
   'Christchurch|New Zealand|-43.5321|172.6362|Pacific/Auckland',
   'Suva|Fiji|-18.1416|178.4419|Pacific/Fiji',
   'Port Moresby|Papua New Guinea|-9.4438|147.1803|Pacific/Port_Moresby',
+
+  'Oxnard|United States|34.1975|-119.1771|America/Los_Angeles',
+  'Bakersfield|United States|35.3733|-119.0187|America/Los_Angeles',
+  'Fresno|United States|36.7378|-119.7871|America/Los_Angeles',
+  'Long Beach|United States|33.7701|-118.1937|America/Los_Angeles',
+  'Anaheim|United States|33.8366|-117.9143|America/Los_Angeles',
+  'Riverside|United States|33.9806|-117.3755|America/Los_Angeles',
+  'Santa Ana|United States|33.7455|-117.8677|America/Los_Angeles',
+  'Irvine|United States|33.6846|-117.8265|America/Los_Angeles',
+  'Stockton|United States|37.9577|-121.2908|America/Los_Angeles',
+  'Oakland|United States|37.8044|-122.2712|America/Los_Angeles',
+  'Santa Barbara|United States|34.4208|-119.6982|America/Los_Angeles',
+  'Spokane|United States|47.6588|-117.4260|America/Los_Angeles',
+  'Tacoma|United States|47.2529|-122.4443|America/Los_Angeles',
+  'Boise|United States|43.6150|-116.2023|America/Boise',
+  'Reno|United States|39.5296|-119.8138|America/Los_Angeles',
+  'Tucson|United States|32.2226|-110.9747|America/Phoenix',
+  'Mesa|United States|33.4152|-111.8315|America/Phoenix',
+  'El Paso|United States|31.7619|-106.4850|America/Denver',
+  'Colorado Springs|United States|38.8339|-104.8214|America/Denver',
+  'Fort Worth|United States|32.7555|-97.3308|America/Chicago',
+  'El Segundo|United States|33.9192|-118.4165|America/Los_Angeles',
+  'Arlington|United States|32.7357|-97.1081|America/Chicago',
+  'Omaha|United States|41.2565|-95.9345|America/Chicago',
+  'Des Moines|United States|41.5868|-93.6250|America/Chicago',
+  'Wichita|United States|37.6872|-97.3301|America/Chicago',
+  'Tulsa|United States|36.1540|-95.9928|America/Chicago',
+  'Little Rock|United States|34.7465|-92.2896|America/Chicago',
+  'Baton Rouge|United States|30.4515|-91.1871|America/Chicago',
+  'Birmingham|United States|33.5186|-86.8104|America/Chicago',
+  'Madison|United States|43.0731|-89.4012|America/Chicago',
+  'Louisville|United States|38.2527|-85.7585|America/New_York',
+  'Cincinnati|United States|39.1031|-84.5120|America/New_York',
+  'Buffalo|United States|42.8864|-78.8784|America/New_York',
+  'Rochester|United States|43.1566|-77.6088|America/New_York',
+  'Albany|United States|42.6526|-73.7562|America/New_York',
+  'Hartford|United States|41.7658|-72.6734|America/New_York',
+  'Providence|United States|41.8240|-71.4128|America/New_York',
+  'Newark|United States|40.7357|-74.1724|America/New_York',
+  'Jersey City|United States|40.7178|-74.0431|America/New_York',
+  'Virginia Beach|United States|36.8529|-75.9780|America/New_York',
+  'Richmond|United States|37.5407|-77.4360|America/New_York',
+  'Raleigh|United States|35.7796|-78.6382|America/New_York',
+  'Jacksonville|United States|30.3322|-81.6557|America/New_York',
+  'Fort Lauderdale|United States|26.1224|-80.1373|America/New_York',
+  'St. Petersburg|United States|27.7676|-82.6403|America/New_York',
+  'Greensboro|United States|36.0726|-79.7920|America/New_York',
+  'Knoxville|United States|35.9606|-83.9207|America/New_York',
+  'Syracuse|United States|43.0481|-76.1474|America/New_York',
+  'Leeds|United Kingdom|53.8008|-1.5491|Europe/London',
+  'Liverpool|United Kingdom|53.4084|-2.9916|Europe/London',
+  'Sheffield|United Kingdom|53.3811|-1.4701|Europe/London',
+  'Bristol|United Kingdom|51.4545|-2.5879|Europe/London',
+  'Nottingham|United Kingdom|52.9548|-1.1581|Europe/London',
+  'Leicester|United Kingdom|52.6369|-1.1398|Europe/London',
+  'Newcastle|United Kingdom|54.9783|-1.6178|Europe/London',
+  'Cardiff|United Kingdom|51.4816|-3.1791|Europe/London',
+  'Belfast|United Kingdom|54.5973|-5.9301|Europe/London',
+  'Southampton|United Kingdom|50.9097|-1.4044|Europe/London',
+  'Brighton|United Kingdom|50.8225|-0.1372|Europe/London',
+  'Cork|Ireland|51.8985|-8.4756|Europe/Dublin',
+  'Galway|Ireland|53.2707|-9.0568|Europe/Dublin',
+  'Hamilton|Canada|43.2557|-79.8711|America/Toronto',
+  'London|Canada|42.9849|-81.2453|America/Toronto',
+  'Kitchener|Canada|43.4516|-80.4925|America/Toronto',
+  'Victoria|Canada|48.4284|-123.3656|America/Vancouver',
+  'Saskatoon|Canada|52.1332|-106.6700|America/Regina',
+  'Regina|Canada|50.4452|-104.6189|America/Regina',
+  'St. John\u2019s|Canada|47.5615|-52.7126|America/St_Johns',
+  'Gold Coast|Australia|-28.0167|153.4000|Australia/Brisbane',
+  'Newcastle|Australia|-32.9283|151.7817|Australia/Sydney',
+  'Wollongong|Australia|-34.4278|150.8931|Australia/Sydney',
+  'Geelong|Australia|-38.1499|144.3617|Australia/Melbourne',
+  'Cairns|Australia|-16.9186|145.7781|Australia/Brisbane',
+  'Hamilton|New Zealand|-37.7870|175.2793|Pacific/Auckland',
+  'Dunedin|New Zealand|-45.8788|170.5028|Pacific/Auckland',
+  'Seville|Spain|37.3891|-5.9845|Europe/Madrid',
+  'Bilbao|Spain|43.2630|-2.9350|Europe/Madrid',
+  'Malaga|Spain|36.7213|-4.4214|Europe/Madrid',
+  'Palma|Spain|39.5696|2.6502|Europe/Madrid',
+  'Las Palmas|Spain|28.1235|-15.4363|Atlantic/Canary',
+  'Turin|Italy|45.0703|7.6869|Europe/Rome',
+  'Florence|Italy|43.7696|11.2558|Europe/Rome',
+  'Bologna|Italy|44.4949|11.3426|Europe/Rome',
+  'Venice|Italy|45.4408|12.3155|Europe/Rome',
+  'Palermo|Italy|38.1157|13.3615|Europe/Rome',
+  'Catania|Italy|37.5079|15.0830|Europe/Rome',
+  'Nice|France|43.7102|7.2620|Europe/Paris',
+  'Toulouse|France|43.6047|1.4442|Europe/Paris',
+  'Bordeaux|France|44.8378|-0.5792|Europe/Paris',
+  'Nantes|France|47.2184|-1.5536|Europe/Paris',
+  'Lille|France|50.6292|3.0573|Europe/Paris',
+  'Strasbourg|France|48.5734|7.7521|Europe/Paris',
+  'Stuttgart|Germany|48.7758|9.1829|Europe/Berlin',
+  'Dusseldorf|Germany|51.2277|6.7735|Europe/Berlin',
+  'Leipzig|Germany|51.3397|12.3731|Europe/Berlin',
+  'Dresden|Germany|51.0504|13.7373|Europe/Berlin',
+  'Bremen|Germany|53.0793|8.8017|Europe/Berlin',
+  'Nuremberg|Germany|49.4521|11.0767|Europe/Berlin',
+  'Hanover|Germany|52.3759|9.7320|Europe/Berlin',
+  'Antwerp|Belgium|51.2194|4.4025|Europe/Brussels',
+  'Ghent|Belgium|51.0543|3.7174|Europe/Brussels',
+  'The Hague|Netherlands|52.0705|4.3007|Europe/Amsterdam',
+  'Utrecht|Netherlands|52.0907|5.1214|Europe/Amsterdam',
+  'Eindhoven|Netherlands|51.4416|5.4697|Europe/Amsterdam',
+  'Salzburg|Austria|47.8095|13.0550|Europe/Vienna',
+  'Graz|Austria|47.0707|15.4395|Europe/Vienna',
+  'Basel|Switzerland|47.5596|7.5886|Europe/Zurich',
+  'Bern|Switzerland|46.9480|7.4474|Europe/Zurich',
+  'Bergen|Norway|60.3913|5.3221|Europe/Oslo',
+  'Malmo|Sweden|55.6050|13.0038|Europe/Stockholm',
+  'Aarhus|Denmark|56.1629|10.2039|Europe/Copenhagen',
+  'Tampere|Finland|61.4978|23.7610|Europe/Helsinki',
+  'Wroclaw|Poland|51.1079|17.0385|Europe/Warsaw',
+  'Gdansk|Poland|54.3520|18.6466|Europe/Warsaw',
+  'Poznan|Poland|52.4064|16.9252|Europe/Warsaw',
+  'Brno|Czechia|49.1951|16.6068|Europe/Prague',
+  'Bratislava|Slovakia|48.1486|17.1077|Europe/Bratislava',
+  'Ljubljana|Slovenia|46.0569|14.5058|Europe/Ljubljana',
+  'Sarajevo|Bosnia and Herzegovina|43.8563|18.4131|Europe/Sarajevo',
+  'Skopje|North Macedonia|41.9981|21.4254|Europe/Skopje',
+  'Tirana|Albania|41.3275|19.8187|Europe/Tirane',
+  'Thessaloniki|Greece|40.6401|22.9444|Europe/Athens',
+  'Nicosia|Cyprus|35.1856|33.3823|Asia/Nicosia',
+  'Valletta|Malta|35.8989|14.5146|Europe/Malta',
+  'Luxembourg|Luxembourg|49.6116|6.1319|Europe/Luxembourg',
+  'Izmir|Turkey|38.4237|27.1428|Europe/Istanbul',
+  'Antalya|Turkey|36.8969|30.7133|Europe/Istanbul',
+  'Haifa|Israel|32.7940|34.9896|Asia/Jerusalem',
+  'Sharjah|United Arab Emirates|25.3463|55.4209|Asia/Dubai',
+  'Mecca|Saudi Arabia|21.3891|39.8579|Asia/Riyadh',
+  'Isfahan|Iran|32.6546|51.6680|Asia/Tehran',
+  'Mashhad|Iran|36.2605|59.6168|Asia/Tehran',
+  'Rawalpindi|Pakistan|33.5651|73.0169|Asia/Karachi',
+  'Faisalabad|Pakistan|31.4187|73.0791|Asia/Karachi',
+  'Lucknow|India|26.8467|80.9462|Asia/Kolkata',
+  'Kanpur|India|26.4499|80.3319|Asia/Kolkata',
+  'Nagpur|India|21.1458|79.0882|Asia/Kolkata',
+  'Indore|India|22.7196|75.8577|Asia/Kolkata',
+  'Bhopal|India|23.2599|77.4126|Asia/Kolkata',
+  'Patna|India|25.5941|85.1376|Asia/Kolkata',
+  'Surat|India|21.1702|72.8311|Asia/Kolkata',
+  'Kochi|India|9.9312|76.2673|Asia/Kolkata',
+  'Chittagong|Bangladesh|22.3569|91.7832|Asia/Dhaka',
+  'Chiang Mai|Thailand|18.7883|98.9853|Asia/Bangkok',
+  'Da Nang|Vietnam|16.0544|108.2022|Asia/Ho_Chi_Minh',
+  'Penang|Malaysia|5.4141|100.3288|Asia/Kuala_Lumpur',
+  'Bandung|Indonesia|-6.9175|107.6191|Asia/Jakarta',
+  'Medan|Indonesia|3.5952|98.6722|Asia/Jakarta',
+  'Davao|Philippines|7.1907|125.4553|Asia/Manila',
+  'Quezon City|Philippines|14.6760|121.0437|Asia/Manila',
+  'Macau|Macau|22.1987|113.5439|Asia/Macau',
+  'Kaohsiung|Taiwan|22.6273|120.3014|Asia/Taipei',
+  'Tianjin|China|39.3434|117.3616|Asia/Shanghai',
+  'Wuhan|China|30.5928|114.3055|Asia/Shanghai',
+  'Xi\u2019an|China|34.3416|108.9398|Asia/Shanghai',
+  'Hangzhou|China|30.2741|120.1551|Asia/Shanghai',
+  'Nanjing|China|32.0603|118.7969|Asia/Shanghai',
+  'Qingdao|China|36.0671|120.3826|Asia/Shanghai',
+  'Harbin|China|45.8038|126.5349|Asia/Shanghai',
+  'Incheon|South Korea|37.4563|126.7052|Asia/Seoul',
+  'Daegu|South Korea|35.8714|128.6014|Asia/Seoul',
+  'Nagoya|Japan|35.1815|136.9066|Asia/Tokyo',
+  'Fukuoka|Japan|33.5904|130.4017|Asia/Tokyo',
+  'Yokohama|Japan|35.4437|139.6380|Asia/Tokyo',
+  'Kobe|Japan|34.6901|135.1955|Asia/Tokyo',
+  'Hiroshima|Japan|34.3853|132.4553|Asia/Tokyo',
+  'Okinawa|Japan|26.2124|127.6809|Asia/Tokyo',
+  'Vladivostok|Russia|43.1332|131.9113|Asia/Vladivostok',
+  'Novosibirsk|Russia|55.0084|82.9357|Asia/Novosibirsk',
+  'Yekaterinburg|Russia|56.8389|60.6057|Asia/Yekaterinburg',
+  'Minsk|Belarus|53.9006|27.5590|Europe/Minsk',
+  'Chisinau|Moldova|47.0105|28.8638|Europe/Chisinau',
+  'Tehran|Iran|35.6892|51.3890|Asia/Tehran',
+  'Port Louis|Mauritius|-20.1609|57.5012|Indian/Mauritius',
+  'Antananarivo|Madagascar|-18.8792|47.5079|Indian/Antananarivo',
+  'Maputo|Mozambique|-25.9692|32.5732|Africa/Maputo',
+  'Gaborone|Botswana|-24.6282|25.9231|Africa/Gaborone',
+  'Windhoek|Namibia|-22.5609|17.0658|Africa/Windhoek',
+  'Port Elizabeth|South Africa|-33.9608|25.6022|Africa/Johannesburg',
+  'Bloemfontein|South Africa|-29.0852|26.1596|Africa/Johannesburg',
+  'Marrakesh|Morocco|31.6295|-7.9811|Africa/Casablanca',
+  'Tangier|Morocco|35.7595|-5.8340|Africa/Casablanca',
+  'Douala|Cameroon|4.0511|9.7679|Africa/Douala',
+  'Bamako|Mali|12.6392|-8.0029|Africa/Bamako',
+  'Conakry|Guinea|9.6412|-13.5784|Africa/Conakry',
+  'Freetown|Sierra Leone|8.4657|-13.2317|Africa/Freetown',
+  'Monrovia|Liberia|6.2907|-10.7605|Africa/Monrovia',
+  'Cotonou|Benin|6.3703|2.3912|Africa/Porto-Novo',
+  'Lome|Togo|6.1319|1.2228|Africa/Lome',
+  'Puebla|Mexico|19.0414|-98.2063|America/Mexico_City',
+  'Cancun|Mexico|21.1619|-86.8515|America/Cancun',
+  'Merida|Mexico|20.9674|-89.5926|America/Merida',
+  'Chihuahua|Mexico|28.6330|-106.0691|America/Chihuahua',
+  'Rosario|Argentina|-32.9442|-60.6505|America/Argentina/Buenos_Aires',
+  'Mendoza|Argentina|-32.8895|-68.8458|America/Argentina/Mendoza',
+  'Valparaiso|Chile|-33.0472|-71.6127|America/Santiago',
+  'Cali|Colombia|3.4516|-76.5320|America/Bogota',
+  'Barranquilla|Colombia|10.9685|-74.7813|America/Bogota',
+  'Guayaquil|Ecuador|-2.1894|-79.8891|America/Guayaquil',
+  'Cusco|Peru|-13.5320|-71.9675|America/Lima',
+  'Santa Cruz|Bolivia|-17.7833|-63.1821|America/La_Paz',
+  'Curitiba|Brazil|-25.4284|-49.2733|America/Sao_Paulo',
+  'Belem|Brazil|-1.4558|-48.4902|America/Belem',
+  'Goiania|Brazil|-16.6869|-49.2648|America/Sao_Paulo',
+  'Campinas|Brazil|-22.9099|-47.0626|America/Sao_Paulo',
+  'Belo Horizonte|Brazil|-19.9167|-43.9345|America/Sao_Paulo',
+  'Natal|Brazil|-5.7945|-35.2110|America/Fortaleza',
+  'Nassau|Bahamas|25.0443|-77.3504|America/Nassau',
+  'Bridgetown|Barbados|13.1132|-59.5988|America/Barbados',
+  'Port of Spain|Trinidad and Tobago|10.6596|-61.5019|America/Port_of_Spain',
+  'Tegucigalpa|Honduras|14.0723|-87.1921|America/Tegucigalpa',
+  'Managua|Nicaragua|12.1149|-86.2362|America/Managua',
+  'San Salvador|El Salvador|13.6929|-89.2182|America/El_Salvador',
+  'Port-au-Prince|Haiti|18.5944|-72.3074|America/Port-au-Prince',
+  'Honolulu|United States|21.3069|-157.8583|Pacific/Honolulu',
+  'Papeete|French Polynesia|-17.5516|-149.5585|Pacific/Tahiti',
+  'Noumea|New Caledonia|-22.2758|166.4580|Pacific/Noumea',
+  'Apia|Samoa|-13.8507|-171.7514|Pacific/Apia',
+  'Guam|Guam|13.4443|144.7937|Pacific/Guam',
 ]
 
 export const PLACES: Place[] = PACKED.map((row) => {
@@ -357,3 +577,176 @@ export function nearestPlace(latitude: number, longitude: number): Place {
 
   return best
 }
+
+/* ── Anywhere that is not on the list ────────────────────────── */
+
+/**
+ * Every time zone the browser knows, which is all of them.
+ *
+ * This is the escape hatch that makes the city list a convenience rather than
+ * a gate. No list of a few hundred cities will ever contain everybody's
+ * birthplace — Oxnard is a city of two hundred thousand people and it is not
+ * here — and a form that refuses to continue because it has never heard of
+ * where somebody was born is the app calling them wrong.
+ *
+ * So the list stops being the authority. What the chart actually needs from a
+ * birthplace is the **time zone**, and the browser ships the entire IANA
+ * database. `Intl.supportedValuesOf` hands the whole thing over for nothing,
+ * and the coordinates are taken from the nearest listed city that shares the
+ * zone — which is at worst a few hundred kilometres, and a few hundred
+ * kilometres is a fraction of a degree of Ascendant.
+ */
+export function allZones(): string[] {
+  try {
+    const supported = (
+      Intl as unknown as { supportedValuesOf?: (key: string) => string[] }
+    ).supportedValuesOf?.('timeZone')
+    if (supported && supported.length > 0) return supported
+  } catch {
+    /* An older engine. The bundled zones are still a real answer. */
+  }
+  return [...new Set(PLACES.map((place) => place.timeZone))].sort()
+}
+
+/** The city part of `America/Los_Angeles`, as somebody would read it. */
+export function zoneLabel(zone: string): string {
+  const parts = zone.split('/')
+  return parts[parts.length - 1].replace(/_/g, ' ')
+}
+
+/** The region part, for the line underneath. */
+export function zoneRegion(zone: string): string {
+  return zone.split('/')[0].replace(/_/g, ' ')
+}
+
+/** Zones matching what has been typed, city part first. */
+export function searchZones(query: string, limit = 8): string[] {
+  const needle = fold(query)
+  if (needle.length < 2) return []
+
+  const scored: { zone: string; score: number }[] = []
+  for (const zone of allZones()) {
+    const city = fold(zoneLabel(zone))
+    const whole = fold(zone.replace(/[_/]/g, ' '))
+    let score = 0
+    if (city === needle) score = 100
+    else if (city.startsWith(needle)) score = 80
+    else if (city.includes(needle)) score = 55
+    else if (whole.includes(needle)) score = 30
+    else continue
+    scored.push({ zone, score })
+  }
+
+  return scored
+    .sort((a, b) => b.score - a.score || a.zone.localeCompare(b.zone))
+    .slice(0, limit)
+    .map((entry) => entry.zone)
+}
+
+/**
+ * A usable place from a zone and whatever the person called it.
+ *
+ * The name is *theirs*. Somebody who typed "Oxnard" should be shown Oxnard
+ * back, not "Los Angeles" — the app borrowed a nearby city's coordinates and
+ * that is an implementation detail, not a correction of where they were born.
+ */
+export function placeFromZone(name: string, zone: string): Place {
+  const region = zone.includes('/') ? zoneRegion(zone) : ''
+
+  const sharing = PLACES.filter((place) => place.timeZone === zone)
+  if (sharing.length > 0) {
+    return { ...sharing[0], name: name.trim() || zoneLabel(zone) }
+  }
+
+  /*
+   * A zone with no listed city in it — around half of the four hundred the
+   * browser knows.
+   *
+   * Longitude follows from the offset, because fifteen degrees an hour is what
+   * a time zone *is*, and that is the coordinate the Ascendant is most
+   * sensitive to. Latitude is taken from the listed city on the nearest offset
+   * rather than left at zero: the equator is a specific and usually wrong
+   * place, and "somewhere on this meridian at a plausible latitude" is a far
+   * better guess than "the Gulf of Guinea".
+   */
+  const hours = zoneOffsetHours(zone)
+
+  let latitude = 0
+  let closest = Number.POSITIVE_INFINITY
+  for (const place of PLACES) {
+    const gap = Math.abs(zoneOffsetHours(place.timeZone) - hours)
+    if (gap < closest) {
+      closest = gap
+      latitude = place.latitude
+    }
+  }
+
+  return {
+    name: name.trim() || zoneLabel(zone),
+    country: region,
+    latitude,
+    longitude: hours * 15,
+    timeZone: zone,
+  }
+}
+
+/** How far ahead of UTC a zone is right now, in hours. Cached: it is asked in a loop. */
+const offsetCache = new Map<string, number>()
+
+function zoneOffsetHours(zone: string): number {
+  const known = offsetCache.get(zone)
+  if (known != null) return known
+
+  let hours = 0
+  try {
+    const shown = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      timeZoneName: 'shortOffset',
+    })
+      .formatToParts(new Date())
+      .find((part) => part.type === 'timeZoneName')?.value
+    const match = shown?.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/)
+    if (match) {
+      hours =
+        (match[1] === '-' ? -1 : 1) *
+        (Number(match[2]) + Number(match[3] ?? 0) / 60)
+    }
+  } catch {
+    /* Greenwich, rather than refusing somebody's birthplace. */
+  }
+
+  offsetCache.set(zone, hours)
+  return hours
+}
+
+/**
+ * A short list of zones to offer when there is nothing to go on.
+ *
+ * The fallback needs a floor. Searching by name works when somebody's
+ * birthplace shares a name with a zone — plenty do — and does nothing at all
+ * for the far greater number that do not: there is no `Australia/Wagga_Wagga`,
+ * and a "pick a time zone" step that returns no results is the same dead end
+ * with an extra step in front of it.
+ *
+ * So these are always on offer. Chosen to cover the largest populations and to
+ * span the clock, so that scrolling to a neighbouring offset is never far.
+ */
+export const COMMON_ZONES = [
+  'America/Los_Angeles',
+  'America/Denver',
+  'America/Chicago',
+  'America/New_York',
+  'America/Sao_Paulo',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Athens',
+  'Africa/Lagos',
+  'Africa/Johannesburg',
+  'Asia/Dubai',
+  'Asia/Kolkata',
+  'Asia/Bangkok',
+  'Asia/Shanghai',
+  'Asia/Tokyo',
+  'Australia/Sydney',
+  'Pacific/Auckland',
+]

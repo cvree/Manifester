@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildChart, momentChart, transits } from './chart'
 import { readToday, vitalsOf } from './reading'
-import { nearestPlace, searchPlaces } from './places'
+import { nearestPlace, placeFromZone, searchPlaces, searchZones } from './places'
 import { zoneOffsetMinutes, zonedToInstant } from './zone'
 
 /**
@@ -229,5 +229,74 @@ describe('places and their clocks', () => {
     expect(zoneOffsetMinutes('Asia/Kolkata', new Date('2026-01-01T00:00:00Z'))).toBe(330)
     expect(zoneOffsetMinutes('America/New_York', new Date('2026-07-01T00:00:00Z'))).toBe(-240)
     expect(zoneOffsetMinutes('America/New_York', new Date('2026-01-01T00:00:00Z'))).toBe(-300)
+  })
+})
+
+describe('a birthplace that is not on the list', () => {
+  /**
+   * The regression this file most needs to hold.
+   *
+   * Somebody born in Oxnard typed their birthplace, was told it was not on the
+   * list, and could not continue — on the screen immediately after the app
+   * promised to keep their birth details private. A city list can never be
+   * complete; refusing to proceed because of that is the app calling the
+   * person wrong.
+   */
+  it('keeps the name they typed and borrows a time zone', () => {
+    const place = placeFromZone('Oxnard', 'America/Los_Angeles')
+
+    expect(place.name).toBe('Oxnard')
+    expect(place.timeZone).toBe('America/Los_Angeles')
+    // Coordinates from the nearest listed city in the same zone, which is
+    // close enough that the Ascendant moves by a fraction of a degree.
+    expect(place.latitude).toBeGreaterThan(30)
+    expect(place.latitude).toBeLessThan(50)
+    expect(place.longitude).toBeLessThan(-110)
+
+    // And it converts, which is the only thing the chart actually needs.
+    expect(
+      zonedToInstant(
+        { year: 1988, month: 8, day: 3, hour: 6, minute: 45 },
+        place.timeZone,
+      ).toISOString(),
+    ).toBe('1988-08-03T13:45:00.000Z')
+  })
+
+  it('answers for a zone with no listed city in it', () => {
+    const place = placeFromZone('Longyearbyen', 'Arctic/Longyearbyen')
+    expect(place.name).toBe('Longyearbyen')
+    expect(place.timeZone).toBe('Arctic/Longyearbyen')
+    expect(Number.isFinite(place.latitude)).toBe(true)
+    expect(Number.isFinite(place.longitude)).toBe(true)
+  })
+
+  it('offers zones for what was typed', () => {
+    expect(searchZones('los ang')).toContain('America/Los_Angeles')
+    expect(searchZones('reykja').length).toBeGreaterThan(0)
+    expect(searchZones('a')).toHaveLength(0)
+  })
+
+  it('now has Oxnard in the list anyway', () => {
+    expect(searchPlaces('oxnard')[0]?.name).toBe('Oxnard')
+  })
+})
+
+describe('a time zone with no listed city', () => {
+  /**
+   * About half the four hundred zones a browser knows have no city in the
+   * bundled list. Falling back to latitude zero put every one of those births
+   * in the Gulf of Guinea, which is a specific and confidently wrong horizon.
+   */
+  it('lands somewhere plausible rather than on the equator', () => {
+    const place = placeFromZone('Salta', 'America/Argentina/Salta')
+    expect(place.name).toBe('Salta')
+    // Argentina is three hours behind UTC, so the meridian follows.
+    expect(place.longitude).toBeCloseTo(-45, 0)
+    // And the latitude is a real one from a city on a comparable offset.
+    expect(Math.abs(place.latitude)).toBeGreaterThan(1)
+  })
+
+  it('does not label a bare zone with a fake country', () => {
+    expect(placeFromZone('Wagga Wagga', 'UTC').country).toBe('')
   })
 })
