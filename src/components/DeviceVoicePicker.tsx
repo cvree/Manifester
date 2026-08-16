@@ -37,6 +37,20 @@ import { CheckIcon, PlayIcon } from './Icons'
  * robotic, worth avoiding", which is true, and which on a machine where every
  * voice is Basic is three rows telling somebody their only options are bad. It
  * is one word now. The person can hear it; they do not need to be told.
+ *
+ * ── The whole card is the target ────────────────────────────────────────────
+ *
+ * The name and the tier used to be the only part of a row that answered to a
+ * tap. Everything else — the padding, the tick, the gap beside the Play button
+ * — looked exactly as pressable and did nothing, which on a phone is a row that
+ * feels broken rather than a row that is smaller than it looks.
+ *
+ * So the card holds the click handler and the button inside it holds none. A
+ * press anywhere on the row bubbles up to one place and is handled once,
+ * including the presses that arrive from the keyboard by way of the button; the
+ * Play button stops the event, because hearing a voice again is a different act
+ * from choosing it. Two targets, no button nested inside a button, and no dead
+ * pixels between them.
  */
 
 interface DeviceVoicePickerProps {
@@ -131,22 +145,39 @@ export function DeviceVoicePicker({
           const chosen = voice.voiceURI === selected
           return (
             <li key={voice.voiceURI}>
+              {/*
+                The card carries the handler, and the button inside it carries
+                none.
+
+                That inversion is what makes every pixel of the row answer to a
+                tap — the padding, the gap, the space beside Play — without a
+                button nested inside a button, which is invalid and which screen
+                readers render as nonsense. A press on the label bubbles up to
+                here and is handled once; a press on the padding is handled the
+                same way; and Play stops the event so that hearing a voice again
+                is still a different act from choosing it.
+
+                The `<button>` stays because the accessibility has to be real:
+                it is what gets focus, what announces `aria-pressed`, and what
+                Enter and Space activate — and those activations arrive here as
+                clicks, like any other.
+              */}
               <div
+                onClick={() => {
+                  cue('select')
+                  onSelect(voice)
+                  // Chosen and heard in one press. See the note above.
+                  audition(voice)
+                }}
                 className={cx(
-                  'flex items-center gap-2 rounded-[1.15rem] border px-3 py-2.5 transition-colors duration-300',
+                  'flex cursor-pointer items-center gap-2 rounded-[1.15rem] border px-3 py-2.5 transition-colors duration-300',
                   chosen
                     ? 'border-[var(--rose)] bg-[var(--rose-soft)]'
-                    : 'border-[var(--border)] bg-[var(--surface-sunken)]',
+                    : 'border-[var(--border)] bg-[var(--surface-sunken)] hover:border-[var(--border-strong)]',
                 )}
               >
                 <button
                   type="button"
-                  onClick={() => {
-                    cue('select')
-                    onSelect(voice)
-                    // Chosen and heard in one press. See the note above.
-                    audition(voice)
-                  }}
                   aria-pressed={chosen}
                   className="interactive flex min-w-0 grow items-center gap-2.5 rounded-[0.9rem] text-left"
                 >
@@ -180,11 +211,14 @@ export function DeviceVoicePicker({
                 {/*
                   Kept even though selecting already speaks, because hearing a
                   voice a second time without re-committing to it is a
-                  different thing to want.
+                  different thing to want — which is exactly what the stopped
+                  propagation buys: the one part of the card that auditions
+                  without also choosing.
                 */}
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation()
                     cue('tap')
                     audition(voice)
                   }}

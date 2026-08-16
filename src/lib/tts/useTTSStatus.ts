@@ -24,6 +24,8 @@ export interface StudioVoiceControls extends StudioSnapshot {
   install: () => void
   cancel: () => void
   forget: () => void
+  /** Throw away every stored byte and download it again from nothing. */
+  startOver: () => void
   /** True once the model is on this device and speaking. */
   installed: boolean
 }
@@ -47,6 +49,14 @@ export function useStudioVoice(): StudioVoiceControls {
   }, [])
   const cancel = useCallback(() => browserKokoro.cancelInstall(), [])
   const forget = useCallback(() => browserKokoro.forget(), [])
+  /*
+   * Clearing and installing are one action from the outside. Somebody who has
+   * asked for a clean download wants a download, not an empty panel and a
+   * second decision.
+   */
+  const startOver = useCallback(() => {
+    void browserKokoro.reset().then(() => browserKokoro.install())
+  }, [])
 
   return {
     ...snapshot,
@@ -57,6 +67,7 @@ export function useStudioVoice(): StudioVoiceControls {
     install,
     cancel,
     forget,
+    startOver,
     installed: snapshot.state === 'ready',
   }
 }

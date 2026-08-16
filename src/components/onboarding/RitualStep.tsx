@@ -186,6 +186,14 @@ export function RitualStep({
               The suggested lines are recorded in Ivy and Fen either way — this
               is only for your own words.
             </p>
+            {/*
+              The list stays open after a choice, deliberately. Choosing here
+              is choosing by ear: the voice speaks the moment it is picked, and
+              a list that folded itself away on the first tap took the
+              comparison with it — you would have heard one voice and be looking
+              at no way to hear the next without finding the panel again. The
+              chosen row is marked, and `Begin my first loop` is right below.
+            */}
             <DeviceVoicePicker
               className="mt-3"
               voices={voices}
@@ -197,7 +205,6 @@ export function RitualStep({
                   voiceName: voice.name,
                   voiceSource: 'device',
                 })
-                setChoosingVoice(false)
               }}
               style={settings.voiceStyle}
             />
