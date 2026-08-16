@@ -290,6 +290,129 @@ describe('installing Studio Voice', () => {
     expect(fake.sent.filter((message) => message.type === 'install')).toHaveLength(1)
   })
 
+  /**
+   * The bug that made this feature uninstallable on slow devices.
+   *
+   * One watchdog covered the whole bring-up, and the stretch it could not see
+   * is the stretch that takes longest: after the last byte the runtime builds
+   * an 86 MB graph and speaks one word, reporting nothing while it does. On a
+   * phone that is minutes. The install was killed at the moment it was about to
+   * succeed, called a stalled download, and — because a timeout ended the
+   * sequence outright — there was no second attempt behind it either.
+   */
+  it('waits through the silence after the last byte', async () => {
+    vi.useFakeTimers()
+    try {
+      const { engine, fake } = build()
+      const installing = engine.install()
+
+      fake.reply({ type: 'progress', loaded: 90_000_000, total: 90_000_000, file: 'model' })
+      fake.reply({ type: 'stage', stage: 'preparing' })
+
+      // Well past anything a download is allowed, and nowhere near what
+      // building the graph is allowed.
+      vi.advanceTimersByTime(120_000)
+      expect(engine.getSnapshot()).toMatchObject({ state: 'installing', stage: 'preparing' })
+
+      fake.reply({ type: 'stage', stage: 'warming' })
+      vi.advanceTimersByTime(120_000)
+      expect(engine.getSnapshot().state).toBe('installing')
+
+      fake.reply({ type: 'ready', backend: 'wasm' })
+      expect(await installing).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('still gives up on a download that really has stopped', async () => {
+    vi.useFakeTimers()
+    try {
+      const { engine, fake } = build()
+      const installing = engine.install()
+      fake.reply({ type: 'progress', loaded: 1_000_000, total: 90_000_000, file: 'model' })
+
+      // The first attempt times out — and is now worth carrying to the other
+      // engine, because a slow graph says nothing about the next runtime.
+      vi.advanceTimersByTime(120_000)
+      await Promise.resolve()
+      expect(engine.getSnapshot()).toMatchObject({ state: 'installing', retrying: true })
+
+      vi.advanceTimersByTime(120_000)
+      expect(await installing).toBe(false)
+      expect(engine.getSnapshot()).toMatchObject({ state: 'failed', failure: 'timeout' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  /**
+   * A copy that will not parse used to fail identically for ever.
+   *
+   * Every retry read the same damaged bytes back out of the browser cache, and
+   * no screen in the app could reach them to clear it. The worker deletes them
+   * at the moment it finds them, so the next press is a genuinely different
+   * attempt rather than the same one again.
+   */
+  it('clears a damaged download rather than retrying into it', async () => {
+    store.set('manifester:tts.studioVoice', 'installed')
+    const { engine, fake } = build()
+    const installing = engine.install()
+
+    fake.reply({
+      type: 'failed',
+      reason: 'corrupt',
+      message: 'wasm: protobuf parsing failed — the stored copy was discarded.',
+    })
+
+    expect(await installing).toBe(false)
+    expect(engine.getSnapshot()).toMatchObject({ state: 'failed', failure: 'corrupt' })
+    // Nothing is on the device any more, so nothing should try to resume it.
+    expect(engine.everInstalled).toBe(false)
+    // And no second ninety megabytes was started on anybody's behalf.
+    expect(fake.sent.filter((message) => message.type === 'install')).toHaveLength(1)
+  })
+
+  it('says nothing when a resume is the one that finds the damage', async () => {
+    store.set('manifester:tts.studioVoice', 'installed')
+    const { engine, fake } = build()
+    const resuming = engine.resume()
+
+    fake.reply({ type: 'failed', reason: 'corrupt', message: 'wasm: invalid model' })
+
+    expect(await resuming).toBe(false)
+    // Nobody asked for anything, so nobody is shown an error about it.
+    expect(engine.getSnapshot()).toMatchObject({ state: 'available', failure: null })
+    expect(engine.everInstalled).toBe(false)
+  })
+
+  /**
+   * The dead Install button.
+   *
+   * A device whose `installed` flag outlived the cache starts a resume on load,
+   * and that resume can only ever answer "not cached". Joining it meant a press
+   * during those seconds was answered by *its* result: the button did nothing,
+   * and then later worked, which reads as an app that ignores you.
+   */
+  it('does not hand a press of Install the answer to a background resume', async () => {
+    store.set('manifester:tts.studioVoice', 'installed')
+    const { engine, fake } = build()
+
+    const resuming = engine.resume()
+    expect(fake.sent[0]).toMatchObject({ type: 'resume' })
+
+    const installing = engine.install()
+    expect(await resuming).toBe(false)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // A real install, in a worker of its own, rather than the resume's answer.
+    expect(fake.sent.at(-1)).toMatchObject({ type: 'install' })
+
+    fake.reply({ type: 'ready', backend: 'wasm' })
+    expect(await installing).toBe(true)
+  })
+
   it('forgets on request', async () => {
     const { engine, fake } = build()
     const installing = engine.install()

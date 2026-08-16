@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
 import { STUDIO_DOWNLOAD_MB } from '../lib/tts'
+import type { StudioStage } from '../lib/tts/studioTypes'
 import { useStudioVoice } from '../lib/tts/useTTSStatus'
 import { Button } from './Button'
 import { CheckIcon, CloseIcon, SparkIcon } from './Icons'
@@ -55,6 +56,21 @@ interface StudioVoicePanelProps {
 /** Bytes as somebody would say them. */
 function megabytes(bytes: number): string {
   return `${Math.round(bytes / 1_000_000)} MB`
+}
+
+/**
+ * What the install is doing, in words, at each stage.
+ *
+ * Every one of these used to read "Preparing Studio Voice…", including the
+ * long silent minute after the bar had already filled — which is the stretch
+ * people actually gave up during, because a full bar that does not move is
+ * indistinguishable from a hang.
+ */
+const STAGE_LABEL: Record<StudioStage, string> = {
+  starting: 'Starting the voice engine…',
+  downloading: 'Downloading Studio Voice…',
+  preparing: 'Setting it up on this device…',
+  warming: 'Trying out the voice…',
 }
 
 export function StudioVoicePanel({
@@ -124,6 +140,14 @@ export function StudioVoicePanel({
 
   if (studio.state === 'installing') {
     const percent = studio.fraction == null ? null : Math.round(studio.fraction * 100)
+    /*
+     * After the last byte there is a minute or more in which nothing at all is
+     * reported, because the runtime is building the graph and then speaking one
+     * word to prove it can. A full bar and the word "Preparing" through all of
+     * that is the app looking frozen while it works, so the bar goes back to
+     * moving of its own accord and the label says which thing is happening.
+     */
+    const settling = studio.stage === 'preparing' || studio.stage === 'warming'
     return (
       <div
         className={cx(
@@ -139,10 +163,10 @@ export function StudioVoicePanel({
               bar that silently restarts, and far more honest than the error it
               replaced.
             */}
-            {studio.retrying ? 'Trying another engine…' : 'Preparing Studio Voice…'}
+            {studio.retrying ? 'Trying another engine…' : STAGE_LABEL[studio.stage]}
           </p>
           <span className="type-meta tabular-nums">
-            {percent == null ? 'starting' : `${percent}%`}
+            {settling ? 'almost' : percent == null ? 'starting' : `${percent}%`}
           </span>
         </div>
 
@@ -162,17 +186,22 @@ export function StudioVoicePanel({
           <div
             className={cx(
               'h-full rounded-pill bg-[var(--rose-deep)] transition-[width] duration-300 ease-out',
-              percent == null && 'animate-studio-indeterminate w-1/3',
+              (percent == null || settling) && 'animate-studio-indeterminate w-1/3',
             )}
-            style={percent == null ? undefined : { width: `${Math.max(2, percent)}%` }}
+            style={
+              percent == null || settling ? undefined : { width: `${Math.max(2, percent)}%` }
+            }
           />
         </div>
 
         <p className="type-meta mt-3">
-          {studio.total > 0
-            ? `${megabytes(studio.loaded)} of ${megabytes(studio.total)}. `
-            : ''}
-          Downloaded once. Generated privately on this device.
+          {settling
+            ? 'Everything is downloaded. Setting it up can take a minute on a phone — it only happens once.'
+            : `${
+                studio.total > 0
+                  ? `${megabytes(studio.loaded)} of ${megabytes(studio.total)}. `
+                  : ''
+              }Downloaded once. Generated privately on this device.`}
         </p>
 
         <Button
@@ -261,7 +290,12 @@ export function StudioVoicePanel({
           )}
         </div>
 
-        {failed && <FailureDetail message={studio.message} trail={studio.trail} />}
+        {failed && (
+          <>
+            <FailureDetail message={studio.message} trail={studio.trail} />
+            <StartOver onStartOver={studio.startOver} />
+          </>
+        )}
       </div>
     )
   }
@@ -339,7 +373,12 @@ export function StudioVoicePanel({
             )}
           </div>
 
-          {failed && <FailureDetail message={studio.message} trail={studio.trail} />}
+          {failed && (
+          <>
+            <FailureDetail message={studio.message} trail={studio.trail} />
+            <StartOver onStartOver={studio.startOver} />
+          </>
+        )}
 
           {variant === 'card' && !failed && (
             <p className="type-meta mt-2.5">
@@ -408,6 +447,72 @@ function FailureDetail({
 }
 
 /**
+ * The way out of a copy that will not work, however it got that way.
+ *
+ * Quiet, and below everything else, because "Try again" is right nearly always
+ * — the files already on the device are what make a second attempt cheap, and
+ * throwing them away to make a point would cost somebody another ninety
+ * megabytes for nothing.
+ *
+ * It exists because for every failure this app cannot name there was
+ * previously no next step at all. Everything the install downloads lives in
+ * caches this app cannot reach from any screen, so a device holding something
+ * unusable would fail identically for ever, and the only remedy anybody could
+ * offer was clearing site data — which takes the person's saved loops with it.
+ * One sentence and one press is a better answer than that.
+ */
+function StartOver({ onStartOver }: { onStartOver: () => void }) {
+  const [asked, setAsked] = useState(false)
+
+  if (!asked) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          cue('tap')
+          setAsked(true)
+        }}
+        className="interactive mt-1 block min-h-11 rounded-pill text-[0.78rem] text-ink-faint underline decoration-[var(--border-strong)] underline-offset-4 hover:text-ink-muted"
+      >
+        Still failing? Start the download over
+      </button>
+    )
+  }
+
+  return (
+    <div className="mt-2 rounded-[1rem] border border-[var(--border)] p-3">
+      <p className="text-[0.82rem] leading-snug text-ink-muted">
+        This throws away everything already downloaded and fetches all{' '}
+        {STUDIO_DOWNLOAD_MB} MB again. Worth it when the same error keeps
+        coming back; a waste of a download otherwise.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          onClick={() => {
+            cue('start')
+            setAsked(false)
+            onStartOver()
+          }}
+        >
+          Download it again
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            cue('tap')
+            setAsked(false)
+          }}
+        >
+          Not now
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/**
  * What went wrong, in a sentence somebody can act on.
  *
  * None of these blame the person and none of them are dead ends — the button
@@ -424,13 +529,23 @@ function FailureDetail({
 export function explainFailure(failure: string | null): string {
   switch (failure) {
     case 'download':
-      return 'The download did not finish. It picks up where it left off, so trying again on a steadier connection is usually all it needs.'
+      /*
+       * It does not, in fact, pick up where it left off, and saying so was a
+       * small lie with a real cost: a browser only stores a file once the whole
+       * of it has arrived, so a connection that drops at eighty megabytes
+       * leaves nothing behind. Somebody deciding whether to retry on a train
+       * deserves to know that. Files that *did* complete are kept, which is
+       * what makes a second attempt shorter rather than free.
+       */
+      return 'The download did not finish. Whole files already fetched are kept, but the one that was interrupted starts again — so it is worth waiting for a steadier connection.'
     case 'storage':
       return 'There was not enough room to store the voice. Freeing some space — or leaving private browsing, which does not allow it at all — will let it through.'
     case 'runtime':
       return 'The voice engine could not be loaded. A content or script blocker is the usual cause, so allowing this site and trying once more is the thing most likely to work.'
+    case 'corrupt':
+      return 'The copy that was downloaded turned out to be damaged, so it has been thrown away. Trying again fetches a clean one — this is not the same as the attempt that just failed.'
     case 'timeout':
-      return 'The download stopped moving and nothing more arrived. Trying again picks up from where it stalled rather than starting over.'
+      return 'Nothing happened for long enough that waiting further would not have been honest. Trying again is worth it: whatever finished downloading is still here.'
     case 'unsupported':
       return 'This device could not start the voice engine. It is usually memory: closing other tabs and trying once more often works.'
     default:

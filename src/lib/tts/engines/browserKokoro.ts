@@ -48,6 +48,7 @@ import type {
   StudioFailure,
   StudioRequest,
   StudioResponse,
+  StudioStage,
 } from '../studioTypes'
 import type {
   AudioFormat,
@@ -82,16 +83,41 @@ const RUNTIME_KEY = 'tts.studioRuntime'
 export const STUDIO_DOWNLOAD_MB = 90
 
 /**
- * How long an install may go without a single byte before it is called.
+ * How long each part of a bring-up may go quiet before it is called.
  *
  * Not a total timeout: ninety megabytes on a bad train connection is minutes,
  * and cutting that off would be the app giving up on somebody who was doing
- * fine. This is a *stall* timer, reset by every progress event, and it exists
- * for the one failure mode that has no error attached to it — a runtime that
- * never resolves, which without this leaves "Preparing Studio Voice…" on
- * screen until the tab is closed.
+ * fine. This is a *stall* timer, reset by every message from the worker, and
+ * it exists for the one failure mode that has no error attached to it — a
+ * runtime that never resolves, which without this leaves "Preparing Studio
+ * Voice…" on screen until the tab is closed.
+ *
+ * ── Why one number was not enough ───────────────────────────────────────────
+ *
+ * It used to be a single forty-five seconds covering everything, and that
+ * quietly broke the install on exactly the devices it was meant to protect.
+ * Downloading reports itself continuously, so forty-five seconds of silence
+ * there really does mean a dead connection. What comes *after* the last byte
+ * reports nothing at all: the runtime builds an 86 MB graph, then speaks one
+ * word to prove it can, and on a phone with a single WebAssembly thread that
+ * is comfortably more than forty-five seconds of legitimate quiet. The
+ * watchdog fired at the moment the install was about to succeed, called it a
+ * stalled download, and — because `timeout` was not worth retrying elsewhere —
+ * ended the whole sequence. A slow device could not install this at all.
+ *
+ * So each stage gets the budget its own silence deserves, and every one of
+ * them is still bounded, because the alternative is a spinner with no end.
  */
-const STALL_MS = 45_000
+const STALL_MS: Record<StudioStage, number> = {
+  /* Worker boot and the engine chunk. Local, and quick, or it is not coming. */
+  starting: 60_000,
+  /* Between byte batches. Generous for a train, hopeless for a dead socket. */
+  downloading: 90_000,
+  /* Session build. Silent by nature, and the longest of them on a phone. */
+  preparing: 300_000,
+  /* espeak, kernel compilation and a whole vocoder pass, once. */
+  warming: 240_000,
+}
 
 export type StudioState =
   /** No worker, no WebAssembly, or a browser that cannot run this. */
@@ -112,6 +138,14 @@ export interface StudioSnapshot {
   /** Bytes so far and bytes expected, while installing. */
   loaded: number
   total: number
+  /**
+   * Which part of the install is happening, while one is.
+   *
+   * On screen, because the minute after the bar reaches 100% is silent and
+   * looks broken. "Preparing Studio Voice…" over a full bar is the app not
+   * saying what it is doing; "Setting it up on this device" is.
+   */
+  stage: StudioStage
   failure: StudioFailure | null
   message: string | null
   /** True when this browser advertises WebGPU. Shown on the install card. */
@@ -194,6 +228,7 @@ export class BrowserKokoroEngine implements TTSEngine {
     backend: null,
     loaded: 0,
     total: 0,
+    stage: 'starting',
     failure: null,
     message: null,
     accelerated: webGpuAvailable(),
@@ -205,14 +240,29 @@ export class BrowserKokoroEngine implements TTSEngine {
   /** The whole sequence of attempts, so two presses of Install share one. */
   private running: Promise<boolean> | null = null
 
+  /** What the sequence in flight is: a deliberate download, or a cache check. */
+  private mode: 'install' | 'resume' = 'install'
+
   /** Resolves when the *current attempt* settles, either way. */
   private attempt: { resolve: (ok: boolean) => void } | null = null
 
-  /** Reset by every progress event. See `STALL_MS`. */
+  /** Reset by every message from the worker. See `STALL_MS`. */
   private stall: ReturnType<typeof setTimeout> | null = null
 
   /** Set while tearing a worker down deliberately, so `crash` stays quiet. */
   private abandoning = false
+
+  /**
+   * Set when a running sequence has been overtaken and should simply stop.
+   *
+   * Distinct from cancelling, which is a person changing their mind and has a
+   * state on screen. This is the app getting out of its own way — a background
+   * resume being pushed aside by somebody pressing Install.
+   */
+  private superseded = false
+
+  /** Resolves the `reset` in flight, when the worker says the caches are gone. */
+  private purged: (() => void) | null = null
 
   constructor(createWorker: () => StudioWorker = defaultWorker) {
     this.createWorker = createWorker
@@ -278,7 +328,73 @@ export class BrowserKokoroEngine implements TTSEngine {
   async install(): Promise<boolean> {
     if (this.snapshot.state === 'unsupported') return false
     if (this.snapshot.state === 'ready') return true
+
+    /*
+     * A press must never be answered by a resume that was already running.
+     *
+     * `sequence` joins whatever is in flight, which is right for two presses of
+     * Install and was wrong in one specific and very confusing way: on a device
+     * whose `installed` flag survived a cache eviction, the app starts a resume
+     * on load, that resume can only ever answer "not cached", and anybody who
+     * pressed Install during those few seconds was handed *its* answer. The
+     * button did nothing, twice, and then worked — which reads as an app that
+     * ignores you rather than as a race.
+     *
+     * So the resume is put aside and the real thing starts behind it. Nothing
+     * is lost: a resume downloads nothing and discovers nothing an install does
+     * not discover for itself.
+     */
+    if (this.running && this.mode === 'resume') {
+      this.supersede()
+      await this.running.catch(() => false)
+    }
     return this.sequence('install')
+  }
+
+  /**
+   * Throw away every stored byte and start over.
+   *
+   * The last resort, and until now it did not exist. Everything this feature
+   * downloads lives in caches keyed by Hugging Face URLs inside the worker's
+   * half of the origin, so a device that had cached something unusable had no
+   * way back: clearing site data would take the person's saved loops with it,
+   * and nothing smaller was on offer. The damaged-file case now clears itself,
+   * but a person staring at a failure nobody predicted deserves a button that
+   * means *forget all of it and try properly*.
+   */
+  async reset(): Promise<void> {
+    if (this.snapshot.state === 'unsupported') return
+    this.supersede()
+    await this.running?.catch(() => false)
+
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        this.abandoning = true
+        this.teardown()
+        this.abandoning = false
+        resolve()
+      }
+      try {
+        this.abandoning = true
+        this.teardown()
+        this.abandoning = false
+        this.ensureWorker()
+        this.purged = done
+        this.post({ type: 'purge' })
+        // A purge that never answers must not hold the button for ever; the
+        // caches are the worker's to clear and it has either done it or died.
+        setTimeout(() => {
+          if (this.purged) {
+            this.purged = null
+            done()
+          }
+        }, 10_000)
+      } catch {
+        done()
+      }
+    })
+
+    this.forget()
   }
 
   /**
@@ -354,6 +470,9 @@ export class BrowserKokoroEngine implements TTSEngine {
   private sequence(kind: 'install' | 'resume'): Promise<boolean> {
     if (this.running) return this.running
 
+    this.mode = kind
+    this.superseded = false
+
     this.running = (async () => {
       const plan = this.plan()
       this.publish({ trail: [] })
@@ -368,11 +487,15 @@ export class BrowserKokoroEngine implements TTSEngine {
           message: null,
           loaded: 0,
           total: 0,
+          stage: 'starting',
           runtime: attempt.runtime,
           retrying: index > 0,
         })
 
         const ok = await this.runAttempt(kind, attempt)
+
+        // Overtaken by a deliberate press. Leave the state to whoever did it.
+        if (this.superseded) return false
 
         this.publish({
           trail: [
@@ -421,7 +544,7 @@ export class BrowserKokoroEngine implements TTSEngine {
       this.teardown()
       this.abandoning = false
 
-      this.armStall()
+      this.armStall('starting')
 
       try {
         this.ensureWorker()
@@ -437,8 +560,16 @@ export class BrowserKokoroEngine implements TTSEngine {
     })
   }
 
-  private armStall(): void {
+  /**
+   * Start the watchdog for the stage the worker says it is in.
+   *
+   * The stage is recorded on the snapshot as well as used for the budget,
+   * because it is the same fact the screen needs: silence that is expected
+   * should be described, not merely tolerated.
+   */
+  private armStall(stage: StudioStage): void {
     this.clearStall()
+    this.publish({ stage })
     this.stall = setTimeout(() => {
       if (this.snapshot.state !== 'installing') return
       this.abandoning = true
@@ -447,15 +578,25 @@ export class BrowserKokoroEngine implements TTSEngine {
       this.publish({
         state: 'failed',
         failure: 'timeout',
-        message: 'Nothing arrived for a while.',
+        message: `Nothing happened for ${Math.round(STALL_MS[stage] / 1000)}s while ${stage}.`,
       })
       this.finishAttempt(false)
-    }, STALL_MS)
+    }, STALL_MS[stage])
   }
 
   private clearStall(): void {
     if (this.stall != null) clearTimeout(this.stall)
     this.stall = null
+  }
+
+  /** Stop whatever sequence is running, without putting a failure on screen. */
+  private supersede(): void {
+    if (!this.running) return
+    this.superseded = true
+    this.abandoning = true
+    this.teardown()
+    this.abandoning = false
+    this.finishAttempt(false)
   }
 
   /** Settle the attempt in flight, once, whatever happened to it. */
@@ -585,9 +726,24 @@ export class BrowserKokoroEngine implements TTSEngine {
   private receive(message: StudioResponse): void {
     switch (message.type) {
       case 'progress':
-        // Bytes are arriving, so the stall clock starts again.
-        if (this.snapshot.state === 'installing') this.armStall()
+        /*
+         * Bytes are arriving, so the stall clock starts again — and on the
+         * download budget, whatever the worker last said. That is what makes a
+         * premature "preparing" harmless: the config file can finish before the
+         * weights are even asked for, and the very next chunk of the weights
+         * puts the watchdog back where it belongs by itself.
+         */
+        if (this.snapshot.state === 'installing') this.armStall('downloading')
         this.publish({ loaded: message.loaded, total: message.total })
+        break
+
+      case 'stage':
+        if (this.snapshot.state === 'installing') this.armStall(message.stage)
+        break
+
+      case 'purged':
+        this.purged?.()
+        this.purged = null
         break
 
       case 'ready':
@@ -627,6 +783,37 @@ export class BrowserKokoroEngine implements TTSEngine {
           this.finishAttempt(false)
           return
         }
+        /*
+         * The damaged copy has just been deleted, so this device no longer has
+         * Studio Voice by any measure — the flag has to go with it, or the next
+         * load will resume a model that is not there.
+         *
+         * A resume that discovers this says nothing on screen, for the same
+         * reason `not-cached` says nothing: nobody asked for anything, and an
+         * error about a file they never knew existed is noise. A person who
+         * pressed Install is owed the opposite, and gets a sentence that
+         * explains why pressing it once more is not the same as pressing it
+         * again.
+         */
+        if (message.reason === 'corrupt') {
+          removeLocal(INSTALLED_KEY)
+          const asked = this.mode === 'install'
+          this.abandoning = true
+          this.teardown()
+          this.abandoning = false
+          this.publish({
+            state: asked ? 'failed' : 'available',
+            backend: null,
+            failure: asked ? 'corrupt' : null,
+            message: asked ? message.message : null,
+            loaded: 0,
+            total: 0,
+            retrying: false,
+          })
+          this.finishAttempt(false)
+          return
+        }
+
         this.abandoning = true
         this.teardown()
         this.abandoning = false
@@ -663,6 +850,7 @@ export class BrowserKokoroEngine implements TTSEngine {
       next.backend === this.snapshot.backend &&
       next.loaded === this.snapshot.loaded &&
       next.total === this.snapshot.total &&
+      next.stage === this.snapshot.stage &&
       next.failure === this.snapshot.failure &&
       next.message === this.snapshot.message &&
       next.runtime === this.snapshot.runtime &&

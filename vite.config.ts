@@ -111,10 +111,24 @@ export default defineConfig({
            * for the speech clips above.
            */
           {
-            urlPattern: ({ url }) =>
-              /kokoro\.worker-[^/]*\.js$/.test(url.pathname) ||
-              /\.wasm$/.test(url.pathname) ||
-              /ort-wasm[^/]*\.mjs$/.test(url.pathname),
+            /*
+             * Same origin only, and the `sameOrigin` guard is not tidiness.
+             *
+             * `CacheFirst` with `statuses: [0, 200]` is right for our own
+             * content-hashed assets and is a trap for anybody else's: a status
+             * of 0 is an opaque response, which is what a cross-origin fetch
+             * produces whether it succeeded or was blocked, and caching one of
+             * those first-and-for-ever would freeze a failure in place with no
+             * way to tell it from a success. The CDN copy of the runtime is a
+             * fallback for a device the bundled one could not satisfy; it needs
+             * the network the first time regardless, and the browser's own HTTP
+             * cache is the right thing to keep it in.
+             */
+            urlPattern: ({ url, sameOrigin }) =>
+              sameOrigin &&
+              (/kokoro\.worker-[^/]*\.js$/.test(url.pathname) ||
+                /\.wasm$/.test(url.pathname) ||
+                /ort-wasm[^/]*\.mjs$/.test(url.pathname)),
             handler: 'CacheFirst',
             options: {
               cacheName: 'manifester-studio-voice',

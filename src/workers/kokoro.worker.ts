@@ -40,6 +40,7 @@ import type {
   StudioFailure,
   StudioRequest,
   StudioResponse,
+  StudioStage,
 } from '../lib/tts/studioTypes'
 
 /** The ONNX export this app speaks with. */
@@ -77,6 +78,9 @@ const USED_VOICES = ['af_heart', 'am_fenrir']
 /** Where `kokoro-js` looks for a voice pack. Matched exactly, or it re-fetches. */
 const VOICE_CACHE = 'kokoro-voices'
 
+/** Where `transformers.js` keeps the weights, the tokeniser and the config. */
+const MODEL_CACHE = 'transformers-cache'
+
 type KokoroModule = typeof import('kokoro-js')
 type KokoroInstance = InstanceType<KokoroModule['KokoroTTS']>
 
@@ -103,6 +107,9 @@ const post = (message: StudioResponse, transfer?: Transferable[]) => {
   else self.postMessage(message)
 }
 
+/** Tell the page which part of the bring-up it is watching. See `StudioStage`. */
+const stage = (next: StudioStage) => post({ type: 'stage', stage: next })
+
 /* ── Bringing the model up ───────────────────────────────────────────────── */
 
 /**
@@ -126,7 +133,7 @@ function requiredUrls(): string[] {
 async function isCached(): Promise<boolean> {
   if (typeof caches === 'undefined') return false
   try {
-    const cache = await caches.open('transformers-cache')
+    const cache = await caches.open(MODEL_CACHE)
     const found = await Promise.all(
       requiredUrls().map((url) => cache.match(url)),
     )
@@ -136,6 +143,64 @@ async function isCached(): Promise<boolean> {
     // guessing "yes" here would turn a resume into a silent download.
     return false
   }
+}
+
+/**
+ * Delete every stored byte of the model.
+ *
+ * Both caches, because they are one install between them: the weights that
+ * `transformers.js` keeps and the two voice packs `kokoro-js` keeps. Leaving
+ * half of it behind would mean a "fresh" download that still reads a stale
+ * voice pack from disk.
+ *
+ * Entry by entry rather than `caches.delete(name)` on the model cache, because
+ * that cache belongs to `transformers.js` rather than to this app, and dropping
+ * a whole named cache is a bigger claim than dropping the four files this
+ * feature put in it.
+ */
+async function discard(): Promise<void> {
+  if (typeof caches === 'undefined') return
+  try {
+    const cache = await caches.open(MODEL_CACHE)
+    await Promise.all(requiredUrls().map((url) => cache.delete(url)))
+  } catch {
+    /* Nothing can be done about a cache that will not open, and the retry is
+       no worse off than it would have been. */
+  }
+  try {
+    const voices = await caches.open(VOICE_CACHE)
+    await Promise.all(
+      USED_VOICES.map((voice) => voices.delete(`${MODEL_BASE}/voices/${voice}.bin`)),
+    )
+  } catch {
+    /* As above. */
+  }
+}
+
+/**
+ * Whether the error means the bytes on disk are bad, rather than the device.
+ *
+ * The distinction decides whether ninety megabytes get thrown away, so it is
+ * drawn narrowly and from the runtime's own words. ONNX Runtime says "Failed to
+ * load model because protobuf parsing failed" when it is handed something that
+ * is not a model — which is what a response truncated by a proxy, or written to
+ * a disk that filled halfway through, looks like once it is in the cache and
+ * indistinguishable from a complete one.
+ *
+ * Everything else is left alone. A graph this phone has not the memory to
+ * build, a GPU with no kernel for `ConvTranspose`, a blocked runtime: none of
+ * those are the model's fault and all of them are recoverable by trying the
+ * next attempt, which is free precisely because the files are still there.
+ */
+function looksCorrupt(error: unknown): boolean {
+  const message = String((error as Error)?.message ?? error ?? '').toLowerCase()
+  return (
+    message.includes('protobuf parsing failed') ||
+    message.includes('failed to load model') ||
+    message.includes('invalid model') ||
+    message.includes('deserialize tensor') ||
+    message.includes('unexpected end of')
+  )
 }
 
 /**
@@ -183,6 +248,14 @@ class Progress {
   private loaded = new Map<string, number>()
   private total = new Map<string, number>()
   private lastSent = 0
+  /** Files `transformers.js` has said it wants, and files it has finished. */
+  private wanted = new Set<string>()
+  private finished = new Set<string>()
+
+  /** A file has been asked for. Its bytes may or may not be on the network. */
+  begin(file: string): void {
+    this.wanted.add(file)
+  }
 
   update(file: string, loaded: number, total: number): void {
     this.loaded.set(file, loaded)
@@ -194,6 +267,26 @@ class Progress {
     if (now - this.lastSent < 120) return
     this.lastSent = now
     this.send(file)
+  }
+
+  /**
+   * A file is in, so send its final tally rather than whichever chunk happened
+   * to fall outside the throttle above — and, once every file that was asked
+   * for has arrived, say so.
+   *
+   * That second part is the one that matters. What follows the last byte is
+   * the runtime building an 86 MB graph in silence, and the page has to be
+   * told that the quiet is expected or it will call it a stall. A `done` that
+   * turns out to be premature — the config file lands before the weights are
+   * even requested — costs nothing, because the next `progress` event puts the
+   * page back into `downloading` by itself.
+   */
+  finish(file: string): void {
+    this.finished.add(file)
+    this.wanted.add(file)
+    this.lastSent = Date.now()
+    this.send(file)
+    if (this.finished.size >= this.wanted.size) stage('preparing')
   }
 
   send(file: string | null): void {
@@ -307,6 +400,7 @@ async function bringUp(
   if (loading) return loading
 
   loading = (async () => {
+    stage('starting')
     if (!allowDownload && !(await isCached())) {
       post({ type: 'failed', reason: 'not-cached', message: 'Studio Voice is not installed.' })
       return
@@ -333,6 +427,8 @@ async function bringUp(
       return
     }
 
+    stage('downloading')
+
     /*
      * Exactly one device, and the page decides which.
      *
@@ -354,9 +450,11 @@ async function bringUp(
           loaded?: number
           total?: number
         }) => {
-          if (event.status === 'progress' && event.file) {
+          if (!event.file) return
+          if (event.status === 'initiate') progress.begin(event.file)
+          else if (event.status === 'progress') {
             progress.update(event.file, event.loaded ?? 0, event.total ?? 0)
-          }
+          } else if (event.status === 'done') progress.finish(event.file)
         },
       })
 
@@ -368,7 +466,13 @@ async function bringUp(
        * compile, a GPU adapter that has already been lost. Finding that out
        * here costs a second and lets the CPU attempt happen quietly; finding
        * it out later means somebody taps Play and hears nothing.
+       *
+       * It is also the slowest silent thing this worker does: a first
+       * inference on a single WebAssembly thread loads espeak-ng, compiles the
+       * graph's kernels and runs the whole vocoder. The page is told, so that
+       * the wait is described rather than mistaken for a stall.
        */
+      stage('warming')
       await instance.generate('Ready.', { voice: 'af_heart', speed: 1 })
 
       tts = instance
@@ -380,6 +484,26 @@ async function bringUp(
     } catch (error) {
       tts = null
       activeBackend = null
+
+      /*
+       * A model that will not parse is a model worth deleting.
+       *
+       * This is the one failure that repeats for ever without it: the files
+       * are all present, so every retry is served the same damaged bytes out
+       * of the cache and fails in exactly the same way, and no button in the
+       * app could reach them. Throwing them away here turns a permanent dead
+       * end into one more press of Install.
+       */
+      if (looksCorrupt(error) && (await isCached())) {
+        await discard()
+        post({
+          type: 'failed',
+          reason: 'corrupt',
+          message: `${device}: ${String((error as Error)?.message ?? error)} — the stored copy was discarded.`,
+        })
+        return
+      }
+
       post({
         type: 'failed',
         reason: classify(error),
@@ -446,6 +570,9 @@ self.onmessage = (event: MessageEvent<StudioRequest>) => {
     }
     case 'cancel':
       cancelled.add(message.id)
+      break
+    case 'purge':
+      void discard().then(() => post({ type: 'purged' }))
       break
     case 'release':
       tts = null

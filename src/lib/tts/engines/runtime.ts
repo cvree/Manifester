@@ -116,8 +116,22 @@ export const CDN_WASM_PATH = `https://cdn.jsdelivr.net/npm/@huggingface/transfor
  *
  * `storage` is not: a device with no room has no room whichever copy of the
  * engine is used, and re-downloading to prove it would be rude. `cancelled`
- * and `not-cached` are not failures at all.
+ * and `not-cached` are not failures at all. `corrupt` is not either, in the
+ * sense that matters here: the damaged files have just been deleted, so the
+ * next attempt would be a second unasked-for ninety megabytes — which is a
+ * decision for the person, and the button in front of them says Try again.
+ *
+ * `timeout` is, and its absence was a bug worth naming. A watchdog firing
+ * during the minute where an 86 MB graph is being built says nothing about the
+ * *next* runtime, and treating it as final meant a device that was merely slow
+ * on WebGPU never reached the CPU attempt that would have worked. Nothing is
+ * re-downloaded to find out — the weights are on disk by then.
  */
 export function worthRetryingElsewhere(reason: string | null): boolean {
-  return reason === 'unsupported' || reason === 'download' || reason === 'runtime'
+  return (
+    reason === 'unsupported' ||
+    reason === 'download' ||
+    reason === 'runtime' ||
+    reason === 'timeout'
+  )
 }
