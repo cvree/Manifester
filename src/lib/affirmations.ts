@@ -25,7 +25,7 @@
  * the studio voice. See `tts/knownPhrases.ts`.
  */
 
-/** The fifteen things people come here for. */
+/** The sixteen things people come here for. */
 export type FocusId =
   | 'confidence'
   | 'calm'
@@ -42,6 +42,7 @@ export type FocusId =
   | 'growth'
   | 'morning'
   | 'night'
+  | 'resilience'
 
 export interface Focus {
   id: FocusId
@@ -67,11 +68,19 @@ export interface Focus {
     | 'sun'
     | 'star'
   /**
-   * Shown on the opening chooser, which holds eight tiles.
+   * Which accent the welcome field takes while this intent is chosen.
    *
-   * The rest are one tap further in, behind "Something else". Fifteen tiles is
-   * a form; eight is a decision, and the difference decides whether somebody
-   * finishes the first minute.
+   * Four of them, all already in the palette, because the point is that the
+   * room warms towards what somebody said they needed — not that every theme
+   * gets a colour of its own. Sixteen hues would be a chart.
+   */
+  tone: 'rose' | 'sage' | 'gold' | 'twilight'
+  /**
+   * Shown on the opening chooser.
+   *
+   * The rest are one tap further in, behind "Something else". Sixteen tiles is
+   * a form; the ten people actually arrive wanting is a decision, and the
+   * difference decides whether somebody finishes the first minute.
    */
   featured?: boolean
   /** A default title for a loop started from this focus. */
@@ -85,6 +94,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Confidence',
     blurb: 'Walk in like you belong there',
     glyph: 'spark',
+    tone: 'rose',
     featured: true,
     loopTitle: 'Steady confidence',
     lines: [
@@ -101,6 +111,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Calm',
     blurb: 'Let the noise settle',
     glyph: 'breath',
+    tone: 'twilight',
     featured: true,
     loopTitle: 'Coming back to calm',
     lines: [
@@ -117,6 +128,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Motivation',
     blurb: 'Get the first step done',
     glyph: 'pulse',
+    tone: 'gold',
     featured: true,
     loopTitle: 'Getting started',
     lines: [
@@ -133,6 +145,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Discipline',
     blurb: 'Keep going on the dull days',
     glyph: 'mountain',
+    tone: 'sage',
     loopTitle: 'Keeping my word',
     lines: [
       'I keep the promises I make to myself.',
@@ -148,6 +161,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Self-worth',
     blurb: 'Nothing to prove today',
     glyph: 'bloom',
+    tone: 'rose',
     featured: true,
     loopTitle: 'Enough as I am',
     lines: [
@@ -164,6 +178,8 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Sleep',
     blurb: 'Put the day down',
     glyph: 'moon',
+    tone: 'twilight',
+    featured: true,
     loopTitle: 'Letting the day go',
     lines: [
       'The day is finished, and I am allowed to put it down.',
@@ -179,6 +195,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Health',
     blurb: 'Look after the body you have',
     glyph: 'leaf',
+    tone: 'sage',
     featured: true,
     loopTitle: 'Taking care of myself',
     lines: [
@@ -195,6 +212,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'School',
     blurb: 'Sit down and learn it',
     glyph: 'book',
+    tone: 'gold',
     featured: true,
     loopTitle: 'Study steadiness',
     lines: [
@@ -211,6 +229,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Career',
     blurb: 'Do the work, take the credit',
     glyph: 'compass',
+    tone: 'gold',
     featured: true,
     loopTitle: 'Work that holds',
     lines: [
@@ -227,6 +246,8 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Relationships',
     blurb: 'Be seen as you are',
     glyph: 'heart',
+    tone: 'rose',
+    featured: true,
     loopTitle: 'Open and looked after',
     lines: [
       'I am easy to love, and I let myself be loved.',
@@ -242,6 +263,8 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Gratitude',
     blurb: 'Notice what is already good',
     glyph: 'seed',
+    tone: 'gold',
+    featured: true,
     loopTitle: 'What is already here',
     lines: [
       'I notice the ordinary things that are going right.',
@@ -257,6 +280,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Fitness',
     blurb: 'Show up and move',
     glyph: 'flame',
+    tone: 'gold',
     loopTitle: 'Strong and moving',
     lines: [
       'I move today in a way that feels good.',
@@ -272,6 +296,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Growth',
     blurb: 'Become who you are heading towards',
     glyph: 'growth',
+    tone: 'sage',
     loopTitle: 'Becoming',
     lines: [
       'I am proud of how far I have already come.',
@@ -287,6 +312,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Morning',
     blurb: 'Set the tone before the day does',
     glyph: 'sun',
+    tone: 'gold',
     loopTitle: 'How this day starts',
     lines: [
       'I meet today as it is, not as I feared it would be.',
@@ -302,6 +328,7 @@ export const FOCUS_AREAS: Focus[] = [
     label: 'Night',
     blurb: 'Close the day kindly',
     glyph: 'star',
+    tone: 'twilight',
     loopTitle: 'End of the day',
     lines: [
       'Whatever this day held, I am still here at the end of it.',
@@ -312,9 +339,25 @@ export const FOCUS_AREAS: Focus[] = [
       'I am doing better than I give myself credit for.',
     ],
   },
+  {
+    id: 'resilience',
+    label: 'Resilience',
+    blurb: 'Get through the hard stretch',
+    glyph: 'mountain',
+    tone: 'twilight',
+    loopTitle: 'Getting through',
+    lines: [
+      'I can handle what is in front of me.',
+      'This is hard, and I am still here.',
+      'I have got through every day so far.',
+      'I do not have to feel fine to keep going.',
+      'The hard part will not last as long as it feels.',
+      'I am allowed to ask for help with this.',
+    ],
+  },
 ]
 
-/** The eight tiles the opening chooser shows. */
+/** The ten tiles the opening chooser shows. */
 export const FEATURED_FOCUSES: Focus[] = FOCUS_AREAS.filter(
   (focus) => focus.featured,
 )
@@ -325,6 +368,33 @@ export const MORE_FOCUSES: Focus[] = FOCUS_AREAS.filter((focus) => !focus.featur
 export function findFocus(id: string | null | undefined): Focus | null {
   if (!id) return null
   return FOCUS_AREAS.find((focus) => focus.id === id) ?? null
+}
+
+/**
+ * How many starters the welcome flow puts on screen.
+ *
+ * Four, and the number is load-bearing. Three reads as a shortlist somebody
+ * has to settle for; six is a menu, and a menu is a task. Four fits above the
+ * fold on the smallest phone this app supports, which is the only place the
+ * count actually gets decided.
+ */
+export const STARTER_COUNT = 4
+
+/**
+ * The lines a first-time visitor is offered, best first.
+ *
+ * The first one is *recommended* rather than merely first: it is the line
+ * chosen to be the one most people would keep, it is drawn a step above the
+ * others, and it is pre-selected so somebody can go straight on. Elevated,
+ * never forced — every other line is one tap away and so is writing your own.
+ */
+export function startersFor(focus: Focus): string[] {
+  return focus.lines.slice(0, STARTER_COUNT)
+}
+
+/** The one drawn a step above the rest. */
+export function recommendedFor(focus: Focus): string {
+  return focus.lines[0]
 }
 
 /**

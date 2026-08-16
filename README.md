@@ -333,41 +333,88 @@ link to your sounds.
 
 ## The first minute
 
-Opening Manifester for the first time is four screens, and it exists because the
-alternative — an empty text box and a Start button — is the worst possible first
-impression of an app whose entire value is the words it already has.
+Opening Manifester for the first time is four screens, and it exists because
+the alternative — an empty text box and a Start button — is the worst possible
+first impression of an app whose entire value is the words it already has.
+
+### The thesis
+
+> **A single field of concentric light that begins unresolved and settles into
+> focus as the person makes each choice — so the interface itself appears to
+> take a breath and come into clarity alongside them.**
+
+That sentence is the whole design brief, and the motion budget is spent against
+it and nothing else:
+
+| Budget | Spent on |
+| --- | --- |
+| One atmospheric visual | [`SettlingField`](src/components/onboarding/SettlingField.tsx) — twelve soft rings on a canvas |
+| One transition language | Steps arrive as one settled movement; words arrive like breath |
+| A few micro-interactions | Tile press, line select, voice switch, hover-warms-the-field |
+| One transition out | A bloom that opens into the player |
+
+There is no carousel, no second background, no particle field, no custom
+cursor, no scroll hijacking and no scene that exists because it looked good in
+isolation. Every motion is interruptible, nothing is delayed to show an
+animation, and with `prefers-reduced-motion` the field draws once — resolved
+and still, which is the frame the whole animation was travelling towards.
+
+### Four beats
 
 ```
-Welcome
-  → what do you want to strengthen?      15 themes, 8 tiles, one tap
-  → choose your first line                6 suggestions, tap to hear it
-  → who should read it?                   Ivy vs Fen, then Studio Voice
-  → begin
+arrival  →  what would you like to strengthen?  →  hear it  →  begin
+ feel          personal relevance                  surprise    calm
 ```
 
-The shape of it is the argument, and three decisions carry most of the weight.
+The **voice moment is folded into the third beat** rather than given a screen
+of its own, because comparing Ivy and Fen only means something when they are
+saying the sentence you just chose — not a sample line about how voices sound.
+Switching the voice speaks immediately, and the other voice's version of the
+selected line is warmed in the background so the comparison is instant.
 
-**Tapping is answering.** There is no Next button on the theme grid or the line
-list: a tile *is* the answer, and a suggestion plays the moment it is touched.
-The audio for those six lines is fetched while the step is still being read, so
-the first tap is a decode rather than a request, and the second and third are
-nothing at all.
+**Personalising is folded in for the same reason.** `Write my own` is a
+textarea on the same screen with a Hear it and one press of the offline writing
+helper the app already has. The full editor is the right screen for somebody
+who has decided they care; thirty seconds into a first visit is not that
+moment.
 
-**The voice is heard before it is sold.** Studio Voice is offered on step four,
-underneath two cards that have just demonstrated what it sounds like. Asking for
-a ninety-megabyte download from somebody who has not heard the voice is asking
-them to take it on faith; asking afterwards is the same offer, honestly made.
-**Maybe later** genuinely puts it away, and nothing about the session that
-follows is any different.
+**Studio Voice is offered last**, under a heading somebody has already heard
+the answer to, as `Private · Free · Offline after setup` and a size. It never
+blocks anything, `Maybe later` is exactly as prominent as `Install`, and
+declining changes nothing about the session that follows.
 
-**Skip is real, and it is on screen from the first frame.** It marks the
-introduction as seen, carries whatever was chosen into the editor, and never
-asks again. An introduction somebody has to escape is one they resent.
+### Things it refuses to do
 
-The whole thing is designed to be finishable in well under a minute by somebody
-impatient, and the launch route only shows it to a device with nothing saved and
-no record of having seen it — a person with forty saved loops and a cleared
-`localStorage` goes straight to their player.
+- **Ask for anything.** No account, no notification permission, no AI key, no
+  model download before the benefit is on screen and audible.
+- **Build a parallel model.** The flow writes into the *same* draft the Create
+  screen edits and the Player reads — `updateDraft` and `updateSettings`,
+  nothing else. `Customize` hands somebody straight to the real editor with
+  their words intact, and the session that starts at the end is an ordinary
+  session in every respect. There is nothing to migrate later.
+- **Trap anybody.** Back on every step after the first; Skip on all of them,
+  which marks the introduction as seen and lands in the editor with whatever
+  was chosen.
+- **Lose anything.** Every change is written to `localStorage`, so a refresh, a
+  discarded tab or a phone that locked mid-sentence resumes where it was, with
+  the words they had typed. Progress expires after six hours, because "what
+  would you like to strengthen *right now*" is a question about right now.
+- **Repeat itself.** Completion is a version number, not a flag
+  ([`onboarding.ts`](src/lib/onboarding.ts)), so a substantially better
+  introduction can be offered deliberately by raising `ONBOARDING_VERSION` —
+  and anybody with saved loops is never shown it at all, whatever their
+  `localStorage` says. It can be replayed on purpose from About, which resets
+  nothing else.
+
+### Afterwards
+
+Exactly one thing is taught after the first loop completes, chosen by what that
+person has *not* done — save the loop, install Studio Voice, or change the
+sound — and shown once in the lifetime of the installation. See
+[`FirstLoopNudge`](src/components/FirstLoopNudge.tsx). It is not a feature
+tour; the welcome experience deliberately taught nothing about saving, timers,
+breathing patterns or exporting, because none of that is worth knowing before
+you have heard your own words read back to you.
 
 ---
 
@@ -1994,9 +2041,14 @@ src/
                           five honest ways it can fail — one component, so an
                           install started in onboarding and watched from
                           settings is visibly the same install
-    onboarding/           the four first-use steps, the frame they sit in, and
-                          `useAudition` — hearing a line, knowing which one is
-                          speaking, and warming the rest
+    FirstLoopNudge        one thing to learn, once, after the first loop
+    onboarding/           the four first-use steps and the frame they sit in
+      SettlingField       the signature visual: concentric light that settles
+                          as choices are made, breathing on the app's own
+                          breath clock and warming towards the chosen intent
+      Reveal              words arriving like breath, and the block version
+      useAudition         hearing a line, knowing *which* one is speaking, and
+                          warming the rest before they are tapped
     BreathingVisualizer   all eight guide forms, plus the phase ring
     LivingCanvas          the canvas, the frame loop and the device ratio the
                           two drawn forms share — and nothing about what they
@@ -2070,7 +2122,8 @@ src/
     affirmations.ts the curated library: fifteen themes, ninety lines, the
                     Studio Voice preview phrases, and the three rules every
                     line had to pass
-    onboarding.ts   whether somebody has been here before
+    onboarding.ts   whether somebody has been here before, how far they got,
+                    and which generation of the introduction they finished
     launch.ts       which of the three first screens they get
     tts/
       index.ts          the four verbs, and the only place engine order is decided

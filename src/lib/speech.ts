@@ -51,11 +51,20 @@ export function clampVoiceVolume(value: number): number {
 }
 
 export function isSpeechSupported(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    'speechSynthesis' in window &&
-    'SpeechSynthesisUtterance' in window
-  )
+  /*
+   * The property being *present* is not the same as it being usable.
+   *
+   * Privacy-hardened browsers and some embedded WebViews keep
+   * `speechSynthesis` on `window` and set it to `undefined` or a stub with no
+   * methods, which passes an `in` check and then throws on the first
+   * `getVoices()` — during app start-up, before anything has rendered. Asking
+   * for the method that is actually about to be called is the only test that
+   * means anything here.
+   */
+  if (typeof window === 'undefined') return false
+  if (typeof window.SpeechSynthesisUtterance !== 'function') return false
+  const synth = window.speechSynthesis as SpeechSynthesis | undefined
+  return !!synth && typeof synth.getVoices === 'function'
 }
 
 /* ── Chunking ────────────────────────────────────────────────── */

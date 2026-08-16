@@ -3,9 +3,12 @@ import {
   FEATURED_FOCUSES,
   FOCUS_AREAS,
   MORE_FOCUSES,
+  STARTER_COUNT,
   STUDIO_PREVIEWS,
   allAffirmations,
   findFocus,
+  recommendedFor,
+  startersFor,
   type FocusId,
 } from './affirmations'
 import { countWords } from './format'
@@ -34,6 +37,7 @@ const REQUIRED: FocusId[] = [
   'growth',
   'morning',
   'night',
+  'resilience',
 ]
 
 describe('the affirmation library', () => {
@@ -83,15 +87,32 @@ describe('the affirmation library', () => {
   })
 
   it('shows eight tiles first and keeps the rest one tap away', () => {
-    // Seven themes plus the "Something else" tile the chooser adds itself.
-    // Eight is the number the grid was designed around: two rows of four on a
-    // tablet, four rows of two on a phone, and no scrolling to make a first
-    // decision.
-    expect(FEATURED_FOCUSES).toHaveLength(7)
+    // The ten intents people actually arrive with, plus the "Something else"
+    // tile the chooser adds itself. Every one of them has to be reachable
+    // without scrolling on the smallest supported phone — which is checked in
+    // the browser, not here, but the count is the input to that.
+    expect(FEATURED_FOCUSES).toHaveLength(10)
     expect(FEATURED_FOCUSES.length + MORE_FOCUSES.length).toBe(FOCUS_AREAS.length)
     // Nothing may be in both lists, or the chooser shows it twice.
     const featured = new Set(FEATURED_FOCUSES.map((focus) => focus.id))
     expect(MORE_FOCUSES.some((focus) => featured.has(focus.id))).toBe(false)
+  })
+
+  it('can offer starters for every focus, with one recommended', () => {
+    for (const focus of FOCUS_AREAS) {
+      const starters = startersFor(focus)
+      expect(starters, focus.id).toHaveLength(STARTER_COUNT)
+      // The recommended line is the one that is pre-selected on arrival, so it
+      // has to be among the ones actually on screen.
+      expect(starters, focus.id).toContain(recommendedFor(focus))
+    }
+  })
+
+  it('gives every focus a tone the welcome field can warm towards', () => {
+    const allowed = new Set(['rose', 'sage', 'gold', 'twilight'])
+    for (const focus of FOCUS_AREAS) {
+      expect(allowed.has(focus.tone), `${focus.id}: ${focus.tone}`).toBe(true)
+    }
   })
 
   it('gives every focus a title a saved loop can wear', () => {

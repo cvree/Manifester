@@ -6,7 +6,9 @@ import {
   type ReactNode,
   type SVGProps,
 } from 'react'
+import { useNavigate } from 'react-router'
 import { AiSetupPanel } from '../components/AiSetupPanel'
+import { Button } from '../components/Button'
 import { AppearanceSettings } from '../components/AppearanceSettings'
 import { Card } from '../components/Card'
 import {
@@ -28,6 +30,7 @@ import { InstallInstructions } from '../components/InstallPrompt'
 import { setStoredCredentials, useCredentials } from '../lib/ai/useCredentials'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
+import { forgetOnboarding } from '../lib/onboarding'
 import { BRAINWAVE_LIST, formatHz, supportsBinaural } from '../lib/brainwaveAudio'
 import { SmoothScroll, scrollToSection, scrollToTop } from '../lib/smoothScroll'
 import { usePreferences } from '../state/PreferencesProvider'
@@ -90,6 +93,7 @@ const SECTIONS: Array<{ id: string; label: string }> = [
   { id: 'settings', label: 'Every setting' },
   { id: 'rhythms', label: 'Rhythms' },
   { id: 'voices', label: 'Better voices' },
+  { id: 'welcome', label: 'The introduction' },
   { id: 'help', label: 'Troubleshooting' },
 ]
 
@@ -317,6 +321,7 @@ const TROUBLE: Array<{ question: string; answer: ReactNode }> = [
  */
 export function AboutRoute() {
   const credentials = useCredentials()
+  const navigate = useNavigate()
   const { preferences, update: updatePreferences } = usePreferences()
 
   const content = (
@@ -606,6 +611,32 @@ export function AboutRoute() {
               panel, under <em className="not-italic text-ink">Customize your ritual</em>{' '}
               on the Create screen.
             </p>
+          </Card>
+
+          <Card
+            data-rise
+            id="welcome"
+            className="scroll-mt-6"
+            title="Watch the introduction again"
+            description="The first minute, from the beginning."
+          >
+            <p className="type-body">
+              Manifester opens with a short guided welcome: choose something to
+              strengthen, hear it read aloud, and begin. You can go through it
+              again whenever you like — it changes nothing you have saved, and
+              your loops, sounds and settings all stay exactly where they are.
+            </p>
+            <Button
+              className="mt-4"
+              leading={<SparkIcon className="text-[0.95rem]" />}
+              onClick={() => {
+                cue('tap')
+                forgetOnboarding()
+                navigate('/welcome')
+              }}
+            >
+              Show me the introduction
+            </Button>
           </Card>
 
           <Card

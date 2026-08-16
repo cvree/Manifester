@@ -9,6 +9,7 @@ import {
 import { useNavigate } from 'react-router'
 import { BreathingVisualizer } from '../components/BreathingVisualizer'
 import { Button } from '../components/Button'
+import { FirstLoopNudge } from '../components/FirstLoopNudge'
 import { Card } from '../components/Card'
 import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
 import { DesktopPlayerPanel } from '../components/DesktopPlayerPanel'
@@ -262,6 +263,16 @@ export function PlayerRoute() {
                       Done for now
                     </Button>
                   </div>
+
+                  {/*
+                    One thing to learn, once, at the one moment somebody is
+                    sitting still and pleased. See `FirstLoopNudge` — it shows
+                    itself only if it has never been shown.
+                  */}
+                  <FirstLoopNudge
+                    className="mt-8 w-full max-w-md"
+                    onChangeSound={() => setSheet('sound')}
+                  />
                 </div>
               </Card>
             ) : (

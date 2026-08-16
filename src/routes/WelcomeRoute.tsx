@@ -1,80 +1,203 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useGSAP } from '@gsap/react'
+import gsap from 'gsap'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { AffirmationStep } from '../components/onboarding/AffirmationStep'
-import { FocusStep } from '../components/onboarding/FocusStep'
+import { ArrivalStep } from '../components/onboarding/ArrivalStep'
+import { IntentStep } from '../components/onboarding/IntentStep'
 import { OnboardingFrame } from '../components/onboarding/OnboardingFrame'
-import { VoiceStep } from '../components/onboarding/VoiceStep'
-import { WelcomeStep } from '../components/onboarding/WelcomeStep'
-import type { Focus } from '../lib/affirmations'
+import { RitualStep } from '../components/onboarding/RitualStep'
+import { SettlingField, type FieldTone } from '../components/onboarding/SettlingField'
+import { useAudition } from '../components/onboarding/useAudition'
+import { VoiceMomentStep } from '../components/onboarding/VoiceMomentStep'
+import { findFocus, recommendedFor, type Focus } from '../lib/affirmations'
+import { findPreset } from '../lib/breathing'
 import { primeBreathAudio } from '../lib/breathAudio'
 import { recordEngagement } from '../lib/engagement'
 import { useReducedMotion } from '../lib/motion'
-import { markOnboarded } from '../lib/onboarding'
+import {
+  clearProgress,
+  markOnboarded,
+  readProgress,
+  writeProgress,
+} from '../lib/onboarding'
+import { soundName } from '../lib/summaries'
 import { tts } from '../lib/tts'
+import { useBreathing } from '../lib/useBreathing'
+import { useLibrary } from '../state/LibraryProvider'
+import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
 
 /**
  * Opening Manifester for the first time.
  *
- * Four steps, and the shape of them is the argument: welcome, what matters to
- * you, hear a line in Manifester's own voice, choose who reads it and begin.
- * Nothing is configured that the app could not have guessed, nothing is
- * explained that would be better discovered, and every step can be left.
+ * ── The thesis ──────────────────────────────────────────────────────────────
  *
- * Two decisions worth defending:
+ * **A single field of concentric light that begins unresolved and settles into
+ * focus as the person makes each choice — so the interface itself appears to
+ * take a breath and come into clarity alongside them.**
  *
- * **The voice is heard on step three, not step four.** The Studio Voice offer
- * only makes sense to somebody who already knows what they are being offered,
- * so the sound comes first and the ~90 MB question comes after.
+ * Everything here serves that sentence, and the motion budget is spent
+ * accordingly: one atmospheric visual (`SettlingField`), one transition
+ * language (steps arrive as a settled movement, words arrive like breath), a
+ * handful of tactile micro-interactions, and one bloom into the first ritual.
+ * There is no carousel, no second background, no particle field and no scene
+ * that exists because it looked good in isolation.
  *
- * **Skip is real.** It marks the introduction as seen and drops straight into
- * the editor, with whatever was chosen so far carried across. A first-run
- * experience somebody has to escape is one they resent, and the whole thing is
- * short enough that most people will not want to.
+ * ── What is preserved ───────────────────────────────────────────────────────
+ *
+ * All of it. This route writes into the *same* draft the Create screen edits
+ * and the Player reads — `updateDraft` and `updateSettings`, nothing else — so
+ * there is no parallel onboarding model to migrate later, `Customize` can hand
+ * somebody straight to the real editor mid-flow with their words intact, and
+ * the session that starts at the end is an ordinary session in every respect.
+ * The voice layer, the caches, the breath engine and the ambience are used
+ * exactly as the rest of the app uses them.
+ *
+ * ── Four beats ──────────────────────────────────────────────────────────────
+ *
+ *     arrival  →  what would you like to strengthen?  →  hear it  →  begin
+ *      feel          personal relevance                  surprise    calm
+ *
+ * The voice moment is folded into the third beat rather than given a screen of
+ * its own, because comparing Ivy and Fen only means something when they are
+ * saying the sentence you just chose. Personalising is folded in for the same
+ * reason: it is the same screen, one tap, with the writing helper the app
+ * already has.
+ *
+ * ── Leaving, and coming back ────────────────────────────────────────────────
+ *
+ * Back on every step after the first. Skip on all of them, which lands in the
+ * editor with whatever was chosen. Every change is written to `localStorage`,
+ * so a refresh, a discarded tab or a phone that locked mid-sentence resumes
+ * where it was — and the whole thing is versioned, so a future introduction
+ * can be offered deliberately rather than by accident.
  */
 
-type Step = 'welcome' | 'focus' | 'affirmation' | 'voice'
+type Step = 'arrival' | 'intent' | 'voice' | 'ritual'
 
-const ORDER: Step[] = ['welcome', 'focus', 'affirmation', 'voice']
+const ORDER: Step[] = ['arrival', 'intent', 'voice', 'ritual']
 
-/** Long enough for the button to settle before the route changes. */
-const START_TRANSITION_MS = 320
+/** How resolved the field is on each step. See `SettlingField`. */
+const RESOLVE: Record<Step, number> = {
+  arrival: 0,
+  intent: 0.34,
+  voice: 0.68,
+  ritual: 1,
+}
+
+/**
+ * How long the bloom runs before the player is mounted.
+ *
+ * Short enough that it reads as one movement rather than as a wait, and long
+ * enough that the field has visibly opened. Nothing is blocked on it: the
+ * session is already starting underneath.
+ */
+const BLOOM_MS = 460
 
 export function WelcomeRoute() {
   const navigate = useNavigate()
   const { updateDraft, updateSettings, draft, prime, start } = useSession()
+  const { preferences } = usePreferences()
+  const { allTracks } = useLibrary()
   const reducedMotion = useReducedMotion()
+  const audition = useAudition()
 
-  const [step, setStep] = useState<Step>('welcome')
-  const [focus, setFocus] = useState<Focus | null>(null)
-  const [text, setText] = useState('')
+  /* ── State, restored from a half-finished visit if there is one ── */
+
+  const restored = useRef(readProgress()).current
+
+  const [step, setStep] = useState<Step>(() =>
+    restored && ORDER.includes(restored.step as Step)
+      ? (restored.step as Step)
+      : 'arrival',
+  )
+  const [focus, setFocus] = useState<Focus | null>(() =>
+    findFocus(restored?.focusId),
+  )
+  const [text, setText] = useState(() => restored?.text ?? '')
   const [style, setStyle] = useState<'feminine' | 'masculine'>(
-    draft.settings.voiceStyle,
+    () => restored?.voiceStyle ?? draft.settings.voiceStyle,
   )
   const [beginning, setBeginning] = useState(false)
+  /** Warms the field towards whatever the pointer is over, before a choice. */
+  const [hovered, setHovered] = useState<Focus | null>(null)
+
+  /*
+   * A resumed journey is mid-flight, and the steps after the first assume the
+   * audio was opened by a real tap on Begin. It was not — this is a fresh page
+   * — so the field and the interface are correct, and the first press of a
+   * line does the unlocking. `useAudition` calls `unlock()` on every play for
+   * exactly this reason.
+   */
+
+  /** Everything worth not losing, written on every change. */
+  useEffect(() => {
+    if (step === 'arrival' && !focus && !text) return
+    writeProgress({ step, focusId: focus?.id ?? null, text, voiceStyle: style })
+  }, [step, focus, text, style])
 
   /*
    * Nothing may still be speaking when this screen goes away.
    *
    * `useAudition` already stops on unmount, but the guarantee has to hold for
-   * the whole route rather than for one step — an audition started on the
-   * affirmation step and a navigation triggered from the voice step are two
-   * different components, and a line still playing over the player's own first
-   * words is the exact overlap this app must never produce.
+   * the route as a whole — an audition started on the voice step and a
+   * navigation triggered from the ritual step are two different components,
+   * and a line still playing over the player's own first words is the exact
+   * overlap this app must never produce.
    */
   useEffect(() => () => tts.stop(), [])
 
-  /** Everything the first session needs, written into the draft. */
+  /* ── The field ── */
+
+  /*
+   * The same breath the player will run, on a silent preview clock. The field
+   * is therefore already breathing at the pattern named on the last step, and
+   * the first thing anybody sees is the thing they came for.
+   */
+  const breathing = useBreathing({
+    pattern: preferences.breathPattern,
+    active: true,
+  })
+
+  const tone: FieldTone = (hovered ?? focus)?.tone ?? 'rose'
+  const speaking = audition.speaking != null || audition.loading != null
+
+  /* ── The bloom into the player ── */
+
+  const bloomRef = useRef<HTMLDivElement>(null)
+  const { contextSafe } = useGSAP({ scope: bloomRef })
+
+  const bloom = contextSafe(() => {
+    const node = bloomRef.current
+    if (!node || reducedMotion) return
+    gsap.fromTo(
+      node,
+      { opacity: 0, scale: 0.6 },
+      { opacity: 1, scale: 1.9, duration: BLOOM_MS / 1000, ease: 'power2.in' },
+    )
+  })
+
+  /* ── Moving between steps ── */
+
+  const go = useCallback(
+    (next: Step) => {
+      audition.stop()
+      setStep(next)
+      // A step change is a new screen at the top, and the intent grid can be
+      // taller than a phone. Instant rather than smooth: this is not a scroll
+      // somebody asked for, it is the page being replaced.
+      window.scrollTo({ top: 0, behavior: 'auto' })
+    },
+    [audition],
+  )
+
+  /** Everything the first session needs, written into the real draft. */
   const commit = useCallback(() => {
     const line = text.trim()
     if (line) {
-      updateDraft({
-        text: line,
-        title: focus?.loopTitle ?? 'My first loop',
-      })
+      updateDraft({ text: line, title: focus?.loopTitle ?? 'My first loop' })
     }
     updateSettings({ voiceStyle: style, voiceSource: 'studio' })
-    markOnboarded()
   }, [focus, style, text, updateDraft, updateSettings])
 
   /**
@@ -84,11 +207,15 @@ export function WelcomeRoute() {
    * skipped did not ask for a session to start, and arriving in the middle of
    * one would be the app doing exactly the thing they just declined.
    */
-  const skip = useCallback(() => {
-    commit()
-    tts.stop()
-    navigate('/create', { replace: true })
-  }, [commit, navigate])
+  const leave = useCallback(
+    (destination: '/create' = '/create') => {
+      commit()
+      markOnboarded()
+      tts.stop()
+      navigate(destination, { replace: true })
+    },
+    [commit, navigate],
+  )
 
   const begin = useCallback(() => {
     if (beginning) return
@@ -96,16 +223,20 @@ export function WelcomeRoute() {
     prime()
     primeBreathAudio()
     commit()
+    markOnboarded()
+    clearProgress()
     setBeginning(true)
+    bloom()
 
     /*
-     * One frame for the draft to land before the session reads it.
+     * One tick for the draft to land before the session reads it.
      *
      * `start()` takes what is in the provider, and `commit()` has only just
      * queued a state update — starting synchronously would begin a session
-     * with the previous, empty draft. The delay that makes the button feel
-     * settled is the same delay that makes this correct, which is a happy
-     * accident worth writing down so nobody removes it as decoration.
+     * with the previous draft. The bloom's duration is the same wait, which is
+     * why the transition reads as continuous rather than as a pause followed
+     * by a screen: by the time the player mounts, the voice is already loading
+     * and the garden behind it never went away.
      */
     window.setTimeout(
       () => {
@@ -113,57 +244,110 @@ export function WelcomeRoute() {
         recordEngagement()
         navigate('/player', { replace: true })
       },
-      reducedMotion ? 24 : START_TRANSITION_MS,
+      reducedMotion ? 24 : BLOOM_MS - 60,
     )
-  }, [beginning, commit, navigate, prime, reducedMotion, start])
+  }, [beginning, bloom, commit, navigate, prime, reducedMotion, start])
+
+  /* ── Derived labels for the ritual preview ── */
+
+  const breathLabel = useMemo(() => {
+    if (!preferences.breathingEnabled) return 'Off'
+    return findPreset(preferences.breathPattern)?.name ?? 'Custom'
+  }, [preferences.breathingEnabled, preferences.breathPattern])
+
+  const ambience = useMemo(
+    () => soundName(draft.settings, allTracks),
+    [draft.settings, allTracks],
+  )
+
+  const index = ORDER.indexOf(step)
 
   return (
-    <OnboardingFrame
-      step={ORDER.indexOf(step)}
-      total={ORDER.length}
-      stepKey={step}
-      width={step === 'focus' ? 'wide' : 'column'}
-      onSkip={skip}
-      skipLabel={step === 'welcome' ? 'Skip' : 'Skip setup'}
-    >
-      {step === 'welcome' && (
-        <WelcomeStep
-          onBegin={() => {
-            // The one gesture the whole screen's responsiveness rests on.
-            tts.unlock()
-            setStep('focus')
-          }}
+    <>
+      {/*
+        The field sits behind the whole route rather than inside a step, so it
+        is one continuous object across all four — the thing that settles,
+        rather than four things that each animate in.
+      */}
+      <div className="pointer-events-none fixed inset-0 -z-[9] overflow-hidden">
+        <SettlingField
+          resolve={RESOLVE[step]}
+          tone={tone}
+          speaking={speaking}
+          breath={breathing.live}
         />
-      )}
+      </div>
 
-      {step === 'focus' && (
-        <FocusStep
-          onChoose={(chosen) => {
-            setFocus(chosen)
-            setText(chosen.lines[0])
-            setStep('affirmation')
-          }}
-        />
-      )}
+      {/* The bloom. Scaled from the centre, over the field, into the player. */}
+      <div
+        ref={bloomRef}
+        aria-hidden="true"
+        className="pointer-events-none fixed left-1/2 top-1/2 -z-[8] h-[70vmin] w-[70vmin] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-0"
+        style={{
+          background:
+            'radial-gradient(circle, color-mix(in oklab, var(--rose) 34%, transparent) 0%, transparent 68%)',
+        }}
+      />
 
-      {step === 'affirmation' && focus && (
-        <AffirmationStep
-          focus={focus}
-          style={style}
-          value={text}
-          onChange={setText}
-          onContinue={() => setStep('voice')}
-        />
-      )}
+      <OnboardingFrame
+        step={index}
+        total={ORDER.length}
+        stepKey={step}
+        width={step === 'intent' ? 'wide' : 'column'}
+        onBack={index > 0 ? () => go(ORDER[index - 1]) : undefined}
+        onSkip={() => leave()}
+        skipLabel={step === 'arrival' ? 'Skip' : 'Skip setup'}
+      >
+        {step === 'arrival' && (
+          <ArrivalStep
+            onBegin={() => {
+              // The one gesture the whole experience's responsiveness rests on.
+              tts.unlock()
+              go('intent')
+            }}
+          />
+        )}
 
-      {step === 'voice' && (
-        <VoiceStep
-          style={style}
-          onStyleChange={setStyle}
-          onBegin={begin}
-          beginning={beginning}
-        />
-      )}
-    </OnboardingFrame>
+        {step === 'intent' && (
+          <IntentStep
+            onPreviewTone={setHovered}
+            onChoose={(chosen) => {
+              setFocus(chosen)
+              setHovered(null)
+              // Pre-select the recommendation so Continue is always one press
+              // away — and so the voice step opens on a real sentence rather
+              // than on an empty state.
+              setText(recommendedFor(chosen))
+              go('voice')
+            }}
+          />
+        )}
+
+        {step === 'voice' && focus && (
+          <VoiceMomentStep
+            focus={focus}
+            value={text}
+            style={style}
+            audition={audition}
+            onChange={setText}
+            onStyleChange={setStyle}
+            onContinue={() => go('ritual')}
+          />
+        )}
+
+        {step === 'ritual' && (
+          <RitualStep
+            text={text}
+            settings={{ ...draft.settings, voiceStyle: style }}
+            breathLabel={breathLabel}
+            soundName={ambience}
+            audition={audition}
+            beginning={beginning}
+            onBegin={begin}
+            onCustomize={() => leave('/create')}
+          />
+        )}
+      </OnboardingFrame>
+    </>
   )
 }

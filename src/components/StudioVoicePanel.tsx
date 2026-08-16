@@ -22,11 +22,18 @@ import { CheckIcon, CloseIcon, SparkIcon } from './Icons'
 
 interface StudioVoicePanelProps {
   /**
-   * `card` is the full offer — used in onboarding and in the Voice sheet.
-   * `inline` is the same machine with the paragraph trimmed, for when it
-   * appears under something that has already explained itself.
+   * `card` is the full offer, used in the Voice sheet.
+   *
+   * `compact` is the same offer at the end of the welcome experience, where
+   * the primary action is `Begin my first loop` and this must not push it off
+   * a phone screen. It leads with the three words that are the whole argument
+   * — Private · Free · Offline after setup — because by then the person has
+   * heard the voice and does not need it described again.
+   *
+   * `inline` is the paragraph trimmed, for when it sits under something that
+   * has already explained itself.
    */
-  variant?: 'card' | 'inline'
+  variant?: 'card' | 'compact' | 'inline'
   /** Called when the model is up. Lets onboarding move on by itself. */
   onInstalled?: () => void
   /** Called when somebody declines. Absent means "no decline button". */
@@ -167,6 +174,66 @@ export function StudioVoicePanel({
   }
 
   const failed = studio.state === 'failed'
+
+  if (variant === 'compact') {
+    return (
+      <div
+        className={cx(
+          'rounded-[1.15rem] border px-4 py-3',
+          failed
+            ? 'border-[var(--gold)] bg-[var(--gold-soft)]'
+            : 'border-[var(--border)] bg-[var(--surface-sunken)]',
+          className,
+        )}
+      >
+        <div className="flex items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--rose-soft)] text-[0.9rem] text-[var(--rose-deep)]"
+          >
+            <SparkIcon />
+          </span>
+          <p className="min-w-0 grow text-[0.95rem] font-medium text-ink">
+            Studio Voice
+          </p>
+          <p className="type-meta shrink-0 text-[0.76rem]">
+            ~{STUDIO_DOWNLOAD_MB} MB
+          </p>
+        </div>
+
+        <p className="mt-1.5 text-[0.84rem] leading-snug text-ink-muted">
+          {failed
+            ? explainFailure(studio.failure)
+            : 'Private · Free · Offline after setup'}
+        </p>
+
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              cue('start')
+              studio.install()
+            }}
+          >
+            {failed ? 'Try again' : 'Install Studio Voice'}
+          </Button>
+          {onDismiss && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                cue('tap')
+                onDismiss()
+              }}
+            >
+              {dismissLabel}
+            </Button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

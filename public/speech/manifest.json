@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-16T06:10:39.183Z",
+  "generatedAt": "2026-08-16T06:35:08.742Z",
   "engine": {
     "id": "kokoro",
     "modelVersion": "kokoro-82m-v1.0"
@@ -2209,6 +2209,126 @@
       "formats": {
         "opus": "fc/fc3783351bbd569fb3532407ac7573a7571463ac67bf7b1d35dcebe70cd7d82b.opus",
         "mp3": "fc/fc3783351bbd569fb3532407ac7573a7571463ac67bf7b1d35dcebe70cd7d82b.mp3"
+      }
+    },
+    "1e6435c94a3b3af0883346061cdb96fe8aae78deee7205c86de7ed4d42dc8991": {
+      "text": "I can handle what is in front of me.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "1e/1e6435c94a3b3af0883346061cdb96fe8aae78deee7205c86de7ed4d42dc8991.opus",
+        "mp3": "1e/1e6435c94a3b3af0883346061cdb96fe8aae78deee7205c86de7ed4d42dc8991.mp3"
+      }
+    },
+    "932dadd2b09807a1c7b6272d196be6617ef2688c8d9b912e8a94ef294e97da57": {
+      "text": "I can handle what is in front of me.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "93/932dadd2b09807a1c7b6272d196be6617ef2688c8d9b912e8a94ef294e97da57.opus",
+        "mp3": "93/932dadd2b09807a1c7b6272d196be6617ef2688c8d9b912e8a94ef294e97da57.mp3"
+      }
+    },
+    "7902c4eeb2cef3b455bbfba06ecff2c88629d5b24b689389417f0d69466961e1": {
+      "text": "This is hard, and I am still here.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "79/7902c4eeb2cef3b455bbfba06ecff2c88629d5b24b689389417f0d69466961e1.opus",
+        "mp3": "79/7902c4eeb2cef3b455bbfba06ecff2c88629d5b24b689389417f0d69466961e1.mp3"
+      }
+    },
+    "9f82e8149de97294ca21f492da701ed64f66a1beb0a6ddc64005bb3cebe96f46": {
+      "text": "This is hard, and I am still here.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "9f/9f82e8149de97294ca21f492da701ed64f66a1beb0a6ddc64005bb3cebe96f46.opus",
+        "mp3": "9f/9f82e8149de97294ca21f492da701ed64f66a1beb0a6ddc64005bb3cebe96f46.mp3"
+      }
+    },
+    "7c284a4cc6f6f571d9cb840f09abd886c3c588cb740425ea82d6d536fd5f8107": {
+      "text": "I have got through every day so far.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "7c/7c284a4cc6f6f571d9cb840f09abd886c3c588cb740425ea82d6d536fd5f8107.opus",
+        "mp3": "7c/7c284a4cc6f6f571d9cb840f09abd886c3c588cb740425ea82d6d536fd5f8107.mp3"
+      }
+    },
+    "fca301306042964d5158298aa8374bc6380682047638b9d28b995b4cc6a4cfbf": {
+      "text": "I have got through every day so far.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "fc/fca301306042964d5158298aa8374bc6380682047638b9d28b995b4cc6a4cfbf.opus",
+        "mp3": "fc/fca301306042964d5158298aa8374bc6380682047638b9d28b995b4cc6a4cfbf.mp3"
+      }
+    },
+    "735ac79d5386cdcc66b1fc9dbc48e388e59ecc13d5c18aad12c29e75707eada0": {
+      "text": "I do not have to feel fine to keep going.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "73/735ac79d5386cdcc66b1fc9dbc48e388e59ecc13d5c18aad12c29e75707eada0.opus",
+        "mp3": "73/735ac79d5386cdcc66b1fc9dbc48e388e59ecc13d5c18aad12c29e75707eada0.mp3"
+      }
+    },
+    "6362100a8862ef5992376a7561648675303c1138d3dd02d1725298920bec327b": {
+      "text": "I do not have to feel fine to keep going.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "63/6362100a8862ef5992376a7561648675303c1138d3dd02d1725298920bec327b.opus",
+        "mp3": "63/6362100a8862ef5992376a7561648675303c1138d3dd02d1725298920bec327b.mp3"
+      }
+    },
+    "97054236ca58120feacd13514ebb72f357f81533a2a0b5499736548f84223c7b": {
+      "text": "The hard part will not last as long as it feels.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "97/97054236ca58120feacd13514ebb72f357f81533a2a0b5499736548f84223c7b.opus",
+        "mp3": "97/97054236ca58120feacd13514ebb72f357f81533a2a0b5499736548f84223c7b.mp3"
+      }
+    },
+    "92250e8071225befce8b2cebb1ab6cd5ea3e27fe2b2bf7b1b29edaeea4c216b4": {
+      "text": "The hard part will not last as long as it feels.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "92/92250e8071225befce8b2cebb1ab6cd5ea3e27fe2b2bf7b1b29edaeea4c216b4.opus",
+        "mp3": "92/92250e8071225befce8b2cebb1ab6cd5ea3e27fe2b2bf7b1b29edaeea4c216b4.mp3"
+      }
+    },
+    "decce617e070fb100e5976184bea02b027307af5ac48d0f81ffc6fbaa34ee8c1": {
+      "text": "I am allowed to ask for help with this.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "de/decce617e070fb100e5976184bea02b027307af5ac48d0f81ffc6fbaa34ee8c1.opus",
+        "mp3": "de/decce617e070fb100e5976184bea02b027307af5ac48d0f81ffc6fbaa34ee8c1.mp3"
+      }
+    },
+    "6d4ebb6ccee15754e4352bc2ec2550687bb7fde5fd5d9dd4db45dfb4d97d84a6": {
+      "text": "I am allowed to ask for help with this.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "6d/6d4ebb6ccee15754e4352bc2ec2550687bb7fde5fd5d9dd4db45dfb4d97d84a6.opus",
+        "mp3": "6d/6d4ebb6ccee15754e4352bc2ec2550687bb7fde5fd5d9dd4db45dfb4d97d84a6.mp3"
       }
     },
     "c7d729fc3d3646c0eba83f90f02040cf1ec08903831276d05d2e02e7b2127e8a": {
