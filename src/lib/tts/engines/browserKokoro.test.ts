@@ -180,10 +180,59 @@ describe('installing Studio Voice', () => {
   it('a worker that dies never leaves the interface waiting', async () => {
     const { engine, fake } = build()
     const installing = engine.install()
+
+    /*
+     * Twice, because a dead worker is now worth one second attempt against the
+     * other copy of the engine before anybody is told it did not work. See
+     * `runtime.ts`: the overwhelmingly common cause of this failure was the
+     * engine being fetched from a CDN that something on the machine refused to
+     * let through, and the recovery for that is to use the bundled one.
+     */
+    fake.die()
+    await Promise.resolve()
     fake.die()
 
     expect(await installing).toBe(false)
     expect(engine.getSnapshot().state).toBe('failed')
+    // Not "your device cannot do this" — the engine could not be loaded.
+    expect(engine.getSnapshot().failure).toBe('runtime')
+  })
+
+  it('tries the other engine once before giving up, and remembers what worked', async () => {
+    const { engine, fake } = build()
+    const installing = engine.install()
+
+    expect(fake.sent[0]).toMatchObject({ type: 'install', runtime: 'bundled' })
+    fake.reply({
+      type: 'failed',
+      reason: 'runtime',
+      message: 'no available backend found.',
+    })
+    await Promise.resolve()
+
+    // Still preparing, from the outside: the app is recovering by itself.
+    expect(engine.getSnapshot()).toMatchObject({ state: 'installing', retrying: true })
+    const second = fake.sent.filter((message) => message.type === 'install').at(-1)
+    expect(second).toMatchObject({ runtime: 'cdn' })
+
+    fake.reply({ type: 'ready', backend: 'wasm' })
+    expect(await installing).toBe(true)
+
+    // And the next install on this device starts with the one that worked.
+    const again = build()
+    void again.engine.install()
+    expect(again.fake.sent[0]).toMatchObject({ runtime: 'cdn' })
+  })
+
+  it('does not go looking for a second engine when there is no room', async () => {
+    const { engine, fake } = build()
+    const installing = engine.install()
+    fake.reply({ type: 'failed', reason: 'storage', message: 'QuotaExceededError' })
+
+    expect(await installing).toBe(false)
+    // One attempt. A device with no room has no room either way, and proving
+    // it a second time would be another ninety megabytes.
+    expect(fake.sent.filter((message) => message.type === 'install')).toHaveLength(1)
   })
 
   it('forgets on request', async () => {

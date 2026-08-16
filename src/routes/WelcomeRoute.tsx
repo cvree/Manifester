@@ -1,16 +1,24 @@
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ArrivalStep } from '../components/onboarding/ArrivalStep'
+import { AttuneStep } from '../components/onboarding/AttuneStep'
 import { IntentStep } from '../components/onboarding/IntentStep'
 import { OnboardingFrame } from '../components/onboarding/OnboardingFrame'
+import { OwnWordsGate } from '../components/onboarding/OwnWordsGate'
 import { RitualStep } from '../components/onboarding/RitualStep'
 import { SettlingField, type FieldTone } from '../components/onboarding/SettlingField'
 import { useAudition } from '../components/onboarding/useAudition'
 import { VoiceMomentStep } from '../components/onboarding/VoiceMomentStep'
-import { findFocus, recommendedFor, type Focus } from '../lib/affirmations'
-import { findPreset } from '../lib/breathing'
+import {
+  blendStarters,
+  findFocus,
+  loopTitleFor,
+  recommendedFor,
+  type Focus,
+} from '../lib/affirmations'
+import { findPreset, type BreathPattern } from '../lib/breathing'
 import { primeBreathAudio } from '../lib/breathAudio'
 import { recordEngagement } from '../lib/engagement'
 import { useReducedMotion } from '../lib/motion'
@@ -20,12 +28,14 @@ import {
   readProgress,
   writeProgress,
 } from '../lib/onboarding'
+import { chooseSound } from '../lib/soundChoice'
 import { soundName } from '../lib/summaries'
 import { tts } from '../lib/tts'
 import { useBreathing } from '../lib/useBreathing'
 import { useLibrary } from '../state/LibraryProvider'
 import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
+import { useTheme } from '../state/ThemeProvider'
 
 /**
  * Opening Manifester for the first time.
@@ -53,16 +63,27 @@ import { useSession } from '../state/SessionProvider'
  * The voice layer, the caches, the breath engine and the ambience are used
  * exactly as the rest of the app uses them.
  *
- * ── Four beats ──────────────────────────────────────────────────────────────
+ * ── The beats ───────────────────────────────────────────────────────────────
  *
- *     arrival  →  what would you like to strengthen?  →  hear it  →  begin
- *      feel          personal relevance                  surprise    calm
+ *   arrival → what would you like to strengthen? → hear it → make it yours
+ *                                                    → your sky → begin
  *
- * The voice moment is folded into the third beat rather than given a screen of
- * its own, because comparing Ivy and Fen only means something when they are
- * saying the sentence you just chose. Personalising is folded in for the same
- * reason: it is the same screen, one tap, with the writing helper the app
- * already has.
+ * The first three are the original flow and are unchanged in shape: feel,
+ * personal relevance, surprise. The two that follow were added for one reason,
+ * which is worth stating because it is not "more features".
+ *
+ * A first visit that consists entirely of *being shown things* produces
+ * somebody who has seen a nice app. A first visit in which somebody chooses
+ * the colour of the room, the rhythm of the breath, the sound underneath and —
+ * if they want it — a chart of their own produces somebody who has **made
+ * something**, and that is a different relationship with the same software.
+ * Every one of those choices already existed in Settings, where nearly nobody
+ * found them.
+ *
+ * `own-words` is a sixth step that is never reached in the ordinary flow: it
+ * is where "Write my own" goes when the question of *who will read those
+ * words* has not been answered yet. See `OwnWordsGate` for why that question
+ * cannot be skipped.
  *
  * ── Leaving, and coming back ────────────────────────────────────────────────
  *
@@ -73,15 +94,26 @@ import { useSession } from '../state/SessionProvider'
  * can be offered deliberately rather than by accident.
  */
 
-type Step = 'arrival' | 'intent' | 'voice' | 'ritual'
+type Step =
+  | 'arrival'
+  | 'intent'
+  | 'voice'
+  | 'own-words'
+  | 'attune'
+  | 'sky'
+  | 'ritual'
 
-const ORDER: Step[] = ['arrival', 'intent', 'voice', 'ritual']
+/** The steps with a mark at the bottom. `own-words` is a detour, not a beat. */
+const ORDER: Step[] = ['arrival', 'intent', 'voice', 'attune', 'sky', 'ritual']
 
 /** How resolved the field is on each step. See `SettlingField`. */
 const RESOLVE: Record<Step, number> = {
   arrival: 0,
-  intent: 0.34,
-  voice: 0.68,
+  intent: 0.28,
+  voice: 0.5,
+  'own-words': 0.5,
+  attune: 0.72,
+  sky: 0.88,
   ritual: 1,
 }
 
@@ -94,10 +126,33 @@ const RESOLVE: Record<Step, number> = {
  */
 const BLOOM_MS = 460
 
+/**
+ * The one step that is code-split, for the same reason the library's Sky tab
+ * is: the city list and everything behind it belong to people who want a
+ * chart, not to every first-time visitor. By the time somebody reaches this
+ * step they have spent thirty seconds on the four before it, so the fetch has
+ * had plenty of time to finish in the background.
+ */
+const SkyStep = lazy(() =>
+  import('../components/onboarding/SkyStep').then((module) => ({
+    default: module.SkyStep,
+  })),
+)
+
 export function WelcomeRoute() {
   const navigate = useNavigate()
-  const { updateDraft, updateSettings, draft, prime, start } = useSession()
-  const { preferences } = usePreferences()
+  const {
+    updateDraft,
+    updateSettings,
+    draft,
+    prime,
+    start,
+    voices,
+    voicesReady,
+    previewVoice,
+  } = useSession()
+  const { preferences, update: updatePreferences } = usePreferences()
+  const { hue, setHue } = useTheme()
   const { allTracks } = useLibrary()
   const reducedMotion = useReducedMotion()
   const audition = useAudition()
@@ -111,8 +166,10 @@ export function WelcomeRoute() {
       ? (restored.step as Step)
       : 'arrival',
   )
-  const [focus, setFocus] = useState<Focus | null>(() =>
-    findFocus(restored?.focusId),
+  const [focuses, setFocuses] = useState<Focus[]>(() =>
+    (restored?.focusIds ?? [])
+      .map((id) => findFocus(id))
+      .filter((focus): focus is Focus => focus != null),
   )
   const [text, setText] = useState(() => restored?.text ?? '')
   const [style, setStyle] = useState<'feminine' | 'masculine'>(
@@ -121,6 +178,21 @@ export function WelcomeRoute() {
   const [beginning, setBeginning] = useState(false)
   /** Warms the field towards whatever the pointer is over, before a choice. */
   const [hovered, setHovered] = useState<Focus | null>(null)
+
+  /**
+   * Whether the textarea is open, and whether it is allowed to be.
+   *
+   * Two separate facts. `writing` is which half of the voice step is on
+   * screen; `wordsUnlocked` is whether the question of who reads a typed line
+   * has been answered — by installing Studio Voice, or by deliberately
+   * choosing a device voice instead. Lifted here rather than kept in the step
+   * because the answer is given on a *different* step and has to survive the
+   * trip back. See `OwnWordsGate`.
+   */
+  const [writing, setWriting] = useState(false)
+  const [wordsUnlocked, setWordsUnlocked] = useState(
+    () => restored?.wordsUnlocked ?? false,
+  )
 
   /*
    * A resumed journey is mid-flight, and the steps after the first assume the
@@ -132,9 +204,15 @@ export function WelcomeRoute() {
 
   /** Everything worth not losing, written on every change. */
   useEffect(() => {
-    if (step === 'arrival' && !focus && !text) return
-    writeProgress({ step, focusId: focus?.id ?? null, text, voiceStyle: style })
-  }, [step, focus, text, style])
+    if (step === 'arrival' && focuses.length === 0 && !text) return
+    writeProgress({
+      step,
+      focusIds: focuses.map((focus) => focus.id),
+      text,
+      voiceStyle: style,
+      wordsUnlocked,
+    })
+  }, [step, focuses, text, style, wordsUnlocked])
 
   /*
    * Nothing may still be speaking when this screen goes away.
@@ -152,14 +230,16 @@ export function WelcomeRoute() {
   /*
    * The same breath the player will run, on a silent preview clock. The field
    * is therefore already breathing at the pattern named on the last step, and
-   * the first thing anybody sees is the thing they came for.
+   * the first thing anybody sees is the thing they came for — and when the
+   * pattern is changed on the Attune step, the change is visible immediately
+   * in the light behind the page.
    */
   const breathing = useBreathing({
     pattern: preferences.breathPattern,
     active: true,
   })
 
-  const tone: FieldTone = (hovered ?? focus)?.tone ?? 'rose'
+  const tone: FieldTone = (hovered ?? focuses[0])?.tone ?? 'rose'
   const speaking = audition.speaking != null || audition.loading != null
 
   /* ── The bloom into the player ── */
@@ -195,10 +275,10 @@ export function WelcomeRoute() {
   const commit = useCallback(() => {
     const line = text.trim()
     if (line) {
-      updateDraft({ text: line, title: focus?.loopTitle ?? 'My first loop' })
+      updateDraft({ text: line, title: loopTitleFor(focuses) })
     }
     updateSettings({ voiceStyle: style, voiceSource: 'studio' })
-  }, [focus, style, text, updateDraft, updateSettings])
+  }, [focuses, style, text, updateDraft, updateSettings])
 
   /**
    * Leave, at any point, keeping whatever has been decided.
@@ -260,14 +340,25 @@ export function WelcomeRoute() {
     [draft.settings, allTracks],
   )
 
+  /** The built-in ambience currently chosen, for the Attune step's chips. */
+  const soundId = useMemo(
+    () =>
+      draft.settings.sound.mode === 'off'
+        ? null
+        : draft.settings.sound.trackId,
+    [draft.settings.sound],
+  )
+
   const index = ORDER.indexOf(step)
+  /* The detour keeps the voice step's mark lit rather than clearing the row. */
+  const marked = index >= 0 ? index : ORDER.indexOf('voice')
 
   return (
     <>
       {/*
         The field sits behind the whole route rather than inside a step, so it
-        is one continuous object across all four — the thing that settles,
-        rather than four things that each animate in.
+        is one continuous object across all of them — the thing that settles,
+        rather than several things that each animate in.
       */}
       <div className="pointer-events-none fixed inset-0 -z-[9] overflow-hidden">
         <SettlingField
@@ -290,11 +381,17 @@ export function WelcomeRoute() {
       />
 
       <OnboardingFrame
-        step={index}
+        step={marked}
         total={ORDER.length}
         stepKey={step}
         width={step === 'intent' ? 'wide' : 'column'}
-        onBack={index > 0 ? () => go(ORDER[index - 1]) : undefined}
+        onBack={
+          step === 'arrival'
+            ? undefined
+            : step === 'own-words'
+              ? () => go('voice')
+              : () => go(ORDER[Math.max(0, index - 1)])
+        }
         onSkip={() => leave()}
         skipLabel={step === 'arrival' ? 'Skip' : 'Skip setup'}
       >
@@ -310,29 +407,110 @@ export function WelcomeRoute() {
 
         {step === 'intent' && (
           <IntentStep
+            chosen={focuses}
             onPreviewTone={setHovered}
-            onChoose={(chosen) => {
-              setFocus(chosen)
+            onChange={(next) => {
+              setFocuses(next)
               setHovered(null)
-              // Pre-select the recommendation so Continue is always one press
-              // away — and so the voice step opens on a real sentence rather
-              // than on an empty state.
-              setText(recommendedFor(chosen))
+              /*
+               * Keep the line in step with the choices, unless they have moved
+               * away from the suggestions. Somebody who has written their own
+               * sentence and then adds a second intent must not have it
+               * silently replaced.
+               */
+              const suggested = blendStarters(next)
+              const untouched =
+                text === '' || blendStarters(focuses).includes(text)
+              if (untouched) {
+                setText(next.length > 0 ? recommendedFor(next[0]) : '')
+              } else if (suggested.length === 0) {
+                setText(text)
+              }
+            }}
+            onContinue={() => go('voice')}
+          />
+        )}
+
+        {step === 'voice' && focuses.length > 0 && (
+          <VoiceMomentStep
+            focuses={focuses}
+            value={text}
+            style={style}
+            audition={audition}
+            writing={writing}
+            onWriteOwn={() => {
+              if (wordsUnlocked) {
+                setWriting(true)
+                return
+              }
+              go('own-words')
+            }}
+            onShowSuggestions={() => setWriting(false)}
+            onChange={setText}
+            onStyleChange={setStyle}
+            onContinue={() => go('attune')}
+          />
+        )}
+
+        {step === 'own-words' && (
+          <OwnWordsGate
+            style={style}
+            voices={voices}
+            voicesReady={voicesReady}
+            selectedVoiceURI={draft.settings.voiceURI}
+            onChooseDeviceVoice={(voice) => {
+              updateSettings({
+                voiceURI: voice.voiceURI,
+                voiceName: voice.name,
+                voiceSource: 'device',
+              })
+            }}
+            onPreviewDeviceVoice={(voice) => {
+              updateSettings({
+                voiceURI: voice.voiceURI,
+                voiceName: voice.name,
+                voiceSource: 'device',
+              })
+              previewVoice(style)
+            }}
+            onResolved={() => {
+              setWordsUnlocked(true)
+              setWriting(true)
+              go('voice')
+            }}
+            onCancel={() => {
+              setWriting(false)
               go('voice')
             }}
           />
         )}
 
-        {step === 'voice' && focus && (
-          <VoiceMomentStep
-            focus={focus}
-            value={text}
-            style={style}
-            audition={audition}
-            onChange={setText}
-            onStyleChange={setStyle}
-            onContinue={() => go('ritual')}
+        {step === 'attune' && (
+          <AttuneStep
+            hue={hue}
+            onHueChange={setHue}
+            breathingEnabled={preferences.breathingEnabled}
+            breathPattern={preferences.breathPattern}
+            onBreathChange={(pattern: BreathPattern, enabled) =>
+              updatePreferences({ breathPattern: pattern, breathingEnabled: enabled })
+            }
+            soundId={soundId}
+            onSoundChange={(id) =>
+              updateSettings({
+                sound: chooseSound(
+                  draft.settings.sound,
+                  id == null ? { kind: 'off' } : { kind: 'track', id },
+                ),
+              })
+            }
+            onContinue={() => go('sky')}
           />
+        )}
+
+        {step === 'sky' && (
+          <Suspense fallback={<div className="min-h-[18rem]" />}>
+            <SkyStep onDone={() => go('ritual')} />
+          </Suspense>
         )}
 
         {step === 'ritual' && (

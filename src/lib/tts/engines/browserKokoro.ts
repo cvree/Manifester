@@ -11,19 +11,29 @@
  * The class has two jobs and they are deliberately separable:
  *
  *  - **A lifecycle**, which the interface drives. Not installed → installing,
- *    with progress → ready, or one of five honest ways to fail. Nothing here
- *    downloads anything until `install()` is called by a person pressing a
- *    button; `resume()` only ever re-opens files that are already on disk.
+ *    with progress → ready, or one of several honest ways to fail. Nothing
+ *    here downloads anything until `install()` is called by a person pressing
+ *    a button; `resume()` only ever re-opens files that are already on disk.
  *  - **A `TTSEngine`**, which the resolver drives and which knows nothing
  *    about any of that. It answers `probe()` with whether the model is up and
  *    `synthesize()` with audio, exactly like the HTTP engine next to it.
  *
  * Everything expensive happens in `workers/kokoro.worker.ts`. This file is the
- * page's half of that conversation, and it is careful about three things: the
+ * page's half of that conversation, and it is careful about four things: the
  * worker is not created until somebody asks for it, a synthesis nobody is
- * waiting for is cancelled rather than left to arrive late, and a failure is
- * always a state the interface can render rather than a rejected promise
+ * waiting for is cancelled rather than left to arrive late, an install that
+ * has stopped moving is reported rather than waited on for ever, and a failure
+ * is always a state the interface can render rather than a rejected promise
  * somebody has to catch.
+ *
+ * ── Two attempts, not one ───────────────────────────────────────────────────
+ *
+ * An install is run against the runtime bundled into this build, and only if
+ * that will not start is it run again against the CDN copy — in a *new*
+ * worker, because ONNX Runtime can be initialised exactly once per thread and
+ * a second attempt in the same one fails with an error about the first. The
+ * reasoning behind the order, and the bug that made it necessary, is in
+ * `runtime.ts`.
  */
 
 import { readLocal, removeLocal, writeLocal } from '../../storage'
@@ -43,9 +53,13 @@ import type {
 import { engineVoiceFor } from '../voices'
 import { encodeWav } from '../wav'
 import { KOKORO_MODEL_VERSION } from './kokoroModel'
+import { RUNTIME_ORDER, worthRetryingElsewhere, type StudioRuntime } from './runtime'
 
 /** Where "this device has the model" is remembered between visits. */
 const INSTALLED_KEY = 'tts.studioVoice'
+
+/** Which copy of the engine actually worked here last time. */
+const RUNTIME_KEY = 'tts.studioRuntime'
 
 /**
  * What the download actually costs, for the sentence on the install card.
@@ -55,6 +69,18 @@ const INSTALLED_KEY = 'tts.studioVoice'
  * afterwards. Quantised weights plus tokeniser plus one voice pack.
  */
 export const STUDIO_DOWNLOAD_MB = 90
+
+/**
+ * How long an install may go without a single byte before it is called.
+ *
+ * Not a total timeout: ninety megabytes on a bad train connection is minutes,
+ * and cutting that off would be the app giving up on somebody who was doing
+ * fine. This is a *stall* timer, reset by every progress event, and it exists
+ * for the one failure mode that has no error attached to it — a runtime that
+ * never resolves, which without this leaves "Preparing Studio Voice…" on
+ * screen until the tab is closed.
+ */
+const STALL_MS = 45_000
 
 export type StudioState =
   /** No worker, no WebAssembly, or a browser that cannot run this. */
@@ -79,6 +105,15 @@ export interface StudioSnapshot {
   message: string | null
   /** True when this browser advertises WebGPU. Shown on the install card. */
   accelerated: boolean
+  /** Which copy of the engine the current or last attempt used. */
+  runtime: StudioRuntime | null
+  /**
+   * True while a second attempt against the other runtime is under way.
+   *
+   * The interface uses it to keep saying "preparing" rather than flashing a
+   * failure that the app is in the middle of recovering from by itself.
+   */
+  retrying: boolean
 }
 
 /** A synthesis the page is still waiting on. */
@@ -114,8 +149,8 @@ export function webGpuAvailable(): boolean {
  * Just enough of `Worker` for this class to talk to one.
  *
  * Narrowed to what is used so a test can supply an object rather than a
- * thread. The lifecycle below — install, progress, ready, cancel, and five
- * kinds of failure — is the part of this feature most likely to strand
+ * thread. The lifecycle below — install, progress, ready, cancel, and the
+ * several kinds of failure — is the part of this feature most likely to strand
  * somebody on "Preparing your voice…" for ever, and it is not testable at all
  * if the only way to reach it is to download 86 MB of weights.
  */
@@ -142,13 +177,21 @@ export class BrowserKokoroEngine implements TTSEngine {
     failure: null,
     message: null,
     accelerated: webGpuAvailable(),
+    runtime: null,
+    retrying: false,
   }
 
-  /** Resolves when the current install settles, either way. */
-  private settling: {
-    promise: Promise<boolean>
-    resolve: (ok: boolean) => void
-  } | null = null
+  /** The whole sequence of attempts, so two presses of Install share one. */
+  private running: Promise<boolean> | null = null
+
+  /** Resolves when the *current attempt* settles, either way. */
+  private attempt: { resolve: (ok: boolean) => void } | null = null
+
+  /** Reset by every progress event. See `STALL_MS`. */
+  private stall: ReturnType<typeof setTimeout> | null = null
+
+  /** Set while tearing a worker down deliberately, so `crash` stays quiet. */
+  private abandoning = false
 
   constructor(createWorker: () => StudioWorker = defaultWorker) {
     this.createWorker = createWorker
@@ -207,14 +250,14 @@ export class BrowserKokoroEngine implements TTSEngine {
     if (this.snapshot.state === 'unsupported') return false
     if (this.snapshot.state === 'ready') return true
     if (!this.everInstalled) return false
-    return this.bringUp('resume')
+    return this.sequence('resume')
   }
 
   /** Download and start the model. Only ever from a deliberate press. */
   async install(): Promise<boolean> {
     if (this.snapshot.state === 'unsupported') return false
     if (this.snapshot.state === 'ready') return true
-    return this.bringUp('install')
+    return this.sequence('install')
   }
 
   /**
@@ -229,22 +272,26 @@ export class BrowserKokoroEngine implements TTSEngine {
    */
   cancelInstall(): void {
     if (this.snapshot.state !== 'installing') return
+    this.abandoning = true
     this.teardown()
-    this.settling?.resolve(false)
-    this.settling = null
+    this.abandoning = false
     this.publish({
       state: 'available',
       failure: 'cancelled',
       message: null,
       loaded: 0,
       total: 0,
+      retrying: false,
     })
+    // After the publish, so the attempt that unwinds cannot overwrite it.
+    this.finishAttempt(false)
   }
 
   /** Forget the model, so the next visit does not try to bring it back. */
   forget(): void {
     this.teardown()
     removeLocal(INSTALLED_KEY)
+    removeLocal(RUNTIME_KEY)
     this.publish({
       state: studioVoiceSupported() ? 'available' : 'unsupported',
       backend: null,
@@ -252,46 +299,138 @@ export class BrowserKokoroEngine implements TTSEngine {
       message: null,
       loaded: 0,
       total: 0,
+      runtime: null,
+      retrying: false,
     })
   }
 
-  private bringUp(kind: 'install' | 'resume'): Promise<boolean> {
-    if (this.settling) return this.settling.promise
+  /**
+   * Which runtime to try first.
+   *
+   * Whatever worked here last time, if anything did. A device behind a filter
+   * that eats the bundled asset — or, far more likely, one where the CDN is
+   * the thing being eaten — should not pay for the discovery twice.
+   */
+  private runtimeOrder(): StudioRuntime[] {
+    const remembered = readLocal(RUNTIME_KEY)
+    const known = RUNTIME_ORDER.filter((runtime) => runtime === remembered)
+    return [...known, ...RUNTIME_ORDER.filter((runtime) => runtime !== remembered)]
+  }
 
-    let resolve!: (ok: boolean) => void
-    const promise = new Promise<boolean>((done) => {
-      resolve = done
+  /**
+   * The whole install: one attempt per runtime, stopping at the first success
+   * and at the first failure not worth carrying to the other one.
+   */
+  private sequence(kind: 'install' | 'resume'): Promise<boolean> {
+    if (this.running) return this.running
+
+    this.running = (async () => {
+      const order = this.runtimeOrder()
+
+      for (let index = 0; index < order.length; index += 1) {
+        const runtime = order[index]
+        const more = index < order.length - 1
+
+        this.publish({
+          state: 'installing',
+          failure: null,
+          message: null,
+          loaded: 0,
+          total: 0,
+          runtime,
+          retrying: index > 0,
+        })
+
+        const ok = await this.runAttempt(kind, runtime)
+        if (ok) {
+          writeLocal(RUNTIME_KEY, runtime)
+          return true
+        }
+
+        const failure = this.snapshot.failure
+        /*
+         * `cancelled` is somebody changing their mind and `not-cached` is the
+         * ordinary answer to a resume. Neither is a reason to go and try the
+         * other engine, and doing so would turn a Cancel press into a second
+         * download.
+         */
+        if (!more || !worthRetryingElsewhere(failure)) return false
+      }
+
+      return false
+    })().finally(() => {
+      this.running = null
+      if (this.snapshot.retrying) this.publish({ retrying: false })
     })
-    this.settling = { promise, resolve }
 
-    this.publish({
-      state: 'installing',
-      failure: null,
-      message: null,
-      loaded: 0,
-      total: 0,
+    return this.running
+  }
+
+  /** One worker, one runtime, one answer. */
+  private runAttempt(
+    kind: 'install' | 'resume',
+    runtime: StudioRuntime,
+  ): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      this.attempt = { resolve }
+
+      /*
+       * A fresh worker for every attempt, and not as a precaution: ONNX
+       * Runtime refuses a second `initializeWebAssembly` in a thread where the
+       * first one failed, so re-using the worker would make the fallback fail
+       * with an error about the failure it was sent to recover from.
+       */
+      this.abandoning = true
+      this.teardown()
+      this.abandoning = false
+
+      this.armStall()
+
+      try {
+        this.ensureWorker()
+        this.post({
+          type: kind,
+          backend: webGpuAvailable() ? 'webgpu' : 'wasm',
+          runtime,
+        })
+      } catch (error) {
+        this.publish({
+          state: 'failed',
+          failure: 'runtime',
+          message: String((error as Error)?.message ?? error),
+        })
+        this.finishAttempt(false)
+      }
     })
+  }
 
-    try {
-      this.send({
-        type: kind,
-        backend: webGpuAvailable() ? 'webgpu' : 'wasm',
-      })
-    } catch (error) {
-      this.settle(false, {
+  private armStall(): void {
+    this.clearStall()
+    this.stall = setTimeout(() => {
+      if (this.snapshot.state !== 'installing') return
+      this.abandoning = true
+      this.teardown()
+      this.abandoning = false
+      this.publish({
         state: 'failed',
-        failure: 'unsupported',
-        message: String((error as Error)?.message ?? error),
+        failure: 'timeout',
+        message: 'Nothing arrived for a while.',
       })
-    }
-
-    return promise
+      this.finishAttempt(false)
+    }, STALL_MS)
   }
 
-  private settle(ok: boolean, patch: Partial<StudioSnapshot>): void {
-    this.publish(patch)
-    this.settling?.resolve(ok)
-    this.settling = null
+  private clearStall(): void {
+    if (this.stall != null) clearTimeout(this.stall)
+    this.stall = null
+  }
+
+  /** Settle the attempt in flight, once, whatever happened to it. */
+  private finishAttempt(ok: boolean): void {
+    this.clearStall()
+    const attempt = this.attempt
+    this.attempt = null
+    attempt?.resolve(ok)
   }
 
   /* ── The engine ───────────────────────────────────────────────── */
@@ -360,11 +499,6 @@ export class BrowserKokoroEngine implements TTSEngine {
 
   /* ── The worker ───────────────────────────────────────────────── */
 
-  private send(message: StudioRequest): void {
-    this.ensureWorker()
-    this.post(message)
-  }
-
   private post(message: StudioRequest): void {
     this.worker?.postMessage(message)
   }
@@ -380,8 +514,10 @@ export class BrowserKokoroEngine implements TTSEngine {
      * failure mode that looks like the app is broken rather than like a
      * feature that is unavailable.
      */
-    this.worker.onerror = () => this.crash('The Studio Voice engine stopped.')
-    this.worker.onmessageerror = () => this.crash('The Studio Voice engine stopped.')
+    this.worker.onerror = () =>
+      this.crash('The voice engine could not be started in this browser.')
+    this.worker.onmessageerror = () =>
+      this.crash('The voice engine stopped unexpectedly.')
   }
 
   private teardown(): void {
@@ -394,30 +530,43 @@ export class BrowserKokoroEngine implements TTSEngine {
   }
 
   private crash(message: string): void {
+    // A worker we terminated on purpose is not a crash to report.
+    if (this.abandoning) return
     const wasInstalling = this.snapshot.state === 'installing'
     this.teardown()
-    this.settle(false, {
+    this.publish({
       state: wasInstalling ? 'failed' : 'available',
       backend: null,
-      failure: 'unsupported',
+      /*
+       * A worker that fails to start is the engine failing to load, not the
+       * device failing to run it — the distinction that decides whether the
+       * sentence on screen is advice somebody can act on or advice that cannot
+       * possibly work.
+       */
+      failure: 'runtime',
       message,
     })
+    this.finishAttempt(false)
   }
 
   private receive(message: StudioResponse): void {
     switch (message.type) {
       case 'progress':
+        // Bytes are arriving, so the stall clock starts again.
+        if (this.snapshot.state === 'installing') this.armStall()
         this.publish({ loaded: message.loaded, total: message.total })
         break
 
       case 'ready':
         writeLocal(INSTALLED_KEY, 'installed')
-        this.settle(true, {
+        this.publish({
           state: 'ready',
           backend: message.backend,
           failure: null,
           message: null,
+          retrying: false,
         })
+        this.finishAttempt(true)
         break
 
       case 'failed': {
@@ -430,24 +579,31 @@ export class BrowserKokoroEngine implements TTSEngine {
          */
         if (message.reason === 'not-cached') {
           removeLocal(INSTALLED_KEY)
+          this.abandoning = true
           this.teardown()
-          this.settle(false, {
+          this.abandoning = false
+          this.publish({
             state: 'available',
             backend: null,
             failure: null,
             message: null,
             loaded: 0,
             total: 0,
+            retrying: false,
           })
+          this.finishAttempt(false)
           return
         }
+        this.abandoning = true
         this.teardown()
-        this.settle(false, {
+        this.abandoning = false
+        this.publish({
           state: 'failed',
           backend: null,
           failure: message.reason,
           message: message.message,
         })
+        this.finishAttempt(false)
         break
       }
 
@@ -475,7 +631,9 @@ export class BrowserKokoroEngine implements TTSEngine {
       next.loaded === this.snapshot.loaded &&
       next.total === this.snapshot.total &&
       next.failure === this.snapshot.failure &&
-      next.message === this.snapshot.message
+      next.message === this.snapshot.message &&
+      next.runtime === this.snapshot.runtime &&
+      next.retrying === this.snapshot.retrying
     ) {
       return
     }

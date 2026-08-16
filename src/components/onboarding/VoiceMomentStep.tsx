@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
+  blendStarters,
   recommendedFor,
-  startersFor,
   type Focus,
 } from '../../lib/affirmations'
 import { cx } from '../../lib/cx'
 import { cue } from '../../lib/feedback'
 import { VOICE_PROFILES, voiceForStyle } from '../../lib/tts'
+import { useTTSStatus } from '../../lib/tts/useTTSStatus'
 import { improveWords } from '../../lib/wordcraft'
 import { Button } from '../Button'
 import { CheckIcon, PencilIcon, PlayIcon, SparkIcon, WaveIcon } from '../Icons'
@@ -19,11 +20,12 @@ import type { Audition } from './useAudition'
  * The moment this whole experience exists for: their line, out loud.
  *
  * Everything on this step is arranged around the second between a tap and a
- * voice. Four starters for whatever they chose, one of them elevated as the
- * recommendation and pre-selected so the next step is always one press away —
- * and tapping any of them *speaks it*, in the same gesture, with no Preview
- * button in between. All four are warmed the moment the step appears, so the
- * common case is a decode rather than a request.
+ * voice. Four starters — blended from every intent they chose, best of each
+ * first — one of them elevated as the recommendation and pre-selected so the
+ * next step is always one press away, and tapping any of them *speaks it*, in
+ * the same gesture, with no Preview button in between. All four are warmed the
+ * moment the step appears, so the common case is a decode rather than a
+ * request.
  *
  * ── The voice moment ────────────────────────────────────────────────────────
  *
@@ -37,38 +39,54 @@ import type { Audition } from './useAudition'
  *
  * ── Personalising ───────────────────────────────────────────────────────────
  *
- * One tap, in place, on the same screen. Not a link to the editor: the editor
- * is a title field, a five-row textarea, starter chips, two AI helpers and a
- * ritual preview, and it is *the right screen* for somebody who has decided
- * they care — thirty seconds into a first visit is not that moment. So it is a
- * textarea, a Hear it, and one press of the writing helper the app already
- * has, which runs offline and rewrites their line into the present tense
- * without sending it anywhere.
+ * One tap, in place, on the same screen — *once the question of who reads it
+ * has an answer*. Writing your own words is the one thing on this screen the
+ * shelf of pre-recorded clips cannot cover, so it is also the one thing that
+ * used to change what the app sounded like without saying so. `OwnWordsGate`
+ * is where that is asked now; this step only knows whether it has been.
+ *
+ * Beyond that it is a textarea, a Hear it, and one press of the writing helper
+ * the app already has, which runs offline and rewrites their line into the
+ * present tense without sending it anywhere.
  */
 
 interface VoiceMomentStepProps {
-  focus: Focus
+  /** In the order they were chosen. The first one leads. */
+  focuses: Focus[]
   value: string
   style: 'feminine' | 'masculine'
   audition: Audition
+  /** True while the textarea is open rather than the suggestion list. */
+  writing: boolean
+  /**
+   * Ask to write their own. The route decides whether that means opening the
+   * textarea or asking the voice question first.
+   */
+  onWriteOwn: () => void
+  onShowSuggestions: () => void
   onChange: (text: string) => void
   onStyleChange: (style: 'feminine' | 'masculine') => void
   onContinue: () => void
 }
 
 export function VoiceMomentStep({
-  focus,
+  focuses,
   value,
   style,
   audition,
+  writing,
+  onWriteOwn,
+  onShowSuggestions,
   onChange,
   onStyleChange,
   onContinue,
 }: VoiceMomentStepProps) {
-  const starters = startersFor(focus)
-  const recommended = recommendedFor(focus)
-  const [writing, setWriting] = useState(() => !starters.includes(value.trim()))
+  // Memoised because it is an effect dependency: a fresh array on every render
+  // would re-warm four clips every time somebody typed a character.
+  const starters = useMemo(() => blendStarters(focuses), [focuses])
+  const recommended = focuses.length > 0 ? recommendedFor(focuses[0]) : starters[0]
   const [note, setNote] = useState<string | null>(null)
+  const status = useTTSStatus()
   const { warm, play } = audition
 
   /*
@@ -177,7 +195,7 @@ export function VoiceMomentStep({
                   onClick={() => {
                     cue('tap')
                     setNote(null)
-                    setWriting(false)
+                    onShowSuggestions()
                   }}
                 >
                   Show suggestions
@@ -186,7 +204,11 @@ export function VoiceMomentStep({
             </div>
             <p className="type-meta mt-2.5" aria-live="polite">
               {note ??
-                'Written here, read here. Nothing you type leaves this device.'}
+                (status.unlimited
+                  ? 'Written here, read here, in the voice you chose. Nothing you type leaves this device.'
+                  : // Said once more, at the moment it becomes true, because
+                    // this is the sentence the gate was protecting.
+                    'Written here, read here by this device’s own voice. Nothing you type leaves this device.')}
             </p>
           </div>
         ) : (
@@ -289,7 +311,7 @@ export function VoiceMomentStep({
               type="button"
               onClick={() => {
                 cue('tap')
-                setWriting(true)
+                onWriteOwn()
               }}
               className="interactive -ml-2 inline-flex min-h-11 items-center gap-2 rounded-pill px-2 text-[0.88rem] text-ink-muted hover:text-ink"
             >

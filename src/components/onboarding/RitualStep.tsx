@@ -4,9 +4,12 @@ import { estimateSpokenSeconds, formatApproxDuration } from '../../lib/format'
 import { VOICE_PROFILES, voiceForStyle } from '../../lib/tts'
 import { useTTSStatus } from '../../lib/tts/useTTSStatus'
 import type { LoopSettings } from '../../lib/types'
+import { useSession } from '../../state/SessionProvider'
 import { Button } from '../Button'
+import { DeviceVoicePicker } from '../DeviceVoicePicker'
 import { BreathIcon, ClockIcon, VoiceIcon, WaveIcon } from '../Icons'
 import { StudioVoicePanel } from '../StudioVoicePanel'
+import { AiOffer } from './AiOffer'
 import { Reveal, RevealText } from './Reveal'
 import type { Audition } from './useAudition'
 
@@ -55,6 +58,8 @@ export function RitualStep({
 }: RitualStepProps) {
   const status = useTTSStatus()
   const [declined, setDeclined] = useState(false)
+  const [choosingVoice, setChoosingVoice] = useState(false)
+  const { voices, voicesReady, setLiveVoice } = useSession()
 
   const line = text.trim()
   const spoken = estimateSpokenSeconds(line, settings.rate)
@@ -162,7 +167,41 @@ export function RitualStep({
             variant="compact"
             className="mt-4 text-left"
             onDismiss={() => setDeclined(true)}
+            onChooseAnother={() => setChoosingVoice(true)}
+            chooseAnotherLabel="Pick a device voice"
           />
+        )}
+
+        {/*
+          Only after an install has actually failed. Offering a list of
+          second-best voices to somebody who has not tried the good one yet
+          would be answering a question nobody asked.
+        */}
+        {choosingVoice && !status.unlimited && (
+          <div className="mt-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-sunken)] p-4 text-left">
+            <p className="text-[0.92rem] text-ink">
+              Which voice should read anything you write yourself?
+            </p>
+            <p className="type-meta mt-1">
+              The suggested lines are recorded in Ivy and Fen either way — this
+              is only for your own words.
+            </p>
+            <DeviceVoicePicker
+              className="mt-3"
+              voices={voices}
+              voicesReady={voicesReady}
+              selected={settings.voiceURI}
+              onSelect={(voice) => {
+                setLiveVoice({
+                  voiceURI: voice.voiceURI,
+                  voiceName: voice.name,
+                  voiceSource: 'device',
+                })
+                setChoosingVoice(false)
+              }}
+              style={settings.voiceStyle}
+            />
+          </div>
         )}
 
         <Button
@@ -181,6 +220,8 @@ export function RitualStep({
         </Button>
 
         <p className="type-meta mt-2.5">Stop whenever you like.</p>
+
+        <AiOffer className="mt-5" />
       </Reveal>
     </div>
   )

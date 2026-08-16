@@ -39,6 +39,16 @@ interface StudioVoicePanelProps {
   /** Called when somebody declines. Absent means "no decline button". */
   onDismiss?: () => void
   dismissLabel?: string
+  /**
+   * Offered *only* when the install has failed.
+   *
+   * A failure with one button on it is a wall. Somebody who has just watched
+   * ninety megabytes not work is owed a way forward that does not involve
+   * trying the same thing again, and the way forward is a real choice between
+   * the voices their device already has. See `DeviceVoicePicker`.
+   */
+  onChooseAnother?: () => void
+  chooseAnotherLabel?: string
   className?: string
 }
 
@@ -52,6 +62,8 @@ export function StudioVoicePanel({
   onInstalled,
   onDismiss,
   dismissLabel = 'Maybe later',
+  onChooseAnother,
+  chooseAnotherLabel = 'Choose another voice',
   className,
 }: StudioVoicePanelProps) {
   const studio = useStudioVoice()
@@ -121,7 +133,13 @@ export function StudioVoicePanel({
       >
         <div className="flex items-baseline justify-between gap-3">
           <p className="text-[1rem] font-medium text-ink" role="status">
-            Preparing Studio Voice…
+            {/*
+              A second attempt against the other engine is the app fixing
+              something, not the app failing. Saying so is more honest than a
+              bar that silently restarts, and far more honest than the error it
+              replaced.
+            */}
+            {studio.retrying ? 'Trying another engine…' : 'Preparing Studio Voice…'}
           </p>
           <span className="type-meta tabular-nums">
             {percent == null ? 'starting' : `${percent}%`}
@@ -218,6 +236,17 @@ export function StudioVoicePanel({
           >
             {failed ? 'Try again' : 'Install Studio Voice'}
           </Button>
+          {failed && onChooseAnother && (
+            <Button
+              size="sm"
+              onClick={() => {
+                cue('tap')
+                onChooseAnother()
+              }}
+            >
+              {chooseAnotherLabel}
+            </Button>
+          )}
           {onDismiss && (
             <Button
               variant="ghost"
@@ -231,6 +260,8 @@ export function StudioVoicePanel({
             </Button>
           )}
         </div>
+
+        {failed && <FailureDetail message={studio.message} />}
       </div>
     )
   }
@@ -283,6 +314,17 @@ export function StudioVoicePanel({
             >
               {failed ? 'Try again' : 'Install Studio Voice'}
             </Button>
+            {failed && onChooseAnother && (
+              <Button
+                size="md"
+                onClick={() => {
+                  cue('tap')
+                  onChooseAnother()
+                }}
+              >
+                {chooseAnotherLabel}
+              </Button>
+            )}
             {onDismiss && (
               <Button
                 variant="ghost"
@@ -296,6 +338,8 @@ export function StudioVoicePanel({
               </Button>
             )}
           </div>
+
+          {failed && <FailureDetail message={studio.message} />}
 
           {variant === 'card' && !failed && (
             <p className="type-meta mt-2.5">
@@ -312,18 +356,53 @@ export function StudioVoicePanel({
 }
 
 /**
+ * The engine's own words, folded away.
+ *
+ * Nobody needs to read "no available backend found" to use this app, and the
+ * one person who does need it — somebody reporting that Studio Voice will not
+ * install on their machine — currently has no way to get at it at all. One
+ * line of detail behind a summary costs a person who does not care nothing,
+ * and it is the difference between a bug report that can be acted on and one
+ * that says "it does not work".
+ */
+function FailureDetail({ message }: { message: string | null }) {
+  if (!message) return null
+  return (
+    <details className="mt-2 text-[0.78rem] text-ink-faint">
+      <summary className="interactive cursor-pointer rounded-pill py-1 hover:text-ink-muted">
+        What the engine reported
+      </summary>
+      <p className="mt-1 break-words font-mono text-[0.72rem] leading-relaxed">
+        {message}
+      </p>
+    </details>
+  )
+}
+
+/**
  * What went wrong, in a sentence somebody can act on.
  *
  * None of these blame the person and none of them are dead ends — the button
- * beside them says "Try again", and the app is still perfectly usable if they
- * never press it.
+ * beside them says "Try again", there is a way to choose another voice next to
+ * it, and the app is still perfectly usable if they never press either.
+ *
+ * Each sentence has to survive a harder test than sounding kind: the advice in
+ * it has to be capable of working. For a long time every failure here arrived
+ * as `unsupported` and was reported as a memory problem, so people were told
+ * to close their tabs for a fault that was the engine being fetched from a CDN
+ * their browser would not allow. `runtime` exists to separate those, and the
+ * app now recovers from it by itself before anybody reads this at all.
  */
-function explainFailure(failure: string | null): string {
+export function explainFailure(failure: string | null): string {
   switch (failure) {
     case 'download':
       return 'The download did not finish. It picks up where it left off, so trying again on a steadier connection is usually all it needs.'
     case 'storage':
       return 'There was not enough room to store the voice. Freeing some space — or leaving private browsing, which does not allow it at all — will let it through.'
+    case 'runtime':
+      return 'The voice engine could not be loaded. A content or script blocker is the usual cause, so allowing this site and trying once more is the thing most likely to work.'
+    case 'timeout':
+      return 'The download stopped moving and nothing more arrived. Trying again picks up from where it stalled rather than starting over.'
     case 'unsupported':
       return 'This device could not start the voice engine. It is usually memory: closing other tabs and trying once more often works.'
     default:

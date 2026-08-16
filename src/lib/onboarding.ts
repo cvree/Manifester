@@ -28,23 +28,35 @@ import type { SavedLoop } from './types'
  * 2 — the settling field: one atmospheric visual, the voice moment folded into
  *     the affirmation itself, an inline personalise step, and a ritual preview
  *     that transitions into the player rather than navigating to it.
+ * 3 — more than one intent at a time; the voice question asked out loud before
+ *     anybody types their own words; and two steps where the person chooses
+ *     rather than is shown — the palette, the breath and the sound, and a
+ *     birth chart if they want one.
  *
  * Raising this offers the new introduction to people who saw the old one. It
  * is a product decision each time and never an automatic consequence of
  * editing this directory, which is why the constant is here rather than
  * derived from anything.
  */
-export const ONBOARDING_VERSION = 2
+export const ONBOARDING_VERSION = 3
 
 /**
  * Which versions still count as "has seen the introduction".
  *
  * Version 2 rearranged the same five minutes of value; it did not add anything
  * somebody who completed version 1 is missing. So they are left alone, and can
- * choose to watch it again from About. A future version that genuinely teaches
- * something new drops the old number from this list instead.
+ * choose to watch it again from About.
+ *
+ * Version 3 is the same judgement made a second time, and it is a closer call.
+ * It does contain something new — the palette, the breath, the sound and the
+ * chart are all offered there for the first time — but every one of them is
+ * also sitting in Settings, reachable by somebody who has been using the app
+ * for a month. Dragging a returning user back through an introduction to show
+ * them controls they can already reach would be the app serving its own
+ * changelog rather than them. So they are left alone here too, and About still
+ * offers the replay.
  */
-const ACCEPTED_VERSIONS = new Set([1, 2])
+const ACCEPTED_VERSIONS = new Set([1, 2, 3])
 
 const DONE_KEY = 'onboarded'
 const PROGRESS_KEY = 'onboarding.progress'
@@ -62,10 +74,19 @@ const PROGRESS_TTL_MS = 6 * 60 * 60 * 1000
 export interface OnboardingProgress {
   /** Which step they were on. Free-form; the route owns the vocabulary. */
   step: string
-  focusId: string | null
+  /** Every intent chosen, in the order they were chosen. The first one leads. */
+  focusIds: string[]
   /** Their words, including anything they had started typing. */
   text: string
   voiceStyle: 'feminine' | 'masculine'
+  /**
+   * Whether the "who reads your own words" question has been answered.
+   *
+   * Carried across a refresh so that somebody who installed Studio Voice, or
+   * deliberately picked a device voice, is not asked the same question again
+   * when their phone discards the tab mid-sentence.
+   */
+  wordsUnlocked: boolean
   /** Written on every change, and used to expire the whole thing. */
   updatedAt: number
   version: number
@@ -120,9 +141,12 @@ export function readProgress(): OnboardingProgress | null {
     if (Date.now() - parsed.updatedAt > PROGRESS_TTL_MS) return null
     return {
       step: parsed.step,
-      focusId: typeof parsed.focusId === 'string' ? parsed.focusId : null,
+      focusIds: Array.isArray(parsed.focusIds)
+        ? parsed.focusIds.filter((id): id is string => typeof id === 'string')
+        : [],
       text: typeof parsed.text === 'string' ? parsed.text : '',
       voiceStyle: parsed.voiceStyle === 'masculine' ? 'masculine' : 'feminine',
+      wordsUnlocked: parsed.wordsUnlocked === true,
       updatedAt: parsed.updatedAt,
       version: ONBOARDING_VERSION,
     }

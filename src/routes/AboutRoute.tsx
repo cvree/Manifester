@@ -1,4 +1,6 @@
 import {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useState,
@@ -8,6 +10,13 @@ import {
 } from 'react'
 import { useNavigate } from 'react-router'
 import { AiSetupPanel } from '../components/AiSetupPanel'
+
+/** Split off for the same reason the library's Sky tab is. See `LibraryRoute`. */
+const AstrologySettings = lazy(() =>
+  import('../components/astrology/AstrologySettings').then((module) => ({
+    default: module.AstrologySettings,
+  })),
+)
 import { Button } from '../components/Button'
 import { AppearanceSettings } from '../components/AppearanceSettings'
 import { Card } from '../components/Card'
@@ -453,6 +462,24 @@ export function AboutRoute() {
               enabled={preferences.aiEnabled}
               onEnabledChange={(aiEnabled) => updatePreferences({ aiEnabled })}
             />
+          </Card>
+
+          <Card
+            data-rise
+            id="sky"
+            className="scroll-mt-6"
+            title="Your sky — set it up or remove it"
+            description="Optional, off unless you ask for it, and computed entirely on this device."
+          >
+            <Suspense
+              fallback={
+                <p className="type-meta" role="status">
+                  Loading…
+                </p>
+              }
+            >
+              <AstrologySettings />
+            </Suspense>
           </Card>
 
           <Card
