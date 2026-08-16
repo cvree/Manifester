@@ -269,16 +269,23 @@ async function configureRuntime(runtime: StudioRuntime): Promise<void> {
   wasm.wasmPaths = runtime === 'cdn' ? CDN_WASM_PATH : undefined
 
   /*
-   * One thread, stated rather than discovered.
+   * As many threads as the page is actually allowed.
    *
    * Multi-threaded WebAssembly needs `SharedArrayBuffer`, which needs
-   * cross-origin isolation, which needs COOP/COEP headers that GitHub Pages
-   * does not send and this app has no way to add. ONNX Runtime works this out
-   * for itself and falls back correctly — but it does so by way of two console
-   * warnings that read like something is broken, on the one feature people
-   * already suspect of being broken.
+   * cross-origin isolation, which needs COOP/COEP headers. GitHub Pages does
+   * not send them, so the hosted build gets one thread — stated here rather
+   * than discovered, because ONNX Runtime's own fallback arrives by way of two
+   * console warnings that read like something is broken.
+   *
+   * The Docker deployment in this repository *can* send those headers, and
+   * threads are the difference between a sentence taking six seconds and two.
+   * So it is asked rather than assumed.
    */
-  wasm.numThreads = 1
+  const isolated =
+    typeof self !== 'undefined' && (self as { crossOriginIsolated?: boolean }).crossOriginIsolated
+  wasm.numThreads = isolated
+    ? Math.max(1, Math.min(4, Math.ceil((navigator.hardwareConcurrency || 2) / 2)))
+    : 1
 
   // Already the default, and worth pinning: the proxy spawns a second worker
   // inside this one, which is a second thing that can fail to load.
@@ -289,12 +296,12 @@ async function configureRuntime(runtime: StudioRuntime): Promise<void> {
 }
 
 async function bringUp(
-  backend: StudioBackend,
+  device: StudioBackend,
   runtime: StudioRuntime,
   allowDownload: boolean,
 ): Promise<void> {
-  if (tts && activeBackend === backend) {
-    post({ type: 'ready', backend })
+  if (tts && activeBackend === device) {
+    post({ type: 'ready', backend: device })
     return
   }
   if (loading) return loading
@@ -327,63 +334,58 @@ async function bringUp(
     }
 
     /*
-     * WebGPU first, then the CPU, and the second attempt is not a retry of the
-     * download — the weights are in the cache by then, so a device whose GPU
-     * path throws pays a couple of seconds rather than another 86 MB. Plenty
-     * of real browsers advertise `navigator.gpu` and then fail to build a
-     * pipeline for one operator in this graph; that is a runtime fact and the
-     * only way to learn it is to try.
+     * Exactly one device, and the page decides which.
+     *
+     * This used to loop WebGPU → WASM in here, and that loop could not work.
+     * ONNX Runtime initialises its WebAssembly once per thread and refuses
+     * ever after — a second attempt in a worker where the first one failed
+     * throws `previous call to initializeWebAssembly() failed`, so the CPU
+     * fallback was guaranteed to fail whenever it was actually needed. It is
+     * the page's job now, and it starts a fresh worker for every attempt.
+     * See `browserKokoro.ts`.
      */
-    const order: StudioBackend[] = backend === 'webgpu' ? ['webgpu', 'wasm'] : ['wasm']
-    let lastError: unknown = null
+    try {
+      const instance = await KokoroTTS.from_pretrained(MODEL_ID, {
+        dtype: DTYPE,
+        device,
+        progress_callback: (event: {
+          status: string
+          file?: string
+          loaded?: number
+          total?: number
+        }) => {
+          if (event.status === 'progress' && event.file) {
+            progress.update(event.file, event.loaded ?? 0, event.total ?? 0)
+          }
+        },
+      })
 
-    for (const device of order) {
-      try {
-        const instance = await KokoroTTS.from_pretrained(MODEL_ID, {
-          dtype: DTYPE,
-          device,
-          progress_callback: (event: {
-            status: string
-            file?: string
-            loaded?: number
-            total?: number
-          }) => {
-            if (event.status === 'progress' && event.file) {
-              progress.update(event.file, event.loaded ?? 0, event.total ?? 0)
-            }
-          },
-        })
+      /*
+       * Say one word before claiming to be ready.
+       *
+       * Building the session succeeds on hardware that then throws on the
+       * first real inference — an unsupported operator, a shader that will not
+       * compile, a GPU adapter that has already been lost. Finding that out
+       * here costs a second and lets the CPU attempt happen quietly; finding
+       * it out later means somebody taps Play and hears nothing.
+       */
+      await instance.generate('Ready.', { voice: 'af_heart', speed: 1 })
 
-        /*
-         * Say one word before claiming to be ready.
-         *
-         * Building the session succeeds on hardware that then throws on the
-         * first real inference — an unsupported operator, a shader that will
-         * not compile, a GPU adapter that has already been lost. Finding that
-         * out here costs a second and lets the WASM fallback happen quietly;
-         * finding it out later means somebody taps Play and hears nothing.
-         */
-        await instance.generate('Ready.', { voice: 'af_heart', speed: 1 })
-
-        tts = instance
-        activeBackend = device
-        progress.send(null)
-        post({ type: 'ready', backend: device })
-        // After `ready`, so it never delays somebody hearing their own words.
-        void warmVoices()
-        return
-      } catch (error) {
-        lastError = error
-        tts = null
-        activeBackend = null
-      }
+      tts = instance
+      activeBackend = device
+      progress.send(null)
+      post({ type: 'ready', backend: device })
+      // After `ready`, so it never delays somebody hearing their own words.
+      void warmVoices()
+    } catch (error) {
+      tts = null
+      activeBackend = null
+      post({
+        type: 'failed',
+        reason: classify(error),
+        message: `${device}: ${String((error as Error)?.message ?? error ?? 'Studio Voice could not start.')}`,
+      })
     }
-
-    post({
-      type: 'failed',
-      reason: classify(lastError),
-      message: String((lastError as Error)?.message ?? 'Studio Voice could not start.'),
-    })
   })().finally(() => {
     loading = null
   })

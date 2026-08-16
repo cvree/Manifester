@@ -51,6 +51,11 @@
 
           var hue = parseInt(localStorage.getItem('manifester:hue'), 10)
           if (hue) root.style.setProperty('--hue-shift', String(hue))
+
+          // Saturation is set here for the same reason the hue is: without it
+          // a vivid palette paints once at the shipped chroma and then jumps.
+          var chroma = parseFloat(localStorage.getItem('manifester:chroma'))
+          if (chroma > 0) root.style.setProperty('--chroma-scale', String(chroma))
         } catch (e) {
           /* private mode — fall back to the light theme */
         }

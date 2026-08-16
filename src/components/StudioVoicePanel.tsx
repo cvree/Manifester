@@ -261,7 +261,7 @@ export function StudioVoicePanel({
           )}
         </div>
 
-        {failed && <FailureDetail message={studio.message} />}
+        {failed && <FailureDetail message={studio.message} trail={studio.trail} />}
       </div>
     )
   }
@@ -339,7 +339,7 @@ export function StudioVoicePanel({
             )}
           </div>
 
-          {failed && <FailureDetail message={studio.message} />}
+          {failed && <FailureDetail message={studio.message} trail={studio.trail} />}
 
           {variant === 'card' && !failed && (
             <p className="type-meta mt-2.5">
@@ -365,16 +365,44 @@ export function StudioVoicePanel({
  * and it is the difference between a bug report that can be acted on and one
  * that says "it does not work".
  */
-function FailureDetail({ message }: { message: string | null }) {
-  if (!message) return null
+function FailureDetail({
+  message,
+  trail,
+}: {
+  message: string | null
+  trail: string[]
+}) {
+  const [copied, setCopied] = useState(false)
+  const report = trail.length > 0 ? trail.join('\n') : (message ?? '')
+  if (!report) return null
+
   return (
     <details className="mt-2 text-[0.78rem] text-ink-faint">
       <summary className="interactive cursor-pointer rounded-pill py-1 hover:text-ink-muted">
         What the engine reported
       </summary>
-      <p className="mt-1 break-words font-mono text-[0.72rem] leading-relaxed">
-        {message}
-      </p>
+      {/*
+        Every attempt, in order, rather than only the last one. "wasm failed"
+        and "the GPU failed and then wasm failed" are different problems with
+        different answers, and the difference is invisible from the final
+        message alone.
+      */}
+      <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[0.72rem] leading-relaxed">
+        {report}
+      </pre>
+      <button
+        type="button"
+        onClick={() => {
+          cue('tap')
+          void navigator.clipboard?.writeText(report).then(
+            () => setCopied(true),
+            () => setCopied(false),
+          )
+        }}
+        className="interactive mt-1.5 min-h-11 rounded-pill underline decoration-[var(--border-strong)] underline-offset-4 hover:text-ink"
+      >
+        {copied ? 'Copied' : 'Copy this'}
+      </button>
     </details>
   )
 }

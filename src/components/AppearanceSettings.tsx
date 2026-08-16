@@ -2,7 +2,9 @@ import { useState, type CSSProperties } from 'react'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
 import {
+  CHROMA_RANGE,
   HUE_PRESETS,
+  chromaName,
   hueName,
   huePreset,
   nightLightName,
@@ -31,7 +33,17 @@ import { SegmentedControl } from './SegmentedControl'
  * something.
  */
 export function AppearanceSettings() {
-  const { theme, setTheme, hue, setHue, nightLight, setNightLight } = useTheme()
+  const {
+    theme,
+    setTheme,
+    hue,
+    setHue,
+    chroma,
+    setChroma,
+    setPalette,
+    nightLight,
+    setNightLight,
+  } = useTheme()
 
   /*
    * Read once, on mount, rather than at module load: this is a browser
@@ -39,7 +51,7 @@ export function AppearanceSettings() {
    * honest under tests that stub `CSS.supports`.
    */
   const [canShiftHue] = useState(supportsHueShift)
-  const exact = huePreset(hue)
+  const exact = huePreset(hue, chroma)
 
   /*
    * The palette sweeps over 700ms when it is *chosen* — a tap on a stop, and
@@ -56,7 +68,9 @@ export function AppearanceSettings() {
     <div className="space-y-8">
       {canShiftHue && (
         <div>
-          <FieldLabel hint={`${hueName(hue)} · ${hue}°`}>Palette</FieldLabel>
+          <FieldLabel hint={`${hueName(hue)} · ${chromaName(chroma)}`}>
+            Palette
+          </FieldLabel>
 
           <DragBar
             label="Palette colour"
@@ -89,7 +103,7 @@ export function AppearanceSettings() {
             handle={
               <span
                 className="hue-handle"
-                style={{ '--h': hue } as CSSProperties}
+                style={{ '--h': hue, '--sat': chroma } as CSSProperties}
               />
             }
           />
@@ -97,7 +111,7 @@ export function AppearanceSettings() {
           <div
             role="radiogroup"
             aria-label="Named palette colours"
-            className="mt-3.5 grid grid-cols-6 justify-items-center gap-1 sm:grid-cols-12"
+            className="mt-3.5 grid grid-cols-7 justify-items-center gap-1"
           >
             {HUE_PRESETS.map((preset) => {
               const selected = exact?.id === preset.id
@@ -111,7 +125,7 @@ export function AppearanceSettings() {
                   title={preset.name}
                   onClick={() => {
                     cue('select')
-                    setHue(preset.shift)
+                    setPalette({ hue: preset.shift, chroma: preset.chroma })
                   }}
                   className={cx(
                     'interactive pressable flex h-11 w-11 items-center justify-center rounded-full p-1.5',
@@ -129,7 +143,12 @@ export function AppearanceSettings() {
                   <span
                     aria-hidden="true"
                     className="hue-swatch"
-                    style={{ '--h': preset.shift } as CSSProperties}
+                    style={
+                      {
+                        '--h': preset.shift,
+                        '--sat': preset.chroma,
+                      } as CSSProperties
+                    }
                   />
                   {selected && <span className="sr-only">(selected)</span>}
                 </button>
@@ -137,9 +156,36 @@ export function AppearanceSettings() {
             })}
           </div>
 
+          <div className="mt-5">
+            <FieldLabel hint={chromaName(chroma)}>Saturation</FieldLabel>
+            <DragBar
+              label="Palette saturation"
+              value={Math.round(chroma * 100)}
+              min={Math.round(CHROMA_RANGE.min * 100)}
+              max={Math.round(CHROMA_RANGE.max * 100)}
+              step={1}
+              coarse={10}
+              valueText={chromaName(chroma)}
+              onChange={(next) => setChroma(next / 100)}
+              onDragStart={() => tuning(true)}
+              onCommit={() => {
+                tuning(false)
+                cue('select')
+              }}
+              track={<span className="chroma-band" />}
+              handle={
+                <span
+                  className="hue-handle"
+                  style={{ '--h': hue, '--sat': chroma } as CSSProperties}
+                />
+              }
+            />
+          </div>
+
           <p className="type-meta mt-3 text-ink-faint">
-            Every colour in the app turns together — the words stay exactly as
-            readable, because only the hue moves.
+            Every colour in the app turns and deepens together. The words stay
+            exactly as readable at any setting, because only the hue and the
+            amount of colour move — never the lightness they are read against.
           </p>
         </div>
       )}

@@ -26,14 +26,20 @@
  * is always a state the interface can render rather than a rejected promise
  * somebody has to catch.
  *
- * ── Two attempts, not one ───────────────────────────────────────────────────
+ * ── Several attempts, each in its own thread ────────────────────────────────
  *
- * An install is run against the runtime bundled into this build, and only if
- * that will not start is it run again against the CDN copy — in a *new*
- * worker, because ONNX Runtime can be initialised exactly once per thread and
- * a second attempt in the same one fails with an error about the first. The
- * reasoning behind the order, and the bug that made it necessary, is in
- * `runtime.ts`.
+ * Bringing the model up is tried against the GPU and then the CPU, against the
+ * bundled engine and then — only if nothing else worked — a CDN copy. Every
+ * one of those attempts gets a **new worker**, and that is not tidiness: ONNX
+ * Runtime initialises its WebAssembly exactly once per thread and refuses ever
+ * after, so a fallback attempted in a worker where the first one failed throws
+ * an error about the first one. Sharing a worker meant the CPU fallback was
+ * guaranteed to fail precisely when it was needed, which is how a GPU that
+ * could not run this graph turned into "this device could not start the voice
+ * engine" with no way out. `runtime.ts` has the order and the reasoning.
+ *
+ * Nothing is re-downloaded between attempts. The weights are in the browser's
+ * cache after the first one, so the second and third cost seconds.
  */
 
 import { readLocal, removeLocal, writeLocal } from '../../storage'
@@ -53,7 +59,12 @@ import type {
 import { engineVoiceFor } from '../voices'
 import { encodeWav } from '../wav'
 import { KOKORO_MODEL_VERSION } from './kokoroModel'
-import { RUNTIME_ORDER, worthRetryingElsewhere, type StudioRuntime } from './runtime'
+import {
+  attemptsFor,
+  worthRetryingElsewhere,
+  type Attempt,
+  type StudioRuntime,
+} from './runtime'
 
 /** Where "this device has the model" is remembered between visits. */
 const INSTALLED_KEY = 'tts.studioVoice'
@@ -107,6 +118,15 @@ export interface StudioSnapshot {
   accelerated: boolean
   /** Which copy of the engine the current or last attempt used. */
   runtime: StudioRuntime | null
+  /**
+   * What every attempt said, in order.
+   *
+   * The single most useful thing when somebody reports that this will not
+   * install. Without it a bug report is "it does not work"; with it, it is
+   * three lines naming the runtime, the processor and the exact error, which
+   * is usually enough to know the answer without owning the device.
+   */
+  trail: string[]
   /**
    * True while a second attempt against the other runtime is under way.
    *
@@ -179,6 +199,7 @@ export class BrowserKokoroEngine implements TTSEngine {
     accelerated: webGpuAvailable(),
     runtime: null,
     retrying: false,
+    trail: [],
   }
 
   /** The whole sequence of attempts, so two presses of Install share one. */
@@ -305,31 +326,41 @@ export class BrowserKokoroEngine implements TTSEngine {
   }
 
   /**
-   * Which runtime to try first.
+   * The attempts, best first, with whatever worked here last time promoted.
    *
-   * Whatever worked here last time, if anything did. A device behind a filter
-   * that eats the bundled asset — or, far more likely, one where the CDN is
-   * the thing being eaten — should not pay for the discovery twice.
+   * A device that had to fall back once should not pay for the discovery on
+   * every visit — and on a machine where the CDN is what gets blocked, the
+   * remembered answer is the bundled runtime, which is also the one this app
+   * would rather use.
    */
-  private runtimeOrder(): StudioRuntime[] {
+  private plan(): Attempt[] {
+    const all = attemptsFor(webGpuAvailable())
     const remembered = readLocal(RUNTIME_KEY)
-    const known = RUNTIME_ORDER.filter((runtime) => runtime === remembered)
-    return [...known, ...RUNTIME_ORDER.filter((runtime) => runtime !== remembered)]
+    if (!remembered) return all
+
+    const [runtime, device] = remembered.split('/')
+    const first = all.findIndex(
+      (attempt) => attempt.runtime === runtime && attempt.device === device,
+    )
+    if (first <= 0) return all
+    return [all[first], ...all.filter((_, index) => index !== first)]
   }
 
   /**
-   * The whole install: one attempt per runtime, stopping at the first success
-   * and at the first failure not worth carrying to the other one.
+   * The whole install: one attempt per entry in the plan, each in a worker of
+   * its own, stopping at the first success and at the first failure not worth
+   * carrying to the next.
    */
   private sequence(kind: 'install' | 'resume'): Promise<boolean> {
     if (this.running) return this.running
 
     this.running = (async () => {
-      const order = this.runtimeOrder()
+      const plan = this.plan()
+      this.publish({ trail: [] })
 
-      for (let index = 0; index < order.length; index += 1) {
-        const runtime = order[index]
-        const more = index < order.length - 1
+      for (let index = 0; index < plan.length; index += 1) {
+        const attempt = plan[index]
+        const more = index < plan.length - 1
 
         this.publish({
           state: 'installing',
@@ -337,24 +368,33 @@ export class BrowserKokoroEngine implements TTSEngine {
           message: null,
           loaded: 0,
           total: 0,
-          runtime,
+          runtime: attempt.runtime,
           retrying: index > 0,
         })
 
-        const ok = await this.runAttempt(kind, runtime)
+        const ok = await this.runAttempt(kind, attempt)
+
+        this.publish({
+          trail: [
+            ...this.snapshot.trail,
+            `${attempt.runtime}/${attempt.device}: ${
+              ok ? 'ready' : (this.snapshot.message ?? this.snapshot.failure ?? 'failed')
+            }`,
+          ],
+        })
+
         if (ok) {
-          writeLocal(RUNTIME_KEY, runtime)
+          writeLocal(RUNTIME_KEY, `${attempt.runtime}/${attempt.device}`)
           return true
         }
 
-        const failure = this.snapshot.failure
         /*
          * `cancelled` is somebody changing their mind and `not-cached` is the
-         * ordinary answer to a resume. Neither is a reason to go and try the
-         * other engine, and doing so would turn a Cancel press into a second
+         * ordinary answer to a resume. Neither is a reason to go and try
+         * another engine, and doing so would turn a Cancel press into a second
          * download.
          */
-        if (!more || !worthRetryingElsewhere(failure)) return false
+        if (!more || !worthRetryingElsewhere(this.snapshot.failure)) return false
       }
 
       return false
@@ -366,11 +406,8 @@ export class BrowserKokoroEngine implements TTSEngine {
     return this.running
   }
 
-  /** One worker, one runtime, one answer. */
-  private runAttempt(
-    kind: 'install' | 'resume',
-    runtime: StudioRuntime,
-  ): Promise<boolean> {
+  /** One worker, one runtime, one processor, one answer. */
+  private runAttempt(kind: 'install' | 'resume', attempt: Attempt): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       this.attempt = { resolve }
 
@@ -388,11 +425,7 @@ export class BrowserKokoroEngine implements TTSEngine {
 
       try {
         this.ensureWorker()
-        this.post({
-          type: kind,
-          backend: webGpuAvailable() ? 'webgpu' : 'wasm',
-          runtime,
-        })
+        this.post({ type: kind, backend: attempt.device, runtime: attempt.runtime })
       } catch (error) {
         this.publish({
           state: 'failed',
@@ -633,7 +666,17 @@ export class BrowserKokoroEngine implements TTSEngine {
       next.failure === this.snapshot.failure &&
       next.message === this.snapshot.message &&
       next.runtime === this.snapshot.runtime &&
-      next.retrying === this.snapshot.retrying
+      next.retrying === this.snapshot.retrying &&
+      /*
+       * The trail has to be in this comparison, not just in the object.
+       *
+       * It was left out once and the effect was silent: an update that changed
+       * only the diagnostic trail matched on every other field, took the early
+       * return, and was thrown away — so the one thing added specifically to
+       * make failures reportable never reached the screen. Any field that can
+       * be the *sole* thing that changed belongs here.
+       */
+      next.trail === this.snapshot.trail
     ) {
       return
     }

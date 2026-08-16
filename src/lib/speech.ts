@@ -249,3 +249,55 @@ export function loadVoices(timeoutMs = 3000): Promise<SpeechSynthesisVoice[]> {
     const bail = setTimeout(() => finish(synth.getVoices()), timeoutMs)
   })
 }
+
+
+/**
+ * Speak one line in one specific device voice, right now.
+ *
+ * Deliberately not routed through the session's settings. Auditioning a voice
+ * in a picker is a question — *what does this one sound like?* — and answering
+ * it by first writing the choice into the loop, then asking the loop to
+ * preview itself, means every voice somebody merely listens to becomes the
+ * voice their session will use. The question and the commitment are separate
+ * acts, so they use separate paths.
+ *
+ * It also has to be *immediate*. A picker that answers a tap half a second
+ * later is a picker people stop tapping, so this goes straight at
+ * `speechSynthesis` rather than through the resolver, the cache and the audio
+ * graph that a real line is worth putting through.
+ */
+export function auditionDeviceVoice(
+  voiceURI: string | null,
+  text = 'This is how your own words will sound.',
+): void {
+  if (!isSpeechSupported()) return
+  try {
+    const synth = window.speechSynthesis
+    // Whatever was speaking is the previous answer to a question nobody is
+    // asking any more.
+    synth.cancel()
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    const match = synth
+      .getVoices()
+      .find((voice) => voice.voiceURI === voiceURI)
+    if (match) {
+      utterance.voice = match
+      utterance.lang = match.lang
+    }
+    utterance.rate = 0.95
+    synth.speak(utterance)
+  } catch {
+    /* A browser that will not speak is not an error worth surfacing here. */
+  }
+}
+
+/** Stop any audition started by `auditionDeviceVoice`. */
+export function stopDeviceAudition(): void {
+  if (!isSpeechSupported()) return
+  try {
+    window.speechSynthesis.cancel()
+  } catch {
+    /* Nothing to stop. */
+  }
+}

@@ -26,44 +26,92 @@
 
 export interface HuePreset {
   id: string
-  /** Named for the lead colour at that rotation, not for a mood. */
+  /** Named for what it looks like, not for a mood. */
   name: string
   /** Degrees added to every hue in the palette. */
   shift: number
+  /**
+   * Multiplied into every chroma. 1 is the palette as shipped.
+   *
+   * This is the axis that was missing, and its absence was the whole reason
+   * the colour choices felt like one colour. See `--chroma-scale`.
+   */
+  chroma: number
 }
 
 /**
- * Twelve named stops around the wheel.
+ * Fourteen palettes, spread across *both* axes.
  *
- * These are no longer the whole of the control — the dial is a continuous
- * band now, and every one of its 360 positions is as considered as the one
- * the app shipped with, because the rotation preserves the palette rather
- * than replacing it. What the stops are for is the other half of the job: a
- * name for wherever the band has landed, and a single tap for the colours
- * most people are actually reaching for.
+ * The old list was twelve hue rotations at a single chroma, which is to say
+ * twelve versions of the same amount of colour. They were tastefully
+ * different and they were not *interestingly* different — the honest
+ * description of that control was "which pastel", and nobody picks a pastel
+ * twice.
  *
- * Spaced by *what they look like* rather than evenly. OKLCH hue is not
- * perceptually uniform in its spacing — there is a wide plateau of greens and
- * a narrow, fast-moving stretch through the blues — so an even twelve would
- * have named four greens and skipped teal entirely.
+ * These move through saturation as deliberately as they move through hue.
+ * Slate is almost monochrome and reads as a graphite instrument; Neon is over
+ * three times the shipped chroma and reads as something lit from inside.
+ * Between them there is real range, and every one of them is still the same
+ * palette underneath — the same lightness relationships, the same spacing
+ * between the three accents, the same contrast on every piece of text.
+ *
+ * Ordered so that scanning the row is a journey rather than a wheel: the
+ * muted ones bookend, the vivid ones sit in the middle where they are seen.
  */
 export const HUE_PRESETS: HuePreset[] = [
-  { id: 'rose', name: 'Rose', shift: 0 },
-  { id: 'ember', name: 'Ember', shift: 40 },
-  { id: 'amber', name: 'Amber', shift: 80 },
-  { id: 'meadow', name: 'Meadow', shift: 130 },
-  { id: 'fern', name: 'Fern', shift: 152 },
-  { id: 'lagoon', name: 'Lagoon', shift: 175 },
-  { id: 'teal', name: 'Teal', shift: 197 },
-  { id: 'cobalt', name: 'Cobalt', shift: 220 },
-  { id: 'indigo', name: 'Indigo', shift: 242 },
-  { id: 'iris', name: 'Iris', shift: 265 },
-  { id: 'orchid', name: 'Orchid', shift: 310 },
-  { id: 'fuchsia', name: 'Fuchsia', shift: 337 },
+  { id: 'rose', name: 'Rose', shift: 0, chroma: 1 },
+  { id: 'clay', name: 'Clay', shift: 28, chroma: 0.72 },
+  { id: 'ember', name: 'Ember', shift: 40, chroma: 1.7 },
+  { id: 'marigold', name: 'Marigold', shift: 78, chroma: 1.75 },
+  { id: 'moss', name: 'Moss', shift: 138, chroma: 0.78 },
+  { id: 'jade', name: 'Jade', shift: 158, chroma: 1.65 },
+  { id: 'lagoon', name: 'Lagoon', shift: 186, chroma: 1.4 },
+  { id: 'neon', name: 'Neon', shift: 202, chroma: 2.4 },
+  { id: 'cobalt', name: 'Cobalt', shift: 238, chroma: 1.8 },
+  { id: 'slate', name: 'Slate', shift: 252, chroma: 0.22 },
+  { id: 'iris', name: 'Iris', shift: 272, chroma: 1.5 },
+  { id: 'ultraviolet', name: 'Ultraviolet', shift: 292, chroma: 2.2 },
+  { id: 'orchid', name: 'Orchid', shift: 316, chroma: 1.15 },
+  { id: 'magenta', name: 'Magenta', shift: 340, chroma: 2.1 },
 ]
 
 /** The palette as designed — rose leading, nothing rotated. */
 export const DEFAULT_HUE = 0
+
+/** The palette at its designed saturation. */
+export const DEFAULT_CHROMA = 1
+
+/**
+ * How far the saturation dial may travel.
+ *
+ * The floor is not zero: a chroma of nothing is grey, and grey is a different
+ * product rather than a quieter version of this one — the canvas would stop
+ * being warm and the three accents would stop being distinguishable from each
+ * other. The ceiling is where the accents begin to clip out of sRGB on a
+ * normal display, which shows up as a colour that stops getting more vivid and
+ * starts getting lighter.
+ */
+export const CHROMA_RANGE = { min: 0.15, max: 2.6 } as const
+
+/** Clamp anything read back from storage into a usable saturation. */
+export function normaliseChroma(value: unknown): number {
+  const scale = Number(value)
+  if (!Number.isFinite(scale)) return DEFAULT_CHROMA
+  return Math.min(
+    CHROMA_RANGE.max,
+    Math.max(CHROMA_RANGE.min, Math.round(scale * 100) / 100),
+  )
+}
+
+/** What to call a saturation, so the control can say something. */
+export function chromaName(scale: number): string {
+  if (scale < 0.4) return 'Hushed'
+  if (scale < 0.85) return 'Muted'
+  if (scale < 1.25) return 'As designed'
+  if (scale < 1.8) return 'Rich'
+  if (scale < 2.3) return 'Vivid'
+  return 'Electric'
+}
 
 /** How long the palette takes to sweep from one hue to the next, in ms. */
 export const HUE_SWEEP_MS = 700
@@ -75,9 +123,25 @@ export function normaliseHue(value: unknown): number {
   return ((Math.round(shift) % 360) + 360) % 360
 }
 
-/** The stop this rotation is exactly on, if it is on one. */
-export function huePreset(shift: number): HuePreset | null {
-  return HUE_PRESETS.find((preset) => preset.shift === shift) ?? null
+/** The stop this palette is exactly on, if it is on one. */
+export function huePreset(shift: number, chroma = DEFAULT_CHROMA): HuePreset | null {
+  return (
+    HUE_PRESETS.find(
+      (preset) =>
+        preset.shift === shift && Math.abs(preset.chroma - chroma) < 0.005,
+    ) ?? null
+  )
+}
+
+/**
+ * The colour a swatch should be painted, as a CSS value.
+ *
+ * Derived from the same base literal and the same arithmetic the whole app
+ * uses, so a swatch is *the* colour rather than a hand-picked approximation of
+ * it that drifts the first time the palette is touched.
+ */
+export function swatchFor(preset: HuePreset): string {
+  return `oklch(from var(--rose-deep-base) l calc(c * ${preset.chroma}) calc(h + ${preset.shift}))`
 }
 
 /**

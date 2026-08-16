@@ -17,9 +17,10 @@
  *  sage support, soft gold accent, twilight depth.
  *
  *  Every colour with a hue worth having is declared twice: once as a `-base`
- *  literal, and once as that literal with `--hue-shift` added to its hue. See
- *  "The hue dial" below — the short version is that the numbers in this file
- *  are the *only* palette, and the dial rotates it rather than replacing it.
+ *  literal, and once as that literal with `--hue-shift` added to its hue and
+ *  `--chroma-scale` multiplied into its chroma. See "The hue dial" below — the
+ *  short version is that the numbers in this file are the *only* palette, and
+ *  the two dials rotate and saturate it rather than replacing it.
  * ─────────────────────────────────────────────────────────────
  */
 
@@ -37,12 +38,36 @@
   initial-value: 0;
 }
 
+/*
+ * How saturated the palette is, as a multiplier on every colour's chroma.
+ *
+ * The hue dial alone turned out not to be a palette control. Rotating hue at
+ * fixed lightness *and fixed chroma* produces twelve colours that are all
+ * exactly as colourful as each other, so every position on the dial felt like
+ * a slightly different version of the same room — which is precisely the
+ * complaint it earned. What separates a hushed slate from an electric cyan is
+ * not where they sit on the wheel; it is how much colour is in them.
+ *
+ * Chroma is the second axis, and it is the safe one to add: OKLCH lightness is
+ * perceptual and untouched, so every contrast ratio in the app survives a
+ * palette that is four times as saturated. Only the amount of colour changes.
+ */
+@property --chroma-scale {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
 :root {
   color-scheme: light;
 
   /* Degrees added to every hue below. Written by the theme provider. */
   --hue-shift: 0;
-  transition: --hue-shift 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* Multiplied into every chroma below. 1 is the palette as designed. */
+  --chroma-scale: 1;
+  transition:
+    --hue-shift 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    --chroma-scale 700ms cubic-bezier(0.22, 1, 0.36, 1);
 
   /*
    * How much blue is taken out of the light, 0 to 1. Written by the theme
@@ -211,48 +236,48 @@
 
 @supports (color: oklch(from white l c calc(h + 30))) {
   :root {
-    --bg-0: oklch(from var(--bg-0-base) l c calc(h + var(--hue-shift)) / alpha);
-    --bg-1: oklch(from var(--bg-1-base) l c calc(h + var(--hue-shift)) / alpha);
-    --bg-2: oklch(from var(--bg-2-base) l c calc(h + var(--hue-shift)) / alpha);
+    --bg-0: oklch(from var(--bg-0-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha);
+    --bg-1: oklch(from var(--bg-1-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha);
+    --bg-2: oklch(from var(--bg-2-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha);
     --panel-solid: oklch(
-      from var(--panel-solid-base) l c calc(h + var(--hue-shift)) / alpha
+      from var(--panel-solid-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha
     );
 
-    --rose: oklch(from var(--rose-base) l c calc(h + var(--hue-shift)) / alpha);
+    --rose: oklch(from var(--rose-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha);
     --rose-deep: oklch(
-      from var(--rose-deep-base) l c calc(h + var(--hue-shift)) / alpha
+      from var(--rose-deep-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha
     );
     --rose-soft: oklch(
-      from var(--rose-soft-base) l c calc(h + var(--hue-shift)) / alpha
+      from var(--rose-soft-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha
     );
-    --sage: oklch(from var(--sage-base) l c calc(h + var(--hue-shift)) / alpha);
+    --sage: oklch(from var(--sage-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha);
     --sage-soft: oklch(
-      from var(--sage-soft-base) l c calc(h + var(--hue-shift)) / alpha
+      from var(--sage-soft-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha
     );
-    --gold: oklch(from var(--gold-base) l c calc(h + var(--hue-shift)) / alpha);
+    --gold: oklch(from var(--gold-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha);
     --gold-soft: oklch(
-      from var(--gold-soft-base) l c calc(h + var(--hue-shift)) / alpha
+      from var(--gold-soft-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha
     );
     --twilight: oklch(
-      from var(--twilight-base) l c calc(h + var(--hue-shift)) / alpha
+      from var(--twilight-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha
     );
 
-    --glow: oklch(from var(--glow-base) l c calc(h + var(--hue-shift)) / alpha);
+    --glow: oklch(from var(--glow-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha);
     --aurora-a: oklch(
-      from var(--aurora-a-base) l c calc(h + var(--hue-shift)) / alpha
+      from var(--aurora-a-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha
     );
     --aurora-b: oklch(
-      from var(--aurora-b-base) l c calc(h + var(--hue-shift)) / alpha
+      from var(--aurora-b-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha
     );
     --aurora-c: oklch(
-      from var(--aurora-c-base) l c calc(h + var(--hue-shift)) / alpha
+      from var(--aurora-c-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha
     );
     --moonlight: oklch(
-      from var(--moonlight-base) l c calc(h + var(--hue-shift)) / alpha
+      from var(--moonlight-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha
     );
-    --spark: oklch(from var(--spark-base) l c calc(h + var(--hue-shift)) / alpha);
+    --spark: oklch(from var(--spark-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha);
     --pollen: oklch(
-      from var(--pollen-base) l c calc(h + var(--hue-shift)) / alpha
+      from var(--pollen-base) l calc(c * var(--chroma-scale)) calc(h + var(--hue-shift)) / alpha
     );
   }
 }
@@ -5148,6 +5173,9 @@ html.tuning {
  */
 .hue-swatch {
   --h: 0;
+  /* The stop's own saturation. See `--chroma-scale`; a swatch that showed the
+     hue but not the chroma would advertise fourteen identical pastels. */
+  --sat: 1;
   display: block;
   width: 100%;
   aspect-ratio: 1;
@@ -5155,18 +5183,37 @@ html.tuning {
   background:
     radial-gradient(
       circle at 30% 24%,
-      oklch(from var(--gold-base) l c calc(h + var(--h))) 0%,
+      oklch(from var(--gold-base) l calc(c * var(--sat)) calc(h + var(--h))) 0%,
       transparent 56%
     ),
     radial-gradient(
       circle at 76% 80%,
-      oklch(from var(--sage-base) l c calc(h + var(--h))) 0%,
+      oklch(from var(--sage-base) l calc(c * var(--sat)) calc(h + var(--h))) 0%,
       transparent 60%
     ),
-    oklch(from var(--rose-base) l c calc(h + var(--h)));
+    oklch(from var(--rose-base) l calc(c * var(--sat)) calc(h + var(--h)));
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.4),
     inset 0 0 0 1px rgb(0 0 0 / 0.06);
+}
+
+/*
+ * The saturation band: the current hue, from hushed to electric.
+ *
+ * Drawn from the palette's own lead colour at both ends rather than from two
+ * picked colours, so the gradient under the handle is a true preview of what
+ * the dial does — the same reason the hue band is drawn from the palette.
+ */
+.chroma-band {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    to right,
+    oklch(from var(--rose-base) l calc(c * 0.15) calc(h + var(--hue-shift))),
+    oklch(from var(--rose-base) l calc(c * 1) calc(h + var(--hue-shift))),
+    oklch(from var(--rose-base) l calc(c * 2.6) calc(h + var(--hue-shift)))
+  );
 }
 
 /* ── The palette band ───────────────────────────────────────── */
@@ -5255,15 +5302,17 @@ html.tuning {
   background:
     radial-gradient(
       circle at 30% 24%,
-      oklch(from var(--gold-base) l c calc(h + var(--h, 0))) 0%,
+      oklch(from var(--gold-base) l calc(c * var(--sat, 1)) calc(h + var(--h, 0)))
+        0%,
       transparent 56%
     ),
     radial-gradient(
       circle at 76% 80%,
-      oklch(from var(--sage-base) l c calc(h + var(--h, 0))) 0%,
+      oklch(from var(--sage-base) l calc(c * var(--sat, 1)) calc(h + var(--h, 0)))
+        0%,
       transparent 60%
     ),
-    oklch(from var(--rose-base) l c calc(h + var(--h, 0)));
+    oklch(from var(--rose-base) l calc(c * var(--sat, 1)) calc(h + var(--h, 0)));
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
 }
 

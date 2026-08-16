@@ -149,10 +149,9 @@ export function WelcomeRoute() {
     start,
     voices,
     voicesReady,
-    previewVoice,
   } = useSession()
   const { preferences, update: updatePreferences } = usePreferences()
-  const { hue, setHue } = useTheme()
+  const { hue, chroma, setPalette } = useTheme()
   const { allTracks } = useLibrary()
   const reducedMotion = useReducedMotion()
   const audition = useAudition()
@@ -465,14 +464,6 @@ export function WelcomeRoute() {
                 voiceSource: 'device',
               })
             }}
-            onPreviewDeviceVoice={(voice) => {
-              updateSettings({
-                voiceURI: voice.voiceURI,
-                voiceName: voice.name,
-                voiceSource: 'device',
-              })
-              previewVoice(style)
-            }}
             onResolved={() => {
               setWordsUnlocked(true)
               setWriting(true)
@@ -488,12 +479,15 @@ export function WelcomeRoute() {
         {step === 'attune' && (
           <AttuneStep
             hue={hue}
-            onHueChange={setHue}
+            chroma={chroma}
+            onPaletteChange={setPalette}
             breathingEnabled={preferences.breathingEnabled}
             breathPattern={preferences.breathPattern}
             onBreathChange={(pattern: BreathPattern, enabled) =>
               updatePreferences({ breathPattern: pattern, breathingEnabled: enabled })
             }
+            breathStyle={preferences.breathStyle}
+            onBreathStyleChange={(breathStyle) => updatePreferences({ breathStyle })}
             soundId={soundId}
             onSoundChange={(id) =>
               updateSettings({

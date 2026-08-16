@@ -51,7 +51,6 @@ interface OwnWordsGateProps {
   /** The device voice currently chosen, if they have chosen one. */
   selectedVoiceURI: string | null
   onChooseDeviceVoice: (voice: RankedVoice) => void
-  onPreviewDeviceVoice?: (voice: RankedVoice) => void
   /** Let them through: the question has an answer now. */
   onResolved: () => void
   /** Back to the suggestions, having decided not to decide. */
@@ -64,7 +63,6 @@ export function OwnWordsGate({
   voicesReady,
   selectedVoiceURI,
   onChooseDeviceVoice,
-  onPreviewDeviceVoice,
   onResolved,
   onCancel,
 }: OwnWordsGateProps) {
@@ -161,7 +159,6 @@ export function OwnWordsGate({
               voicesReady={voicesReady}
               selected={selectedVoiceURI}
               onSelect={onChooseDeviceVoice}
-              onPreview={onPreviewDeviceVoice}
               style={style}
             />
 
