@@ -4,6 +4,7 @@ import { MAX_VOICE_VOLUME } from '../lib/speech'
 import { VOICE_PROFILES, voiceForStyle } from '../lib/tts'
 import { useStudioAvailable, useTTSStatus } from '../lib/tts/useTTSStatus'
 import type { LoopSettings } from '../lib/types'
+import { contentLanguage, voiceSpeaks } from '../lib/voiceLanguage'
 import type { RankedVoice, VoiceTier } from '../lib/voiceRanking'
 import { BetterVoicesPanel } from './BetterVoicesPanel'
 import { FieldLabel } from './Card'
@@ -256,15 +257,16 @@ export function VoiceSettings({
             <option value="">
               This device — best {settings.voiceStyle} voice available
             </option>
+            {/*
+              Filtered by the language of the *words*, not of the phone's
+              menus. `navigator.language` used to decide this, which meant a
+              phone set to Chinese hid every English voice installed on it and
+              listed a dozen that read English as pinyin. The checkbox above is
+              still the way out for anybody writing in another language.
+            */}
             {voices
               .filter(
-                (voice) =>
-                  showAllVoices ||
-                  voice.lang
-                    .toLowerCase()
-                    .startsWith(
-                      (navigator.language || 'en').slice(0, 2).toLowerCase(),
-                    ),
+                (voice) => showAllVoices || voiceSpeaks(voice.lang, contentLanguage()),
               )
               .map((voice) => (
                 <option key={voice.voiceURI} value={voice.voiceURI}>

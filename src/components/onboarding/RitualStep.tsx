@@ -207,6 +207,9 @@ export function RitualStep({
                 })
               }}
               style={settings.voiceStyle}
+              rate={settings.rate}
+              pitch={settings.pitch}
+              volume={settings.voiceVolume}
             />
           </div>
         )}

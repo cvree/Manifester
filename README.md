@@ -323,10 +323,16 @@ link to your sounds.
 - The install suggestion waits until you have actually started or saved a loop,
   appears once as a small card, and remembers being dismissed. The full
   instructions live on the About screen.
-- Original procedural interface sounds and haptics — a tap, a selection tick, a
-  rising start tone, a settling pause tone, a save sparkle, a completion chime
-  and a quiet error tone — separate from the breath's own voice, which has its
-  own instrument and its own level. Sliders never vibrate.
+- Original procedural interface cues and haptics, designed for this app rather
+  than borrowed from an operating system: a fingertip tap, a selection tick, a
+  rising start, a settling stop, a warm save chord, a layered bloom when a loop
+  completes, and a low muted tone for anything that went wrong. Every one of
+  them is sine partials under a lowpass, an order of magnitude below a spoken
+  line, and quieter still while you are listening. Separate from the breath's
+  own voice, which has its own instrument and its own level. Sliders never
+  vibrate, and both cues and haptics are one press to turn off.
+- A live audio mixer, one tap from the player: a fader and a mute for every
+  background layer, plus a master, all changing while you listen.
 - Works offline after the first visit.
 
 ---
@@ -776,6 +782,48 @@ rendered test for each.
 
 ---
 
+### The mixer: a level per layer
+
+One volume for the whole background is the right control nine times out of ten
+and the wrong one for the tenth. It could not answer any of the questions people
+actually had — *rain under the fire? the tide quieter than the pad over it? drop
+the rhythm without losing the ambience?* — because the sources were a radio
+group sharing a single fader.
+
+A background source is a **layer** now, and each carries its own level and its
+own mute ([`src/lib/soundMixer.ts`](src/lib/soundMixer.ts)):
+
+```text
+   primary ambience ─→ its level ─┐
+      stacked layer ─→ its level ─┼─→ music ─┐
+      stacked layer ─→ its level ─┘          ├─→ generated (master) ─→ ceiling ─→ output
+                             rhythm ─────────┘
+```
+
+Four rules hold it together.
+
+- **A level is never a rebuild.** Moving a fader ramps a gain node that already
+  exists, over 140 ms — short enough to read as the fader itself, long enough
+  that the fastest possible dragging cannot put a step, and therefore a click,
+  into a running mix. Adding or removing a layer is the only mixer control that
+  builds or releases audio, and it fades over 0.9 s.
+- **Adding a layer disturbs nothing already playing.** `setLayers` is additive
+  and subtractive rather than a rebuild, so a third sound arriving leaves the
+  two underneath it on exactly the graph, phase and schedule they had.
+- **Mute is not a level of zero.** The two are separate state, so unmuting
+  returns you to the balance you had rather than to full. Moving a muted layer's
+  fader unmutes it, because a slider that visibly does nothing is worse.
+- **The master still exists and still does what it did.** It scales the sum of
+  the layers; it does not replace their individual controls.
+
+It opens from the player's own corner, one tap from the stage, because balancing
+what you are hearing should not mean opening a settings sheet and finding a row
+in it. Levels are saved with the loop, so a mix you built is the mix you come
+back to; loops saved before the mixer existed read as "one sound, full level,
+nothing muted", which is exactly what they sounded like.
+
+---
+
 ## Why the export records your voice instead of the app's
 
 **No web page can capture speech synthesis output.** `SpeechSynthesisUtterance`
@@ -1158,6 +1206,51 @@ The difference between them and the fallback synthesiser is not subtle.
 
 Install one and reopen Manifester — it finds it automatically. The same
 instructions live inside the app, under the voice picker.
+
+### English words are spoken by an English voice
+
+There was a bug here worth writing down, because it was the same mistake in four
+places and each of them looked reasonable on its own.
+
+On a phone whose interface language is not English, an English affirmation was
+read aloud by a voice for that other language — English words pronounced as
+though they were Chinese. Every part of the app that had to name a language
+named `navigator.language`, which is a fact about somebody's *menus* and says
+nothing about the words they wrote:
+
+1. the ranking defaulted to it, so every voice in the interface language scored
+   3000 points above every English one, and "the best voice on this device" was
+   one that cannot pronounce English;
+2. the best-voice pick had no language constraint at all, so it took whatever
+   that ranking put first;
+3. a saved premium voice that was no longer installed fell back the same way;
+4. and the utterance went out with **no `lang` set at all**, which every engine
+   resolves against the platform locale — the mechanism that actually produced
+   the wrong pronunciation.
+
+The rule now is one sentence: *the language of the content decides the voice,
+and this app's content is English* ([`src/lib/voiceLanguage.ts`](src/lib/voiceLanguage.ts)).
+
+- Voices are ranked against the content language. The language bonus is larger
+  than the entire quality range, so no combination of "neural", "premium" or
+  "default" can lift a wrong-language voice above a right-language one.
+- `pickBestVoice` considers only voices that speak the language; it crosses into
+  another one only when the device has no voice in the right one at all, and the
+  picker then says so out loud rather than sounding broken.
+- A voice somebody chose themselves is always kept, in any language — the rule
+  is *never silently*, not *never*. A saved voice that is no longer installed
+  falls back to the best **English** voice.
+- Every utterance carries an explicit locale. An English-speaking device keeps
+  its own region, so `en-GB` is read in British English; every other interface
+  language gets `en-US`. Text in a non-Latin script claims no language, and the
+  engine decides.
+- The picker auditions through the same resolver as real playback — same voice,
+  same locale, same speed, pitch and volume — so what you hear when you press a
+  voice is what you get when you press play.
+
+[`src/lib/voiceLanguage.test.ts`](src/lib/voiceLanguage.test.ts) pins all of it
+against a simulated phone whose menus are in Chinese and which has good English
+voices installed: the case where every quality signal points the wrong way.
 
 ---
 
@@ -2103,7 +2196,11 @@ src/
                           than on a percentage that was right at one width
     useStageExpansion.ts  grows the player into the screen, and back
     smoothScroll.tsx  Lenis on the two screens that genuinely scroll
-    feedback.ts     haptics and generated interface tones
+    feedback.ts     the live cue player: gesture unlocking, anti-spam, ducking
+    cueSounds.ts    the cue sound design — note tables, envelopes, the ceiling
+    soundMixer.ts   the background mix as arithmetic: levels, mutes, layers
+    voiceLanguage.ts  which language the words are in, and which voice may read
+    deviceVoice.ts  one resolver for every utterance the platform speaks
     recorder.ts     microphone capture for exports
     exportAudio.ts  offline bed rendering, decoding, normalisation
     audio.ts        background sound engine (synth + imported files)

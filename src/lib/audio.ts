@@ -21,6 +21,8 @@ import {
   type RainCharacter,
 } from './ambient'
 import type { AudioBus } from './audioBus'
+import { rampParam } from './audioParams'
+import { clampLevel } from './soundMixer'
 import { onHeartbeat, scheduleIn } from './heartbeat'
 import { isLowPowerDevice } from './motion'
 import type { RepeatMode } from './types'
@@ -33,6 +35,24 @@ const FADE_MS = AMBIENCE_FADE_SECONDS * 1000
 export interface AmbienceOptions {
   rainCharacter?: RainCharacter
 }
+
+/**
+ * How long a level change takes to arrive.
+ *
+ * Short enough to read as the fader itself moving, long enough that the fastest
+ * possible dragging cannot put a step — and therefore a click — into a running
+ * mix. Every level in this engine goes through a ramp of this length, which is
+ * what makes "drag it as fast as you like" a true statement rather than a hope.
+ */
+const LEVEL_RAMP_SECONDS = 0.14
+
+/**
+ * How long a layer takes to arrive or leave.
+ *
+ * Longer than a level change and shorter than a soundscape swap. Adding rain
+ * under a fire should be the rain fading up, not the rain starting.
+ */
+const LAYER_FADE_SECONDS = 0.9
 
 /** A valid, zero-sample WAV — used only to unlock playback on iOS. */
 const SILENT_WAV =
@@ -53,9 +73,29 @@ export interface MusicEngineHandlers {
   onError?: (message: string) => void
 }
 
+/** One generated ambience stacked under the main choice. */
+interface Layer {
+  handle: AmbientHandle
+  /** This layer's own level, between the ambience and the shared music node. */
+  gain: GainNode
+}
+
 export class MusicEngine {
   private readonly bus: AudioBus
   private ambient: AmbientHandle | null = null
+  /**
+   * The primary sound's own level.
+   *
+   * Between the ambience and the shared music node, so the mixer's per-source
+   * fader and the master "Sound" fader are genuinely different controls rather
+   * than two names for the same number: this one scales one source, the bus's
+   * scales the sum of them.
+   */
+  private primaryGain: GainNode | null = null
+  private primaryLevel = 1
+  /** Extra generated ambiences, by soundscape id. See `soundMixer.ts`. */
+  private layers = new Map<string, Layer>()
+  private layerLevels = new Map<string, number>()
   private element: HTMLAudioElement | null = null
   private objectUrl: string | null = null
   /**
@@ -142,8 +182,136 @@ export class MusicEngine {
     this.bus.setMusicVolume(this.volume)
     // Only take over the element's volume when it is not mid-fade.
     if (this.element && this.fadeTimer == null && this.active) {
-      this.element.volume = this.volume
+      this.element.volume = this.elementVolume()
     }
+  }
+
+  /* ── The mixer ───────────────────────────────────────────────── */
+
+  /**
+   * Set the main sound's own level, under the master.
+   *
+   * Ramped on an `AudioParam` for a generated ambience, which is
+   * sample-accurate and free; stepped on the media element for an imported
+   * file, because a media element has no scheduled params — the step is on a
+   * value that is already being changed by a person's finger, and 14 ms of
+   * ramp on top of a 60 Hz input event would only be pretending.
+   */
+  setPrimaryLevel(level: number): void {
+    this.primaryLevel = clampLevel(level)
+
+    const ctx = this.bus.context
+    if (this.primaryGain && ctx) {
+      rampParam(
+        this.primaryGain.gain,
+        this.primaryLevel,
+        LEVEL_RAMP_SECONDS,
+        ctx.currentTime,
+      )
+    }
+
+    if (this.element && this.fadeTimer == null && this.active) {
+      this.element.volume = this.elementVolume()
+    }
+  }
+
+  /** One stacked layer's level, ramped so a dragged fader cannot click. */
+  setLayerLevel(id: string, level: number): void {
+    const value = clampLevel(level)
+    this.layerLevels.set(id, value)
+
+    const layer = this.layers.get(id)
+    const ctx = this.bus.context
+    if (!layer || !ctx) return
+    rampParam(layer.gain.gain, value, LEVEL_RAMP_SECONDS, ctx.currentTime)
+  }
+
+  /**
+   * Bring the set of stacked ambiences into line with `ids`.
+   *
+   * Additive and subtractive rather than a rebuild, and that is the whole
+   * point: a layer already playing is left completely alone — same graph, same
+   * phase, same scheduled transients — so adding a third sound cannot disturb
+   * the two somebody is already listening to. New layers fade up from silence;
+   * removed ones fade out and release themselves.
+   *
+   * `levelFor` is asked for each layer's stored level as it is built, so a
+   * layer that comes back arrives at the level it left at rather than at full.
+   */
+  setLayers(ids: string[], levelFor: (id: string) => number = () => 1): void {
+    const wanted = new Set(ids)
+
+    for (const [id, layer] of this.layers) {
+      if (wanted.has(id)) continue
+      layer.handle.stop(LAYER_FADE_SECONDS)
+      // Released after the ambience's own fade, so nothing is cut mid-ramp.
+      const gain = layer.gain
+      window.setTimeout(() => {
+        try {
+          gain.disconnect()
+        } catch {
+          /* Already released. */
+        }
+      }, (LAYER_FADE_SECONDS + 0.3) * 1000)
+      this.layers.delete(id)
+    }
+
+    for (const id of ids) {
+      this.layerLevels.set(id, clampLevel(levelFor(id)))
+      if (this.layers.has(id)) {
+        this.setLayerLevel(id, this.layerLevels.get(id) ?? 1)
+        continue
+      }
+      this.buildLayer(id)
+    }
+  }
+
+  /** Every stacked layer, in the order they were added. */
+  get layerIds(): string[] {
+    return [...this.layers.keys()]
+  }
+
+  private buildLayer(id: string): void {
+    const ctx = this.bus.ensure()
+    const destination = this.bus.musicNode
+    const preset = findAmbientPreset(id)
+    if (!ctx || !destination || !preset) return
+
+    const level = clampLevel(this.layerLevels.get(id) ?? 1)
+    const gain = ctx.createGain()
+    gain.gain.value = level
+    gain.connect(destination)
+
+    // The preset fades itself in over `AMBIENCE_FADE_SECONDS`, so the layer
+    // arrives as weather rather than as a switch. See `ambient.ts`.
+    const handle = preset.build(ctx, gain, {
+      rainCharacter: this.ambienceOptions.rainCharacter,
+      lowPower: isLowPowerDevice(),
+    })
+
+    this.layers.set(id, { handle, gain })
+  }
+
+  private releaseLayers(fadeSeconds = 0): void {
+    for (const [, layer] of this.layers) {
+      layer.handle.stop(fadeSeconds)
+      const gain = layer.gain
+      const release = () => {
+        try {
+          gain.disconnect()
+        } catch {
+          /* Already released. */
+        }
+      }
+      if (fadeSeconds > 0) window.setTimeout(release, (fadeSeconds + 0.3) * 1000)
+      else release()
+    }
+    this.layers.clear()
+  }
+
+  /** What the media element's own volume should be, master times its trim. */
+  private elementVolume(): number {
+    return Math.min(1, Math.max(0, this.volume * this.primaryLevel))
   }
 
   /**
@@ -201,7 +369,28 @@ export class MusicEngine {
     }
   }
 
+  /**
+   * Everything the background is doing, stopped.
+   *
+   * The stacked layers go with it. They are part of "the background sound",
+   * not a separate feature that outlives the session that started them — and
+   * a layer left running under a stopped session is sound coming out of an
+   * app somebody has just closed.
+   */
   stop(fadeMs = FADE_MS): void {
+    this.releaseLayers(fadeMs / 1000)
+    this.stopPrimary(fadeMs)
+  }
+
+  /**
+   * Fade out the main sound, leaving the stacked layers playing.
+   *
+   * What "no sound" means in the mixer once layers exist. Choosing silence for
+   * the main slot while rain is stacked underneath has to leave the rain — the
+   * two are separate controls, and the alternative is a mixer where one row
+   * silently switches off the others.
+   */
+  stopPrimary(fadeMs = FADE_MS): void {
     this.active = false
     this.paused = false
     this.teardown(fadeMs, fadeMs)
@@ -210,7 +399,14 @@ export class MusicEngine {
 
   /** Release this engine's resources. The shared bus outlives it. */
   dispose(): void {
+    this.releaseLayers(0)
     this.teardown(0, 0)
+    try {
+      this.primaryGain?.disconnect()
+    } catch {
+      /* Already released. */
+    }
+    this.primaryGain = null
     this.active = false
     this.paused = false
     this.element = null
@@ -279,7 +475,7 @@ export class MusicEngine {
     }
 
     this.bus.setMusicVolume(this.volume)
-    this.ambient = preset.build(ctx, destination, {
+    this.ambient = preset.build(ctx, this.primaryDestination(destination), {
       rainCharacter: this.ambienceOptions.rainCharacter,
       lowPower: isLowPowerDevice(),
     })
@@ -332,7 +528,7 @@ export class MusicEngine {
     try {
       await element.play()
       if (generation !== this.generation) return
-      this.rampElement(element, this.volume, FADE_MS)
+      this.rampElement(element, this.elementVolume(), FADE_MS)
     } catch {
       if (generation !== this.generation) return
       this.handlers.onError?.(
@@ -349,11 +545,30 @@ export class MusicEngine {
     if (!ctx || !destination || !preset) return
 
     this.ambient?.stop(AMBIENCE_FADE_SECONDS)
-    this.ambient = preset.build(ctx, destination, {
+    this.ambient = preset.build(ctx, this.primaryDestination(destination), {
       rainCharacter: this.ambienceOptions.rainCharacter,
       lowPower: isLowPowerDevice(),
     })
     this.ambientPresetId = preset.id
+  }
+
+  /**
+   * The node the primary ambience connects to: its own level, then the mix.
+   *
+   * Created once and reused, so the fader survives every soundscape swap
+   * underneath it — choosing a different sound must not silently reset the
+   * level somebody set for the sound slot.
+   */
+  private primaryDestination(mix: AudioNode): AudioNode {
+    const ctx = this.bus.context
+    if (!ctx) return mix
+    if (!this.primaryGain) {
+      const gain = ctx.createGain()
+      gain.gain.value = this.primaryLevel
+      gain.connect(mix)
+      this.primaryGain = gain
+    }
+    return this.primaryGain
   }
 
   private advance(generation: number): void {

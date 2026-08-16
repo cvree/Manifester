@@ -1,6 +1,7 @@
 import { MAX_MUSIC_VOLUME } from '../lib/audioBus'
 import { cue } from '../lib/feedback'
 import { MAX_VOICE_VOLUME } from '../lib/speech'
+import { describeMix, mixerLayers } from '../lib/soundMixer'
 import {
   brainwaveSummary,
   breathingSummary,
@@ -12,13 +13,22 @@ import { usePreferences } from '../state/PreferencesProvider'
 import { useSession } from '../state/SessionProvider'
 import { Button } from './Button'
 import type { PanelKey } from './CustomizePanel'
-import { BreathIcon, MuteIcon, PulseIcon, TuneIcon, WaveIcon } from './Icons'
+import {
+  BreathIcon,
+  MixerIcon,
+  MuteIcon,
+  PulseIcon,
+  TuneIcon,
+  WaveIcon,
+} from './Icons'
 import { SettingRow } from './SettingRow'
 import { Slider } from './Slider'
 
 interface DesktopPlayerPanelProps {
   onOpenPanel: (key: PanelKey) => void
   onEditWords: () => void
+  /** The mixer has its own sheet rather than being a settings panel. */
+  onOpenMixer: () => void
 }
 
 /**
@@ -31,6 +41,7 @@ interface DesktopPlayerPanelProps {
 export function DesktopPlayerPanel({
   onOpenPanel,
   onEditWords,
+  onOpenMixer,
 }: DesktopPlayerPanelProps) {
   const {
     draft,
@@ -83,12 +94,22 @@ export function DesktopPlayerPanel({
         />
         {!idle && (
           <p className="type-meta -mt-1">
-            Voice applies on the next line. Sound changes immediately.
+            Both are live. Every level here changes as you drag it.
           </p>
         )}
       </div>
 
       <div className="border-t border-[var(--quiet-border)]">
+        <SettingRow
+          icon={<MixerIcon />}
+          title="Mixer"
+          summary={describeMix(mixerLayers(settings.sound, allTracks))}
+          onClick={() => {
+            cue('tap')
+            onOpenMixer()
+          }}
+          accent={soundOn || settings.brainwave.enabled}
+        />
         <SettingRow
           icon={soundOn ? <WaveIcon /> : <MuteIcon />}
           title="Background sound"
@@ -119,7 +140,7 @@ export function DesktopPlayerPanel({
         />
         <SettingRow
           icon={<TuneIcon />}
-          title="Haptics"
+          title="Feedback"
           summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
           onClick={() => open('feel')}
         />

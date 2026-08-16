@@ -11,6 +11,8 @@
  * localService) and picks the best feminine and masculine option available.
  */
 
+import { contentLanguage, normaliseLang, voiceSpeaks } from './voiceLanguage'
+
 export type VoiceStyle = 'feminine' | 'masculine' | 'unlabelled'
 
 /** How good the voice is likely to sound, in plain language. */
@@ -150,19 +152,26 @@ const TIER_SCORE: Record<VoiceTier, number> = {
 /**
  * Score a voice for this device. Language match dominates — a superb Italian
  * voice reading English affirmations is worse than a plain English one.
+ *
+ * The language bonuses are larger than the entire tier range on purpose, and
+ * that ordering is a correctness property rather than a preference: the very
+ * best neural voice in the wrong language scores 1000, and the very worst
+ * formant synth in the right one scores 3000, so no combination of quality
+ * signals can ever lift a wrong-language voice above a right-language one.
+ * `voiceRanking.test.ts` pins it.
  */
 export function rankVoice(
   voice: SpeechSynthesisVoice,
   preferredLang: string,
 ): RankedVoice {
   const tier = classifyTier(voice)
-  const lang = voice.lang.toLowerCase().replace('_', '-')
-  const preferred = preferredLang.toLowerCase().replace('_', '-')
+  const lang = normaliseLang(voice.lang)
+  const preferred = normaliseLang(preferredLang)
 
   let score = TIER_SCORE[tier]
 
   if (lang === preferred) score += 4000
-  else if (lang.slice(0, 2) === preferred.slice(0, 2)) score += 3000
+  else if (voiceSpeaks(lang, preferred)) score += 3000
 
   // Among equals, prefer a named voice over a generic locale-coded one.
   if (/^[a-z]{2}[-_][a-z]{2}$/i.test(voice.name)) score -= 120
@@ -183,31 +192,103 @@ export function rankVoice(
   }
 }
 
+/**
+ * Rank every voice on the device for this app's content.
+ *
+ * The default is `contentLanguage()` — English — and emphatically *not*
+ * `navigator.language`, which is what it used to be. That default was the
+ * source of the worst voice bug this app has had: on a phone whose interface
+ * is Chinese, every Chinese voice scored 3000 points above every English one,
+ * so "the best voice on this device" for an English affirmation was a Chinese
+ * voice, and English words came out of it as though they were pinyin.
+ *
+ * The interface language is a fact about somebody's menus. It says nothing
+ * about the words they wrote. See `voiceLanguage.ts`.
+ */
 export function rankVoices(
   voices: SpeechSynthesisVoice[],
-  preferredLang = typeof navigator !== 'undefined' ? navigator.language : 'en-US',
+  preferredLang = contentLanguage(),
 ): RankedVoice[] {
   return voices
     .map((voice) => rankVoice(voice, preferredLang))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
 }
 
+/** Only the voices that speak a given language, in ranked order. */
+export function voicesInLanguage(
+  ranked: RankedVoice[],
+  language: string,
+): RankedVoice[] {
+  return ranked.filter((voice) => voiceSpeaks(voice.lang, language))
+}
+
 /**
- * The best voice for a requested style.
+ * The best voice for a requested style, in the language of the words.
  *
- * Falls back through: exact style match → unlabelled voices → anything at all,
- * so this never returns nothing when the device has any voice whatsoever.
+ * Two rules, in this order, and the first one is the important one:
+ *
+ *  1. **Language before everything.** Only voices that speak `language` are
+ *     considered. A device with one mediocre English voice and twelve superb
+ *     Chinese ones has exactly one candidate here, because the alternative —
+ *     the behaviour this replaced — is English affirmations read aloud in
+ *     Chinese, which is not a lesser version of the feature but a broken one.
+ *  2. **Then style, then anything.** Within the language: the requested style,
+ *     an unlabelled voice, or the best-ranked one of any style.
+ *
+ * The cross-language fallback at the end fires only when the device has no
+ * voice in the wanted language at all. That is a real situation — a stripped
+ * Android build with one locale installed — and silence would be worse; it is
+ * also the one case the interface is told about, through `isWrongLanguage`,
+ * so it can say so rather than quietly sounding wrong.
  */
 export function pickBestVoice(
   ranked: RankedVoice[],
   style: 'feminine' | 'masculine',
+  language: string = contentLanguage(),
 ): RankedVoice | null {
   if (ranked.length === 0) return null
+
+  const speaking = voicesInLanguage(ranked, language)
+  const pool = speaking.length > 0 ? speaking : ranked
+
   return (
-    ranked.find((voice) => voice.style === style) ??
-    ranked.find((voice) => voice.style === 'unlabelled') ??
-    ranked[0]
+    pool.find((voice) => voice.style === style) ??
+    pool.find((voice) => voice.style === 'unlabelled') ??
+    pool[0]
   )
+}
+
+/**
+ * Resolve a saved choice: the exact voice if it is still installed, otherwise
+ * the best voice in the right language.
+ *
+ * The second half is the requirement that a saved premium voice which has been
+ * uninstalled, renamed by an OS update, or is simply absent on a second device
+ * degrades to *the best English voice*, never to whatever happens to sort
+ * first on a phone with a different interface language.
+ */
+export function resolveVoiceChoice(
+  ranked: RankedVoice[],
+  voiceURI: string | null,
+  style: 'feminine' | 'masculine',
+  language: string = contentLanguage(),
+): RankedVoice | null {
+  if (voiceURI) {
+    const chosen = ranked.find((voice) => voice.voiceURI === voiceURI)
+    // An explicit choice is honoured whatever language it is in: somebody who
+    // picked a Spanish voice for Spanish affirmations meant it. What is never
+    // honoured is a *stale* choice, which is what falls through to below.
+    if (chosen) return chosen
+  }
+  return pickBestVoice(ranked, style, language)
+}
+
+/** True when the only voice available cannot speak the words' language. */
+export function isWrongLanguage(
+  voice: RankedVoice | null,
+  language: string = contentLanguage(),
+): boolean {
+  return voice != null && !voiceSpeaks(voice.lang, language)
 }
 
 /** True when the device has nothing better than a legacy formant synth. */

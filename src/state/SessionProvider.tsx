@@ -19,6 +19,7 @@ import { findAmbientPreset } from '../lib/ambient'
 import { MusicEngine, type TrackSource } from '../lib/audio'
 import { AudioBus } from '../lib/audioBus'
 import { configureBreath, setBreathActive } from '../lib/breathEngine'
+import { setCueDucking } from '../lib/feedback'
 import { beat } from '../lib/heartbeat'
 import { useLibrary } from './LibraryProvider'
 import { usePreferences } from './PreferencesProvider'
@@ -36,6 +37,15 @@ import {
 } from '../lib/loops'
 import { ActiveTimeClock } from '../lib/sessionClock'
 import { soundPlaybackChanged } from '../lib/soundChoice'
+import {
+  effectiveLevel,
+  layersChanged,
+  primarySourceId,
+  withLayer,
+  withLevel,
+  withMuted,
+  withoutLayer,
+} from '../lib/soundMixer'
 import {
   clampVoiceVolume,
   isSpeechSupported,
@@ -55,8 +65,8 @@ import {
   type SoundConfig,
 } from '../lib/types'
 import {
-  pickBestVoice,
   rankVoices,
+  resolveVoiceChoice,
   type RankedVoice,
 } from '../lib/voiceRanking'
 
@@ -155,6 +165,21 @@ interface SessionContextValue {
    * out, not a stop.
    */
   setLiveSound: (patch: Partial<SoundConfig>) => void
+
+  /* ── The mixer ── */
+
+  /**
+   * One background source's own level, applied to the running graph now.
+   *
+   * Separate from `setLiveSound` on purpose. That one asks "has the *audio*
+   * changed?" and rebuilds a queue when the answer is yes; a level is a ramp on
+   * a gain node that already exists, and putting it through the same path would
+   * mean a fader that restarts the rain it is adjusting.
+   */
+  setLayerLevel: (id: string, level: number) => void
+  setLayerMuted: (id: string, muted: boolean) => void
+  /** Stack a generated ambience under the main sound, or take it back out. */
+  setLayerEnabled: (id: string, enabled: boolean) => void
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null)
@@ -297,16 +322,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  /** The device voice this style setting actually lands on. */
-  const resolvedDeviceVoice = useMemo(() => {
-    if (draft.settings.voiceURI) {
-      const chosen = voices.find(
-        (voice) => voice.voiceURI === draft.settings.voiceURI,
-      )
-      if (chosen) return chosen
-    }
-    return pickBestVoice(voices, draft.settings.voiceStyle)
-  }, [voices, draft.settings.voiceURI, draft.settings.voiceStyle])
+  /**
+   * The device voice this style setting actually lands on.
+   *
+   * `resolveVoiceChoice` rather than a hand-rolled lookup, because the two
+   * halves of the answer are easy to get subtly wrong in different places: an
+   * exact choice that is still installed always wins, and everything else —
+   * including a saved voice that has since been uninstalled — falls to the
+   * best voice *in the language of the words*, never to whatever ranks first
+   * on a phone whose interface is in another language.
+   */
+  const resolvedDeviceVoice = useMemo(
+    () =>
+      resolveVoiceChoice(
+        voices,
+        draft.settings.voiceURI,
+        draft.settings.voiceStyle,
+      ),
+    [voices, draft.settings.voiceURI, draft.settings.voiceStyle],
+  )
 
   /* ── Restore the returning user's last loop ── */
 
@@ -429,6 +463,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  /*
+   * Step the interface cues back while a session is running.
+   *
+   * A cue is punctuation around the words, never over them. It is already an
+   * order of magnitude below a spoken line — see `cueSounds.ts` — and while
+   * somebody is actually listening it goes further down still, so adjusting a
+   * fader mid-session is felt rather than heard. The signal is the session
+   * rather than the utterance on purpose: it is stable across the gaps between
+   * lines, and a cue that ducked and un-ducked every four seconds would be
+   * more noticeable than one that simply stayed quiet.
+   */
+  useEffect(() => {
+    setCueDucking(session.status === 'playing')
+    return () => setCueDucking(false)
+  }, [session.status])
+
   /* ── Screen wake lock: speech stops when a phone sleeps ── */
 
   const requestWakeLock = useCallback(async () => {
@@ -531,8 +581,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // not open a media element outside one.
     music.unlock()
 
+    // The stacked layers are independent of the main choice, so they are
+    // brought into line whether or not the main choice is silence — turning
+    // the primary sound off leaves rain under the words if that is what
+    // somebody built.
+    music.setLayers(settings.sound.layers, (id) =>
+      effectiveLevel(settings.sound, id),
+    )
+
     if (settings.sound.mode === 'off') {
-      music.stop()
+      // Only the main sound. Anything stacked underneath keeps playing —
+      // "no background sound" is a choice about one row of the mixer, not a
+      // switch that silently empties the others.
+      music.stopPrimary()
       return
     }
 
@@ -543,9 +604,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // A third choice made while the second was still being read out of
       // IndexedDB must not arrive after it.
       if (!liveRef.current || generation !== soundGenerationRef.current) return
-      if (sources.length > 0) void music.play(sources, settings.sound.repeat)
-      else music.stop()
+      if (sources.length > 0) {
+        void music.play(sources, settings.sound.repeat)
+        // The queue was just rebuilt, so the primary gain is new: put the
+        // stored level back on it before the ambience finishes fading in.
+        music.setPrimaryLevel(primaryLevelFor(settings.sound))
+      } else music.stopPrimary()
     })
+  }, [])
+
+  /**
+   * Put every level in the mix onto the engine, without touching what plays.
+   *
+   * Called after each fader move. Every one of them is a short ramp on a gain
+   * that already exists, so this is safe to call as fast as a finger can
+   * generate events — which is exactly the property a draggable mixer needs.
+   */
+  const applyMixLevels = useCallback((sound: SoundConfig) => {
+    const music = musicRef.current
+    if (!music) return
+    music.setPrimaryLevel(primaryLevelFor(sound))
+    for (const id of sound.layers) {
+      music.setLayerLevel(id, effectiveLevel(sound, id))
+    }
   }, [])
 
   /* ── Stop ── */
@@ -621,9 +702,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           voice: voiceForStyle(settings.voiceStyle),
           preferDevice: settings.voiceSource === 'device',
           deviceVoiceURI:
-            settings.voiceURI ??
-            pickBestVoice(voices, settings.voiceStyle)?.voiceURI ??
-            null,
+            resolveVoiceChoice(voices, settings.voiceURI, settings.voiceStyle)
+              ?.voiceURI ?? null,
           rate: settings.rate,
           pitch: settings.pitch,
           volume: settings.voiceVolume,
@@ -699,15 +779,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       void requestWakeLock()
 
       music.setHandlers({
-        onTrackChange: (track) =>
-          setSession((current) => ({ ...current, trackName: track?.name ?? null })),
+        onTrackChange: (track) => {
+          setSession((current) => ({ ...current, trackName: track?.name ?? null }))
+          // A playlist moving on lands on a track with its own stored level,
+          // and the engine has one primary gain — so the level travels with
+          // the track rather than staying on the one that has just left.
+          if (track) music.setPrimaryLevel(primaryLevelFor(settings.sound, track.id))
+        },
         onError: (message) =>
           setSession((current) => ({ ...current, notice: message })),
       })
       music.setVolume(settings.musicVolume)
       music.setAmbienceOptions({ rainCharacter: settings.sound.rainCharacter })
+      // The stacked layers first: they are independent of the main choice and
+      // of the file lookup below, so they can start fading up immediately.
+      music.setLayers(settings.sound.layers, (id) =>
+        effectiveLevel(settings.sound, id),
+      )
       void resolveTrackSources(settings).then((sources) => {
-        if (sources.length > 0) void music.play(sources, settings.sound.repeat)
+        if (sources.length === 0) return
+        void music.play(sources, settings.sound.repeat)
+        music.setPrimaryLevel(primaryLevelFor(settings.sound))
       })
 
       // The rhythm is a sibling of the ambience, not part of it: it plays on
@@ -826,7 +918,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         voice: voiceForStyle(style),
         preferDevice: source === 'device',
         deviceVoiceURI:
-          voiceURI ?? pickBestVoice(voices, style)?.voiceURI ?? null,
+          resolveVoiceChoice(voices, voiceURI, style)?.voiceURI ?? null,
       })
     },
     [updateSettings, voices, draft.settings.voiceStyle, draft.settings.voiceSource],
@@ -889,6 +981,74 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       applyLiveSound({ ...draft.settings, sound })
     },
     [applyLiveSound, draft.settings, session.status, updateSettings],
+  )
+
+  /**
+   * Move one fader.
+   *
+   * The engine is told first and the settings second. That order is the reason
+   * dragging feels attached to the sound: the ramp is scheduled on the audio
+   * thread in the same tick as the input event, rather than a React render
+   * later. The stored value follows for the next session to read.
+   */
+  const setLayerLevel = useCallback<SessionContextValue['setLayerLevel']>(
+    (id, level) => {
+      setDraft((current) => {
+        const sound = withLevel(current.settings.sound, id, level)
+        const settings = { ...current.settings, sound }
+        if (liveRef.current) applyMixLevels(sound)
+        void storage.saveLastSettings(settings)
+        return { ...current, settings }
+      })
+      draftTouchedRef.current = true
+    },
+    [applyMixLevels],
+  )
+
+  const setLayerMuted = useCallback<SessionContextValue['setLayerMuted']>(
+    (id, muted) => {
+      setDraft((current) => {
+        const sound = withMuted(current.settings.sound, id, muted)
+        const settings = { ...current.settings, sound }
+        // The level itself is untouched, so unmuting returns to the balance
+        // somebody had rather than to full. See `soundMixer.effectiveLevel`.
+        if (liveRef.current) applyMixLevels(sound)
+        void storage.saveLastSettings(settings)
+        return { ...current, settings }
+      })
+      draftTouchedRef.current = true
+    },
+    [applyMixLevels],
+  )
+
+  /**
+   * Add or remove a stacked ambience.
+   *
+   * The only mixer control that builds or releases audio rather than ramping
+   * it, which is why it goes through the engine's `setLayers` — that leaves
+   * every layer already playing exactly as it was, so adding a third sound
+   * cannot disturb the two underneath it.
+   */
+  const setLayerEnabled = useCallback<SessionContextValue['setLayerEnabled']>(
+    (id, enabled) => {
+      setDraft((current) => {
+        const previous = current.settings.sound
+        const sound = enabled ? withLayer(previous, id) : withoutLayer(previous, id)
+        if (!layersChanged(previous, sound)) return current
+
+        const settings = { ...current.settings, sound }
+        if (liveRef.current) {
+          musicRef.current?.unlock()
+          musicRef.current?.setLayers(sound.layers, (layerId) =>
+            effectiveLevel(sound, layerId),
+          )
+        }
+        void storage.saveLastSettings(settings)
+        return { ...current, settings }
+      })
+      draftTouchedRef.current = true
+    },
+    [],
   )
 
   /**
@@ -1022,6 +1182,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLiveVoice,
       setBrainwave,
       setLiveSound,
+      setLayerLevel,
+      setLayerMuted,
+      setLayerEnabled,
     }),
     [
       ready,
@@ -1051,6 +1214,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLiveVoice,
       setBrainwave,
       setLiveSound,
+      setLayerLevel,
+      setLayerMuted,
+      setLayerEnabled,
     ],
   )
 
@@ -1061,6 +1227,19 @@ export function useSession(): SessionContextValue {
   const context = useContext(SessionContext)
   if (!context) throw new Error('useSession must be used inside <SessionProvider>')
   return context
+}
+
+/**
+ * The level for whichever source is in the main slot.
+ *
+ * A playlist's tracks each have their own stored level and the engine has one
+ * primary gain, so the level that applies is the one belonging to the track
+ * actually playing. `primarySourceId` names the first of a queue, which is
+ * what a queue starts on; `onTrackChange` re-applies it as the queue advances.
+ */
+function primaryLevelFor(sound: SoundConfig, currentTrackId?: string | null): number {
+  const id = currentTrackId ?? primarySourceId(sound)
+  return id ? effectiveLevel(sound, id) : 1
 }
 
 /** Turn a saved sound configuration into playable sources. */

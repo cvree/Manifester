@@ -13,6 +13,9 @@ const base: SoundConfig = {
   playlist: ['moon-garden', 'ocean-tide'],
   repeat: 'one',
   rainCharacter: 'steady',
+  layers: [],
+  levels: {},
+  muted: [],
 }
 
 describe('choosing a sound', () => {

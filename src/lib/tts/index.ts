@@ -19,6 +19,7 @@
  */
 
 import type { AudioBus } from '../audioBus'
+import { langForText } from '../deviceVoice'
 import type { RankedVoice } from '../voiceRanking'
 import { TTSClient, NoEngineError, type ResolveOptions } from './client'
 import { DEFAULT_CONFIG, type TTSConfig } from './config'
@@ -334,6 +335,19 @@ class TTS {
     await this.client.preload(words, this.resolveOptions(settings))
   }
 
+  /**
+   * Turn the line that is currently speaking up or down.
+   *
+   * Only the studio voice can do this — it plays through a gain node this app
+   * owns. A device utterance's volume is fixed the moment `speak()` is called
+   * and no browser exposes a way to change it, so there the level still lands
+   * on the next line. Saying so out loud in the interface is better than
+   * pretending both are instant.
+   */
+  setLiveVolume(value: number): void {
+    this.player.setVolume(value)
+  }
+
   /** Stop speaking now. Does not cancel work that is nearly finished. */
   stop(): void {
     this.generation += 1
@@ -554,6 +568,16 @@ class TTS {
     const handle = this.fallbackVoice.speak(spoken, {
       style: profile.fallbackStyle,
       voiceURI: settings.deviceVoiceURI ?? null,
+      /*
+       * Explicit, always. `settings.language` is the app's own content
+       * language; `langForText` falls back to English for Latin-script words
+       * and to `null` — meaning "let the engine decide" — for anything in
+       * another script. What is never allowed to happen is an utterance going
+       * out with no language at all, which is what the platform answers with
+       * its own locale, and is why English affirmations were being read in
+       * Chinese on Chinese-language phones.
+       */
+      lang: langForText(spoken) ?? settings.language ?? null,
       rate: settings.speed,
       pitch: settings.pitch,
       volume: settings.volume,

@@ -170,7 +170,7 @@ export function SoundSettings({
           step={0.05}
           value={settings.musicVolume}
           display={`${Math.round(settings.musicVolume * 100)}%`}
-          hint="Keep this well under the voice so the words stay clear."
+          hint="The master level for the whole bed. The Mixer, in the player's corner, gives each layer its own."
           onChange={onVolumeChange}
         />
       )}

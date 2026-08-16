@@ -1,12 +1,14 @@
-import { isRainCharacter } from './ambient'
+import { isBuiltInAmbientId, isRainCharacter } from './ambient'
 import { normaliseBrainwave } from './brainwaveAudio'
 import { createId } from './format'
+import { clampLevel, MAX_ACTIVE_LAYERS } from './soundMixer'
 import { clampVoiceVolume } from './speech'
 import {
   DEFAULT_SETTINGS,
   type LoopOrigin,
   type LoopSettings,
   type SavedLoop,
+  type SoundConfig,
 } from './types'
 
 /**
@@ -287,12 +289,43 @@ export function normaliseSettings(settings: Partial<LoopSettings>): LoopSettings
     voiceVolume: clampVoiceVolume(
       settings.voiceVolume ?? DEFAULT_SETTINGS.voiceVolume,
     ),
-    sound: {
-      ...sound,
-      rainCharacter: isRainCharacter(sound.rainCharacter)
-        ? sound.rainCharacter
-        : DEFAULT_SETTINGS.sound.rainCharacter,
-    },
+    sound: normaliseSound(sound),
     brainwave: normaliseBrainwave(settings.brainwave),
+  }
+}
+
+/**
+ * Bring a stored sound configuration up to date.
+ *
+ * Everything the mixer added is optional on the way in, because every loop
+ * saved before it existed has none of it — and the absence has to read as
+ * "one sound, at full level, nothing muted", which is exactly what those loops
+ * sounded like. Levels are clamped and mutes de-duplicated on the way through,
+ * so a hand-edited backup cannot produce a layer at 40× or a mute that can
+ * never be lifted.
+ */
+function normaliseSound(sound: SoundConfig): SoundConfig {
+  const layers = Array.isArray(sound.layers)
+    ? [...new Set(sound.layers.filter(isBuiltInAmbientId))].slice(0, MAX_ACTIVE_LAYERS)
+    : []
+
+  const levels: Record<string, number> = {}
+  if (sound.levels && typeof sound.levels === 'object') {
+    for (const [id, value] of Object.entries(sound.levels)) {
+      if (typeof value !== 'number' || !Number.isFinite(value)) continue
+      levels[id] = clampLevel(value)
+    }
+  }
+
+  return {
+    ...sound,
+    rainCharacter: isRainCharacter(sound.rainCharacter)
+      ? sound.rainCharacter
+      : DEFAULT_SETTINGS.sound.rainCharacter,
+    layers,
+    levels,
+    muted: Array.isArray(sound.muted)
+      ? [...new Set(sound.muted.filter((id) => typeof id === 'string'))]
+      : [],
   }
 }

@@ -3,7 +3,8 @@ import { cx } from '../lib/cx'
 import { VOICE_PROFILES, voiceForStyle } from '../lib/tts'
 import { useStudioAvailable } from '../lib/tts/useTTSStatus'
 import type { LoopSettings } from '../lib/types'
-import type { RankedVoice } from '../lib/voiceRanking'
+import { contentLanguage } from '../lib/voiceLanguage'
+import { voicesInLanguage, type RankedVoice } from '../lib/voiceRanking'
 import { Disclosure } from './Disclosure'
 import { Slider } from './Slider'
 
@@ -47,10 +48,11 @@ const STUDIO = {
  * too high and opening a settings sheet over the orb is the wrong answer.
  *
  * So it is three controls, folded shut, stating their current value on the
- * lid. Every one of them is live: `setLiveRate`, `setLivePitch` and
- * `setLiveVoice` update the running speech loop's options rather than
- * restarting it, so a change lands on the next line and the loop never breaks
- * step.
+ * lid. Every one of them is live, and live here means *now*: `setLiveRate`,
+ * `setLivePitch` and `setLiveVoice` re-option the running loop, which stops the
+ * line it is on and speaks it again in the new voice within a breath. It keeps
+ * its place in the affirmation and its pass count — a line is restarted, never
+ * the ritual. See `VoiceLooper.updateOptions`.
  */
 export function VoiceQuickSettings({
   settings,
@@ -66,14 +68,17 @@ export function VoiceQuickSettings({
   /*
    * The device's whole list is often forty voices in fifteen languages, and
    * nobody scrolling a dropdown mid-session wants to read past Polish to find
-   * Samantha. Anything in the page's language, plus whatever is already
+   * Samantha. The voices that can read these words, plus whatever is already
    * chosen, and that is the list.
+   *
+   * "Can read these words" used to mean `navigator.language`, which is a fact
+   * about somebody's menus rather than about their affirmations — so on a phone
+   * set to Chinese this list hid every English voice on the device and offered
+   * a dozen that would read English as pinyin. It is the content's language
+   * now. See `voiceLanguage.ts`.
    */
   const listed = useMemo(() => {
-    const tongue = (navigator.language || 'en').slice(0, 2).toLowerCase()
-    const near = voices.filter((voice) =>
-      voice.lang.toLowerCase().startsWith(tongue),
-    )
+    const near = voicesInLanguage(voices, contentLanguage())
     const chosen = voices.find((voice) => voice.voiceURI === settings.voiceURI)
     if (chosen && !near.includes(chosen)) return [chosen, ...near]
     return near
@@ -183,7 +188,7 @@ export function VoiceQuickSettings({
 
       <p className="type-meta -mt-1">
         {live
-          ? 'Each of these takes effect on the next line.'
+          ? 'Each of these applies at once — the line you are hearing is spoken again in the new voice.'
           : usingStudio
             ? 'Studio voices sound the same on every device.'
             : 'Some voices ignore pitch. If nothing changes, that is why.'}

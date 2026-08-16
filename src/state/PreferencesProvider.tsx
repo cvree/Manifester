@@ -63,8 +63,19 @@ export interface Preferences {
    * a minute and a half at a time. See `BACKGROUND_MODES`.
    */
   backgroundMode: BackgroundChoice
-  /** Interface taps and confirmations. */
+  /** Interface taps and confirmations. See `feedback.ts`. */
   uiSounds: boolean
+  /**
+   * True once somebody has answered the question about cues themselves.
+   *
+   * Interface audio was silent for several versions, and everyone who used the
+   * app during them has `uiSounds: false` stored — not because they turned cues
+   * off, but because there was nothing to turn off and `false` was the honest
+   * value for a feature that did not exist. Bringing the cues back means that
+   * stored `false` has to be told apart from a real preference, and this is
+   * what does it: unset means "never asked", and the current default applies.
+   */
+  uiSoundsChosen: boolean
   uiHaptics: boolean
   /**
    * The master switch for anything that talks to an AI.
@@ -86,7 +97,8 @@ const DEFAULTS: Preferences = {
   breathHapticCues: true,
   backgroundVisualizer: true,
   backgroundMode: DEFAULT_BACKGROUND_CHOICE,
-  uiSounds: false,
+  uiSounds: true,
+  uiSoundsChosen: false,
   uiHaptics: true,
   aiEnabled: true,
 }
@@ -120,6 +132,12 @@ function load(): Preferences {
     if (parsed.breathSound == null && typeof parsed.breathSoundCues === 'boolean') {
       merged.breathSound = parsed.breathSoundCues ? 'chime' : 'off'
     }
+
+    /*
+     * A stored `uiSounds` from the silent era is not an answer to a question
+     * nobody was asked. See `uiSoundsChosen`.
+     */
+    if (parsed.uiSoundsChosen !== true) merged.uiSounds = DEFAULTS.uiSounds
 
     if (
       parsed.backgroundVisualizer == null &&
@@ -168,6 +186,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       breathPattern: patch.breathPattern
         ? { ...current.breathPattern, ...patch.breathPattern }
         : current.breathPattern,
+      // Touching the switch at all is the answer, whichever way it was moved.
+      uiSoundsChosen: patch.uiSounds != null ? true : current.uiSoundsChosen,
     }))
   }, [])
 

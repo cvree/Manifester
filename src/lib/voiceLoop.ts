@@ -41,6 +41,13 @@ export interface Speaker {
   speak(text: string, options?: SpeakSettings): Promise<SpeakOutcome>
   preload(text: string, options?: SpeakSettings): Promise<void>
   stop(): void
+  /**
+   * Change the level of the line already speaking, where the voice can.
+   *
+   * Optional: a fake in a test does not have to implement it, and the device
+   * voice genuinely cannot — see `TTS.setLiveVolume`.
+   */
+  setLiveVolume?(value: number): void
   readonly isSpeaking: boolean
 }
 
@@ -82,6 +89,18 @@ export interface VoiceLoopHandlers {
  */
 const FAILURES_BEFORE_NOTICE = 3
 
+/**
+ * How long a live voice change settles before the line is spoken again.
+ *
+ * The whole budget of this number is "instant to a person, but only once per
+ * gesture". A slider fires a change per pixel and a select fires one per
+ * arrow-key press; 140 ms is below the ~200 ms at which a response stops
+ * feeling immediate, and comfortably above the interval between two events
+ * from one continuous drag — so the fastest possible dragging still costs one
+ * restart, at the value the finger stopped on.
+ */
+const RESTART_SETTLE_MS = 140
+
 export class VoiceLooper {
   private voice: Speaker
   private generation = 0
@@ -103,6 +122,8 @@ export class VoiceLooper {
   private gapVisible = true
   private pausedGapMs: number | null = null
   private pausedGapVisible = true
+  /** Settles a burst of live voice changes into one restart. See `updateOptions`. */
+  private restartTimer: number | null = null
 
   /** The singleton in the app; a fake in a test. */
   constructor(voice: Speaker = tts) {
@@ -129,15 +150,113 @@ export class VoiceLooper {
     return null
   }
 
-  /** Live-update rate/volume/voice; takes effect on the next line. */
+  /**
+   * Change how the voice sounds, while it is speaking.
+   *
+   * ── Why this is not simply "takes effect on the next line" ──
+   *
+   * It used to be, and that is a perfectly defensible answer for a loop of
+   * four-second affirmations — right up until somebody opens the voice
+   * controls *because* the voice is wrong. Then the interface says "Samantha",
+   * the previous voice carries on for the rest of the line, and the gap
+   * between the two is the exact confusing state this is meant to remove.
+   * With a long line and a three-second rest after it, "the next line" can be
+   * eight seconds away, which nobody reads as a setting having applied.
+   *
+   * So a change that alters *how the current line sounds* stops it and speaks
+   * it again from the top, at the same index, in the same pass. Three things
+   * are deliberately preserved: the position in the affirmation, the completed
+   * cycle count, and everything else about the session — this restarts a line,
+   * never a ritual.
+   *
+   * Two changes are handled differently and both for good reasons:
+   *
+   *  - **Volume** does not restart anything. The studio voice's level is a
+   *    gain node this app owns, so it can simply be turned down mid-word,
+   *    which is better than a restart in every way.
+   *  - **Everything else** (`repeatPauseMs`, `loop`) does not change the sound
+   *    of the line being spoken, so interrupting it would be damage with no
+   *    benefit.
+   *
+   * The restart is debounced. A slider being dragged produces a change per
+   * pixel, and re-synthesising a line per pixel is how you turn a fader into a
+   * stutter; a short settle means the fastest drag costs exactly one restart,
+   * on the value the finger came to rest at.
+   */
   updateOptions(patch: Partial<VoiceLoopOptions>): void {
     if (!this.options) return
-    this.options = { ...this.options, ...patch }
+
+    const before = this.options
+    this.options = { ...before, ...patch }
+
+    if (patch.volume != null && patch.volume !== before.volume) {
+      this.voice.setLiveVolume?.(patch.volume)
+    }
+
+    if (this.reshapesCurrentLine(before, this.options)) {
+      this.restartCurrentLine()
+      return
+    }
+
     // The next line is already being fetched under the old settings, so a
     // change of voice or speed makes that preload worthless. Fetching the new
     // one now means the change is heard on the next line rather than the one
     // after it.
     this.preloadNext()
+  }
+
+  /**
+   * True when a change alters the sound of the line currently being spoken.
+   *
+   * Rate and pitch are here as well as the voice itself: a studio line is
+   * rendered audio, so its speed is baked into the clip, and a device
+   * utterance's rate and pitch are fixed when it is handed to the platform.
+   * Neither can be bent mid-word by anybody, so the only honest way to make
+   * them instant is to say the line again.
+   */
+  private reshapesCurrentLine(
+    before: VoiceLoopOptions,
+    after: VoiceLoopOptions,
+  ): boolean {
+    return (
+      before.voice !== after.voice ||
+      before.preferDevice !== after.preferDevice ||
+      (before.deviceVoiceURI ?? null) !== (after.deviceVoiceURI ?? null) ||
+      before.rate !== after.rate ||
+      before.pitch !== after.pitch
+    )
+  }
+
+  /**
+   * Say the current line again, now, under the settings that are in force.
+   *
+   * Nothing about the session moves: `index` and `cycles` are untouched, the
+   * timer keeps running, the ambience keeps playing, and the gap between
+   * passes — if the change arrived during one — is left alone, because
+   * restarting a line during a deliberate silence would mean speaking in it.
+   */
+  private restartCurrentLine(): void {
+    if (!this.running || this.paused || !this.options) return
+    // Mid-gap: the change is already applied to the options and the line the
+    // gap ends on will be spoken under them. Nothing to interrupt.
+    if (this.gapCancel != null || this.pausedGapMs != null) {
+      this.preload(this.index)
+      return
+    }
+
+    this.preload(this.index)
+
+    if (this.restartTimer != null) clearTimeout(this.restartTimer)
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = null
+      if (!this.running || this.paused) return
+      // Invalidate the line in flight, then say it again from the top. The
+      // outgoing clip is stopped by `speak`'s own interrupt, which fades it
+      // rather than cutting it.
+      this.generation += 1
+      this.speaking = false
+      void this.speakCurrent(this.generation)
+    }, RESTART_SETTLE_MS) as unknown as number
   }
 
   start(options: VoiceLoopOptions, handlers: VoiceLoopHandlers = {}): boolean {
@@ -184,6 +303,7 @@ export class VoiceLooper {
     this.generation += 1
     this.speaking = false
     this.clearGap()
+    this.clearRestart()
     this.voice.stop()
   }
 
@@ -215,6 +335,7 @@ export class VoiceLooper {
     this.pausedGapMs = null
     this.pausedGapVisible = true
     this.clearGap()
+    this.clearRestart()
     this.voice.stop()
   }
 
@@ -343,6 +464,13 @@ export class VoiceLooper {
   private clearGap(): void {
     this.gapCancel?.()
     this.gapCancel = null
+  }
+
+  private clearRestart(): void {
+    if (this.restartTimer != null) {
+      clearTimeout(this.restartTimer)
+      this.restartTimer = null
+    }
   }
 
   /** Warm the cache for a line, wrapping around at the end of a pass. */

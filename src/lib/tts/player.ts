@@ -29,6 +29,8 @@ import type { SpeakOutcome } from './types'
 const START_LEAD_SECONDS = 0.02
 const FADE_IN_SECONDS = 0.01
 const FADE_OUT_SECONDS = 0.03
+/** Short enough to feel like the slider, long enough not to step. */
+const LEVEL_RAMP_SECONDS = 0.08
 
 export interface PlayOptions {
   /** 0–1. The app's own gain, not the engine's. */
@@ -93,6 +95,35 @@ export class AudioPlayer {
   unlock(): boolean {
     const ctx = this.getContext()
     return ctx != null && ctx.state !== 'closed'
+  }
+
+  /**
+   * Change the level of the line that is speaking *now*.
+   *
+   * The reason this exists rather than the volume simply applying to the next
+   * line: a person dragging a volume slider is listening to the thing they are
+   * dragging it for, and a fader whose effect arrives after the sentence ends
+   * is a fader that feels broken. A clip is an `AudioBufferSourceNode` through
+   * a gain this class owns, so unlike the device voice — whose volume is fixed
+   * at the moment the utterance is handed over — the studio voice can simply
+   * be turned down while it speaks.
+   *
+   * Ramped rather than assigned: a step on a live waveform is a click.
+   */
+  setVolume(value: number, rampSeconds = LEVEL_RAMP_SECONDS): void {
+    const active = this.active
+    const ctx = this.getContext()
+    if (!active || !ctx || ctx.state === 'closed') return
+
+    const target = Math.max(0.0001, clamp01(value))
+    const now = ctx.currentTime
+    try {
+      active.gain.gain.cancelScheduledValues(now)
+      active.gain.gain.setValueAtTime(active.gain.gain.value, now)
+      active.gain.gain.linearRampToValueAtTime(target, now + rampSeconds)
+    } catch {
+      /* A node released between the check and the ramp. */
+    }
   }
 
   play(buffer: AudioBuffer, options: PlayOptions = {}): PlayHandle {

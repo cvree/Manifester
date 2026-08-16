@@ -129,6 +129,9 @@ describe('saving a ritual', () => {
         playlist: [],
         repeat: 'one',
         rainCharacter: 'full',
+        layers: [],
+        levels: {},
+        muted: [],
       },
       brainwave: {
         enabled: true,

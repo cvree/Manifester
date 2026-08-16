@@ -356,3 +356,29 @@ export const GrowthIcon = (props: IconProps) => (
     <path d="M12 15.4c0-2.4 1.9-4.1 4.7-4.3.2 2.6-1.4 4.3-4.7 4.3Z" />
   </Icon>
 )
+
+/** Three faders at different heights — the ambience mixer. */
+export const MixerIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M6 20V15M6 9V4M12 20V12M12 6V4M18 20V17M18 11V4" />
+    <circle cx="6" cy="12" r="2.1" fill="var(--panel-solid)" />
+    <circle cx="12" cy="9" r="2.1" fill="var(--panel-solid)" />
+    <circle cx="18" cy="14" r="2.1" fill="var(--panel-solid)" />
+  </Icon>
+)
+
+/** A speaker with one small wave — a layer that is sounding. */
+export const SpeakerIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M5 9.4h3.1L12 6v12l-3.9-3.4H5Z" />
+    <path d="M15.4 9.8a3.6 3.6 0 0 1 0 4.4" />
+  </Icon>
+)
+
+/** A speaker crossed through — a layer that is muted. */
+export const SpeakerOffIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M5 9.4h3.1L12 6v12l-3.9-3.4H5Z" />
+    <path d="M15.4 10.2 19 13.8M19 10.2l-3.6 3.6" />
+  </Icon>
+)

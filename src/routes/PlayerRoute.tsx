@@ -14,12 +14,14 @@ import { Card } from '../components/Card'
 import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
 import { DesktopPlayerPanel } from '../components/DesktopPlayerPanel'
 import { EmptyState } from '../components/EmptyState'
+import { AmbienceMixer } from '../components/AmbienceMixer'
 import { PlayerAdjust } from '../components/PlayerAdjust'
 import { PlayerAtmosphere } from '../components/PlayerAtmosphere'
 import {
   CloseIcon,
   CollapseIcon,
   ExpandIcon,
+  MixerIcon,
   MuteIcon,
   PauseIcon,
   PlayIcon,
@@ -68,7 +70,7 @@ export function PlayerRoute() {
   const { preferences } = usePreferences()
   const { allTracks, listeningStats } = useLibrary()
   const { expanded, setExpanded } = useStage()
-  const [sheet, setSheet] = useState<PanelKey | 'adjust' | null>(null)
+  const [sheet, setSheet] = useState<PanelKey | 'adjust' | 'mixer' | null>(null)
   const reducedMotion = useReducedMotion()
 
   const hasText = countWords(draft.text) > 0
@@ -302,6 +304,26 @@ export function PlayerRoute() {
                   {soundOn ? <WaveIcon /> : <MuteIcon />}
                 </button>
 
+                {/*
+                  The mixer, one tap from the stage and never more than one.
+                  It sits in the stage's own corner beside the sound button
+                  rather than inside Adjust, because the whole point of it is
+                  that balancing what you are hearing should not mean opening a
+                  settings sheet and finding a row in it.
+                */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    cue('tap')
+                    setSheet('mixer')
+                  }}
+                  aria-label="Open the audio mixer: a level for every layer"
+                  title="Mixer"
+                  className="stage__mixer interactive flex h-11 w-11 items-center justify-center rounded-full border border-[var(--panel-border)] bg-[var(--panel)] text-[1.05rem] text-ink-faint hover:text-ink"
+                >
+                  <MixerIcon />
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -459,7 +481,11 @@ export function PlayerRoute() {
         </div>
 
         {!expanded && !complete && (
-          <DesktopPlayerPanel onOpenPanel={setSheet} onEditWords={editWords} />
+          <DesktopPlayerPanel
+            onOpenPanel={setSheet}
+            onEditWords={editWords}
+            onOpenMixer={() => setSheet('mixer')}
+          />
         )}
       </div>
 
@@ -468,9 +494,11 @@ export function PlayerRoute() {
         onClose={() => setSheet(null)}
         onOpenPanel={setSheet}
         onEditWords={editWords}
+        onOpenMixer={() => setSheet('mixer')}
       />
+      <AmbienceMixer open={sheet === 'mixer'} onClose={() => setSheet(null)} />
       <SettingsSheets
-        open={sheet === 'adjust' ? null : sheet}
+        open={sheet === 'adjust' || sheet === 'mixer' ? null : sheet}
         onOpenChange={setSheet}
       />
     </>
