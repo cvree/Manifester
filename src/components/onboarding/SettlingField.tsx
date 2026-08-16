@@ -111,6 +111,26 @@ export function SettlingField({
   const reducedMotion = useReducedMotion()
 
   /*
+   * The eased state lives outside the effect on purpose.
+   *
+   * It is the field's memory — where it currently is, as opposed to where it
+   * has been asked to be — and it has to survive anything that rebuilds the
+   * frame loop. Holding it inside meant every step change reset `resolve` to
+   * zero and re-settled from nothing, which is precisely the opposite of the
+   * one thing this component is for.
+   */
+  const eased = useRef({
+    resolve: 0,
+    voice: 0,
+    x: 0,
+    y: 0,
+    colour: null as [number, number, number] | null,
+  })
+
+  /** Set by the effect so a reduced-motion redraw can be asked for. */
+  const redraw = useRef<(() => void) | null>(null)
+
+  /*
    * Everything the frame loop reads lives in refs, so a new prop is a new
    * *target* rather than a re-mounted animation. Changing intent mid-flight
    * eases the colour across; it does not cut.
@@ -202,13 +222,16 @@ export function SettlingField({
 
     /* ── The frame ── */
 
-    // Eased state, so every input arrives as a movement rather than a cut.
-    const eased = {
-      resolve: reducedMotion ? resolve : 0,
-      voice: 0,
-      x: 0,
-      y: 0,
-      colour: [...(palette[tone] ?? palette.rose)] as [number, number, number],
+    const state = eased.current
+    if (!state.colour) {
+      state.colour = [...(palette[target.current.tone] ?? palette.rose)] as [
+        number,
+        number,
+        number,
+      ]
+      // With motion reduced there is no settle to watch, so the first frame is
+      // the answer rather than the beginning of one.
+      if (reducedMotion) state.resolve = target.current.resolve
     }
 
     let frame = 0
@@ -225,12 +248,14 @@ export function SettlingField({
       // One time constant for everything, so the whole field settles as a
       // single object rather than as parts arriving separately.
       const k = reducedMotion ? 1 : 1 - Math.exp(-dt * 2.4)
-      eased.resolve += (wanted.resolve - eased.resolve) * k
-      eased.voice += ((wanted.speaking ? 1 : 0) - eased.voice) * k
-      eased.x += (pointerX - eased.x) * k * 0.5
-      eased.y += (pointerY - eased.y) * k * 0.5
+      const colour = state.colour ?? [...goal]
+      state.colour = colour as [number, number, number]
+      state.resolve += (wanted.resolve - state.resolve) * k
+      state.voice += ((wanted.speaking ? 1 : 0) - state.voice) * k
+      state.x += (pointerX - state.x) * k * 0.5
+      state.y += (pointerY - state.y) * k * 0.5
       for (let i = 0; i < 3; i += 1) {
-        eased.colour[i] += (goal[i] - eased.colour[i]) * k
+        colour[i] += (goal[i] - colour[i]) * k
       }
 
       const live = breath?.current
@@ -239,15 +264,15 @@ export function SettlingField({
       const expansion = live?.active ? live.e : 0.4
       const seconds = live?.seconds ?? now / 1000
 
-      const settle = eased.resolve
-      const centreX = width / 2 + eased.x * 22 * (1 - settle * 0.6)
-      const centreY = height * (0.5 - 0.06 * (1 - settle)) + eased.y * 16
+      const settle = state.resolve
+      const centreX = width / 2 + state.x * 22 * (1 - settle * 0.6)
+      const centreY = height * (0.5 - 0.06 * (1 - settle)) + state.y * 16
 
       // The field contracts as it resolves: wide and searching at first, close
       // and certain by the ritual.
       const span = Math.min(width, height)
       const outer = span * (0.92 - 0.3 * settle) * (0.94 + expansion * 0.12)
-      const [r, g, b] = eased.colour
+      const [r, g, b] = colour
 
       context.clearRect(0, 0, width, height)
       context.globalCompositeOperation = 'lighter'
@@ -278,7 +303,7 @@ export function SettlingField({
           falloff *
           (0.075 + settle * 0.115) *
           (0.72 + expansion * 0.5) *
-          (1 + eased.voice * 0.85)
+          (1 + state.voice * 0.85)
 
         const x = centreX + drift
         const y = centreY + drift * 0.6
@@ -310,7 +335,7 @@ export function SettlingField({
        * player's orb takes over from when the welcome ends.
        */
       const heart = span * (0.09 + 0.05 * settle) * (0.82 + expansion * 0.4)
-      const heartAlpha = (0.10 + settle * 0.14) * (1 + eased.voice * 0.7)
+      const heartAlpha = (0.10 + settle * 0.14) * (1 + state.voice * 0.7)
       const core = context.createRadialGradient(
         centreX,
         centreY,
@@ -337,6 +362,7 @@ export function SettlingField({
       frame = requestAnimationFrame(draw)
     }
 
+    redraw.current = () => draw(performance.now())
     frame = requestAnimationFrame(draw)
 
     /*
@@ -359,15 +385,28 @@ export function SettlingField({
 
     return () => {
       running = false
+      redraw.current = null
       cancelAnimationFrame(frame)
       observer.disconnect()
       themeWatcher.disconnect()
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pointermove', onPointerMove)
     }
-    // `resolve` and `tone` are read through `target`; only the things that
-    // change *how* the loop is built belong here.
-  }, [reducedMotion, breath, resolve, tone])
+    /*
+     * `resolve`, `tone` and `speaking` are read through `target` every frame,
+     * so they must not be dependencies: listing them would tear down the loop
+     * and both observers on every step, and reset the settle it exists to
+     * show. Only the things that change *how* the loop is built belong here.
+     */
+  }, [reducedMotion, breath])
+
+  /*
+   * With motion reduced there is no loop to notice a change, so a new step has
+   * to ask for the one frame it is entitled to.
+   */
+  useEffect(() => {
+    if (reducedMotion) redraw.current?.()
+  }, [resolve, tone, speaking, reducedMotion])
 
   return (
     <canvas

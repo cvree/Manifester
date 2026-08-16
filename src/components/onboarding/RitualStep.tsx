@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { cx } from '../../lib/cx'
 import { cue } from '../../lib/feedback'
 import { estimateSpokenSeconds, formatApproxDuration } from '../../lib/format'
 import { VOICE_PROFILES, voiceForStyle } from '../../lib/tts'
@@ -181,7 +180,7 @@ export function RitualStep({
           {beginning ? 'Beginning…' : 'Begin my first loop'}
         </Button>
 
-        <p className={cx('type-meta mt-2.5')}>Stop whenever you like.</p>
+        <p className="type-meta mt-2.5">Stop whenever you like.</p>
       </Reveal>
     </div>
   )
