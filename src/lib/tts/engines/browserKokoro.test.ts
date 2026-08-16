@@ -41,6 +41,22 @@ function fakeWorker() {
   }
 }
 
+/**
+ * Let the ticks between a press and the worker run.
+ *
+ * Pressing Install no longer reaches the worker in the same turn: the engine
+ * asks the GPU driver whether it will actually hand over an adapter before it
+ * decides what to try, and that is a promise however quickly it answers. A
+ * handful of microtasks covers the probe, the plan and the first post; nothing
+ * here waits on a timer, so it is safe under `vi.useFakeTimers`.
+ */
+async function settle(): Promise<void> {
+  for (let tick = 0; tick < 6; tick += 1) await Promise.resolve()
+}
+
+/** A browser that advertises WebGPU *and* hands over an adapter. */
+const workingGpu = { gpu: { requestAdapter: async () => ({}) } }
+
 function build() {
   const fake = fakeWorker()
   let created = 0
@@ -94,11 +110,13 @@ describe('installing Studio Voice', () => {
   })
 
   it('reports progress and then readiness', async () => {
-    const { engine, fake } = build()
+    const built = build()
+    const { engine, fake } = built
     const seen: string[] = []
     engine.subscribe((snapshot) => seen.push(snapshot.state))
 
     const installing = engine.install()
+    await settle()
     expect(fake.sent[0]).toMatchObject({ type: 'install' })
     expect(engine.getSnapshot().state).toBe('installing')
 
@@ -118,6 +136,7 @@ describe('installing Studio Voice', () => {
     const { engine, fake } = build()
     const first = engine.install()
     const second = engine.install()
+    await settle()
     fake.reply({ type: 'ready', backend: 'wasm' })
     expect(await Promise.all([first, second])).toEqual([true, true])
     expect(fake.sent.filter((message) => message.type === 'install')).toHaveLength(1)
@@ -130,6 +149,7 @@ describe('installing Studio Voice', () => {
     const restarted = build()
 
     const resuming = restarted.engine.resume()
+    await settle()
     expect(restarted.fake.sent[0]).toMatchObject({ type: 'resume' })
 
     /*
@@ -151,8 +171,10 @@ describe('installing Studio Voice', () => {
   })
 
   it('keeps a real failure on screen, with a way back', async () => {
-    const { engine, fake } = build()
+    const built = build()
+    const { engine, fake } = built
     const installing = engine.install()
+    await settle()
     fake.reply({ type: 'failed', reason: 'storage', message: 'QuotaExceededError' })
 
     expect(await installing).toBe(false)
@@ -164,8 +186,10 @@ describe('installing Studio Voice', () => {
   })
 
   it('cancelling stops the worker and offers the install again', async () => {
-    const { engine, fake } = build()
+    const built = build()
+    const { engine, fake } = built
     const installing = engine.install()
+    await settle()
     engine.cancelInstall()
 
     expect(await installing).toBe(false)
@@ -178,8 +202,10 @@ describe('installing Studio Voice', () => {
   })
 
   it('a worker that dies never leaves the interface waiting', async () => {
-    const { engine, fake } = build()
+    const built = build()
+    const { engine, fake } = built
     const installing = engine.install()
+    await settle()
 
     /*
      * Twice, because a dead worker is now worth one second attempt against the
@@ -208,9 +234,10 @@ describe('installing Studio Voice', () => {
    * device could not start the voice engine, with nothing behind the message.
    */
   it('falls back from the GPU to the CPU in a brand new worker', async () => {
-    vi.stubGlobal('navigator', { gpu: {} })
+    vi.stubGlobal('navigator', workingGpu)
     const built = build()
     const installing = built.engine.install()
+    await settle()
 
     expect(built.fake.sent[0]).toMatchObject({ type: 'install', backend: 'webgpu' })
     expect(built.created).toBe(1)
@@ -236,10 +263,42 @@ describe('installing Studio Voice', () => {
     expect(built.engine.getSnapshot().backend).toBe('wasm')
   })
 
+  /**
+   * The wasted install.
+   *
+   * Chrome defines `navigator.gpu` on machines that have no adapter to give —
+   * a virtual machine, a driver that is not on the allow list, a browser
+   * started without the flag — and only says so when `requestAdapter()`
+   * resolves to `null`. The engine used to take the property as the answer,
+   * plan a WebGPU attempt, download ninety megabytes, build the graph, and
+   * discover the truth at the first word:
+   *
+   *     webgpu: no available backend found … Failed to get GPU adapter.
+   *
+   * Asking first costs a millisecond and skips the road entirely.
+   */
+  it('never tries the GPU a browser will not actually hand over', async () => {
+    vi.stubGlobal('navigator', { gpu: { requestAdapter: async () => null } })
+    const built = build()
+    const installing = built.engine.install()
+    await settle()
+
+    expect(built.fake.sent[0]).toMatchObject({ type: 'install', backend: 'wasm' })
+    // And the card stops claiming an acceleration this device does not have.
+    expect(built.engine.getSnapshot().accelerated).toBe(false)
+
+    built.fake.reply({ type: 'ready', backend: 'wasm' })
+    expect(await installing).toBe(true)
+    // One attempt, one worker: nothing was spent finding out.
+    expect(built.created).toBe(1)
+  })
+
   it('keeps a readable trail of what every attempt said', async () => {
-    vi.stubGlobal('navigator', { gpu: {} })
-    const { engine, fake } = build()
+    vi.stubGlobal('navigator', workingGpu)
+    const built = build()
+    const { engine, fake } = built
     const installing = engine.install()
+    await settle()
 
     fake.reply({ type: 'failed', reason: 'unsupported', message: 'webgpu: no kernel' })
     await Promise.resolve()
@@ -254,8 +313,10 @@ describe('installing Studio Voice', () => {
   })
 
   it('tries the other engine once before giving up, and remembers what worked', async () => {
-    const { engine, fake } = build()
+    const built = build()
+    const { engine, fake } = built
     const installing = engine.install()
+    await settle()
 
     expect(fake.sent[0]).toMatchObject({ type: 'install', runtime: 'bundled' })
     fake.reply({
@@ -276,12 +337,15 @@ describe('installing Studio Voice', () => {
     // And the next install on this device starts with the one that worked.
     const again = build()
     void again.engine.install()
+    await settle()
     expect(again.fake.sent[0]).toMatchObject({ runtime: 'cdn' })
   })
 
   it('does not go looking for a second engine when there is no room', async () => {
-    const { engine, fake } = build()
-    const installing = engine.install()
+    const built = build()
+    const { fake } = built
+    const installing = built.engine.install()
+    await settle()
     fake.reply({ type: 'failed', reason: 'storage', message: 'QuotaExceededError' })
 
     expect(await installing).toBe(false)
@@ -303,8 +367,10 @@ describe('installing Studio Voice', () => {
   it('waits through the silence after the last byte', async () => {
     vi.useFakeTimers()
     try {
-      const { engine, fake } = build()
+      const built = build()
+      const { engine, fake } = built
       const installing = engine.install()
+    await settle()
 
       fake.reply({ type: 'progress', loaded: 90_000_000, total: 90_000_000, file: 'model' })
       fake.reply({ type: 'stage', stage: 'preparing' })
@@ -328,8 +394,10 @@ describe('installing Studio Voice', () => {
   it('still gives up on a download that really has stopped', async () => {
     vi.useFakeTimers()
     try {
-      const { engine, fake } = build()
+      const built = build()
+      const { engine, fake } = built
       const installing = engine.install()
+    await settle()
       fake.reply({ type: 'progress', loaded: 1_000_000, total: 90_000_000, file: 'model' })
 
       // The first attempt times out — and is now worth carrying to the other
@@ -356,8 +424,10 @@ describe('installing Studio Voice', () => {
    */
   it('clears a damaged download rather than retrying into it', async () => {
     store.set('manifester:tts.studioVoice', 'installed')
-    const { engine, fake } = build()
+    const built = build()
+    const { engine, fake } = built
     const installing = engine.install()
+    await settle()
 
     fake.reply({
       type: 'failed',
@@ -375,8 +445,10 @@ describe('installing Studio Voice', () => {
 
   it('says nothing when a resume is the one that finds the damage', async () => {
     store.set('manifester:tts.studioVoice', 'installed')
-    const { engine, fake } = build()
+    const built = build()
+    const { engine, fake } = built
     const resuming = engine.resume()
+    await settle()
 
     fake.reply({ type: 'failed', reason: 'corrupt', message: 'wasm: invalid model' })
 
@@ -396,15 +468,16 @@ describe('installing Studio Voice', () => {
    */
   it('does not hand a press of Install the answer to a background resume', async () => {
     store.set('manifester:tts.studioVoice', 'installed')
-    const { engine, fake } = build()
+    const built = build()
+    const { engine, fake } = built
 
     const resuming = engine.resume()
+    await settle()
     expect(fake.sent[0]).toMatchObject({ type: 'resume' })
 
     const installing = engine.install()
     expect(await resuming).toBe(false)
-    await Promise.resolve()
-    await Promise.resolve()
+    await settle()
 
     // A real install, in a worker of its own, rather than the resume's answer.
     expect(fake.sent.at(-1)).toMatchObject({ type: 'install' })
@@ -414,8 +487,10 @@ describe('installing Studio Voice', () => {
   })
 
   it('forgets on request', async () => {
-    const { engine, fake } = build()
+    const built = build()
+    const { engine, fake } = built
     const installing = engine.install()
+    await settle()
     fake.reply({ type: 'ready', backend: 'wasm' })
     await installing
 
@@ -438,6 +513,7 @@ describe('speaking', () => {
   async function ready() {
     const built = build()
     const installing = built.engine.install()
+    await settle()
     built.fake.reply({ type: 'ready', backend: 'wasm' })
     await installing
     return built

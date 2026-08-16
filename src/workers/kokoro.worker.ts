@@ -324,7 +324,17 @@ function classify(error: unknown): StudioFailure {
     message.includes('dynamically imported module') ||
     message.includes('initializewebassembly') ||
     message.includes('ort-wasm') ||
-    message.includes('wasm backend')
+    message.includes('wasm backend') ||
+    /*
+     * espeak-ng, which turns the words into sounds before the model ever sees
+     * them. It says "Invalid language identifier" when it cannot find its own
+     * pronunciation data, and it is worth naming here because that sentence
+     * once reached people as `unsupported` — "this device could not run the
+     * model" — when the device was never the problem and closing tabs could not
+     * possibly have helped. See `engines/phonemizer.ts`.
+     */
+    message.includes('language identifier') ||
+    message.includes('phonem')
   ) {
     return 'runtime'
   }

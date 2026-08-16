@@ -1122,12 +1122,16 @@ cover"**:
 - WebGPU, where it exists, is roughly an order of magnitude faster than the
   WebAssembly path and makes the difference academic.
 
-The rest is failure handling, because on this path every failure is a device
-fact rather than a bug:
+The rest is failure handling. Most of it is device facts rather than bugs —
+though not all of it was: for a while every install on every device died at the
+last step, in a way that read exactly like a device fact. See
+[`src/lib/tts/engines/phonemizer.ts`](src/lib/tts/engines/phonemizer.ts).
 
 | Situation | What happens |
 | --- | --- |
+| WebGPU advertised but no adapter behind it | Asked before anything is planned — `navigator.gpu` exists on plenty of machines that will not hand over a GPU — so the attempt is never made and nothing is spent finding out |
 | WebGPU advertised but the pipeline will not build | The worker warms up with one real inference before reporting ready; if it throws, the session is re-opened on WebAssembly with the **same cached weights** — no second download |
+| espeak-ng cannot find its own pronunciation data | Reported as an engine failure rather than as a device that cannot run the model, because that is what it is. The build ships espeak exactly as compiled, unbundled, so it cannot happen again |
 | Download interrupted, tab closed, tunnel | Partial files stay in the browser cache; **Install** resumes rather than restarting |
 | No room (private-mode Safari, a full phone) | Reported as a storage failure with a sentence about what to free; everything else keeps working |
 | Cache evicted between visits | `resume()` finds the files missing, quietly clears the installed flag, and offers a clean install |
@@ -2132,6 +2136,8 @@ src/
       engines/
         browserKokoro.ts  Studio Voice on the device: lifecycle, progress,
                           failure classification, and a plain `TTSEngine`
+        phonemizer.ts     espeak-ng, loaded as an asset rather than bundled,
+                          because a bundler quietly miscompiles it
         kokoro.ts         the HTTP client for a deployment that has a service
       wav.ts            float samples → the one container everything decodes
     ai/

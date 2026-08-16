@@ -1,4 +1,7 @@
-import { defineConfig } from 'vite'
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -25,8 +28,106 @@ const BACKGROUND_COLOR = '#F7F1E8'
  */
 const ttsTarget = process.env.TTS_PROXY_TARGET ?? 'http://127.0.0.1:8787'
 
+/**
+ * Everything that only exists to run Studio Voice.
+ *
+ * One list, used twice below: these files are kept *out* of the offline bundle
+ * every visitor downloads, and cached the first time somebody actually presses
+ * Install. They are twenty-four megabytes together — the worker, `kokoro-js`,
+ * `transformers.js`, ONNX Runtime and espeak-ng — for a feature that promises
+ * to download nothing until it is asked for.
+ *
+ * Written as one pattern so the two rules cannot drift apart. They did once,
+ * silently, when the worker stopped being a single flattened bundle and the
+ * ignore list still named only the file it used to be.
+ */
+const STUDIO_VOICE_CHUNK =
+  /(?:kokoro[.-]|transformers|phonemizer-|ort-wasm)[^/]*\.(?:js|mjs|wasm)$/
+
+/** The real `phonemizer`, as a path on disk rather than as a module. */
+const PHONEMIZER_ENTRY = fileURLToPath(import.meta.resolve('phonemizer'))
+
+/** What `src/lib/tts/engines/phonemizer.ts` imports to find the asset. */
+const PHONEMIZER_URL_ID = 'virtual:phonemizer-runtime'
+
+/**
+ * Ship espeak-ng exactly as its author compiled it.
+ *
+ * `phonemizer` is a WebAssembly build of espeak-ng translated back into
+ * JavaScript, and Rolldown — the bundler `vite build` uses — miscompiles it:
+ * it deletes `continue` statements that end a labelled block inside a loop,
+ * which is a pattern no human writes and a compiler emits constantly. Eleven
+ * of them vanished, `printf` stopped concatenating, espeak looked for its
+ * pronunciation data in the wrong directory, and Studio Voice failed on every
+ * device with `Invalid language identifier: "en-us"` — at the very end of a
+ * ninety-megabyte install, three times over as the fallbacks each tried again.
+ * `src/lib/tts/engines/phonemizer.ts` has the long version.
+ *
+ * So the file is never parsed. It is emitted as an asset, copied byte for byte
+ * with a content hash in its name, and this module hands back its URL for the
+ * worker to `import()` at runtime. The alias below is what puts that module in
+ * the path of `kokoro-js`, which asks for `phonemizer` by name and has no idea
+ * any of this is happening.
+ *
+ * Only the build needs it. `vite dev` transforms with esbuild, which leaves the
+ * code alone, so in development the URL simply points at the file on disk.
+ */
+function phonemizerRuntime(): Plugin {
+  const resolved = `\0${PHONEMIZER_URL_ID}`
+  let serving = false
+
+  return {
+    name: 'manifester:phonemizer-runtime',
+    configResolved(config) {
+      serving = config.command === 'serve'
+    },
+    resolveId(id) {
+      return id === PHONEMIZER_URL_ID ? resolved : undefined
+    },
+    load(id) {
+      if (id !== resolved) return undefined
+
+      if (serving) {
+        // Vite's own escape hatch for a file outside the project root.
+        return `export default ${JSON.stringify(`${base}@fs${PHONEMIZER_ENTRY}`)}\n`
+      }
+
+      const source = readFileSync(PHONEMIZER_ENTRY, 'utf8')
+      /*
+       * The name is spelled out rather than left to the asset pipeline, which
+       * renames a `.js` asset to `.cjs` to keep it from being mistaken for a
+       * chunk. That rename is fatal here: this file is loaded with `import()`,
+       * and a static host that does not serve `.cjs` as JavaScript makes the
+       * browser refuse it outright.
+       */
+      const digest = createHash('sha256').update(source).digest('hex').slice(0, 8)
+      const reference = this.emitFile({
+        type: 'asset',
+        fileName: `assets/phonemizer-${digest}.js`,
+        source,
+      })
+      return `export default import.meta.ROLLUP_FILE_URL_${reference}\n`
+    },
+  }
+}
+
 export default defineConfig({
   base,
+  resolve: {
+    alias: [
+      /*
+       * Exactly `phonemizer`, and a regular expression because a plain string
+       * would also capture every path underneath it — including the one the
+       * plugin above resolves.
+       */
+      {
+        find: /^phonemizer$/,
+        replacement: fileURLToPath(
+          new URL('./src/lib/tts/engines/phonemizer.ts', import.meta.url),
+        ),
+      },
+    ],
+  },
   server: {
     proxy: {
       '/api/tts': {
@@ -35,7 +136,31 @@ export default defineConfig({
       },
     },
   },
+  /*
+   * The worker gets its own bundle, and therefore its own copy of the plugin.
+   * It is also the only place `phonemizer` is ever reached from — `kokoro-js`
+   * runs nowhere else — so leaving this out means the fix does not exist.
+   */
+  worker: {
+    /*
+     * A real module, which is what the page already asks for.
+     *
+     * `defaultWorker()` has always created this with `{ type: 'module' }`, but
+     * the bundle behind it defaulted to an IIFE — and an IIFE has no
+     * `import.meta`, so the URL of the espeak asset resolved against
+     * `undefined` and the worker threw before it could speak. Saying `es` here
+     * makes the output match the declaration.
+     *
+     * It also makes a promise this file already made come true. `kokoro-js` and
+     * ONNX Runtime are behind a dynamic import precisely so that nobody who
+     * never turns Studio Voice on downloads them; flattened into an IIFE they
+     * were in the worker chunk regardless, and the split only exists now.
+     */
+    format: 'es',
+    plugins: () => [phonemizerRuntime()],
+  },
   plugins: [
+    phonemizerRuntime(),
     react(),
     tailwindcss(),
     VitePWA({
@@ -125,10 +250,7 @@ export default defineConfig({
              * cache is the right thing to keep it in.
              */
             urlPattern: ({ url, sameOrigin }) =>
-              sameOrigin &&
-              (/kokoro\.worker-[^/]*\.js$/.test(url.pathname) ||
-                /\.wasm$/.test(url.pathname) ||
-                /ort-wasm[^/]*\.mjs$/.test(url.pathname)),
+              sameOrigin && STUDIO_VOICE_CHUNK.test(url.pathname),
             handler: 'CacheFirst',
             options: {
               cacheName: 'manifester-studio-voice',
@@ -154,13 +276,20 @@ export default defineConfig({
          * precaching it taxes everybody who never turns the feature on — which
          * is the default.
          *
-         * The Studio Voice worker is 2.2 MB, and the model it loads is another
-         * ninety. Precaching the worker would mean every visitor downloads the
-         * runtime for a feature that explicitly promises to download nothing
-         * until they press Install — which would make the promise false in the
-         * only way that matters. It is runtime-cached instead, above.
+         * The Studio Voice worker is 2.2 MB, and espeak-ng beside it is another
+         * 1.3 MB, and the model they load is ninety. Precaching any of that
+         * would mean every visitor downloads the runtime for a feature that
+         * explicitly promises to download nothing until they press Install —
+         * which would make the promise false in the only way that matters. All
+         * three are runtime-cached instead, above.
          */
-        globIgnores: ['**/ai-provider-*.js', '**/kokoro.worker-*.js'],
+        globIgnores: [
+          '**/ai-provider-*.js',
+          '**/kokoro.worker-*.js',
+          '**/kokoro-*.js',
+          '**/transformers*.js',
+          '**/phonemizer-*.js',
+        ],
         navigateFallback: `${base}index.html`,
         cleanupOutdatedCaches: true,
         clientsClaim: true,
