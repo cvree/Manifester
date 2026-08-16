@@ -397,6 +397,72 @@ export function recommendedFor(focus: Focus): string {
   return focus.lines[0]
 }
 
+/* ── More than one thing at a time ───────────────────────────── */
+
+/**
+ * How many intents somebody may carry into their first loop.
+ *
+ * Three, and the number is a judgement rather than a limit imposed by the
+ * layout. Nobody arrives needing one thing — "calm" and "sleep" are the same
+ * evening, "confidence" and "career" are the same meeting — and forcing a
+ * single choice made the opening question feel like it was testing them.
+ *
+ * It stops at three because the starters below are drawn from every intent
+ * chosen, and a shortlist assembled from five themes stops being about any of
+ * them. Three blends; four is a smoothie.
+ */
+export const MAX_FOCUSES = 3
+
+/**
+ * The shortlist for however many intents were chosen.
+ *
+ * Round-robin rather than concatenated, which is the whole trick: taking the
+ * best line from each intent before the second-best from any of them means a
+ * person who chose Sleep and Gratitude sees one of each immediately, rather
+ * than four sleep lines with gratitude somewhere below the fold. The first
+ * intent still leads, so `recommendedFor` continues to be the first thing on
+ * screen and the pre-selected one.
+ */
+export function blendStarters(focuses: Focus[]): string[] {
+  if (focuses.length === 0) return []
+  if (focuses.length === 1) return startersFor(focuses[0])
+
+  const lines: string[] = []
+  const seen = new Set<string>()
+  const depth = Math.max(...focuses.map((focus) => focus.lines.length))
+
+  for (let rank = 0; rank < depth && lines.length < STARTER_COUNT; rank += 1) {
+    for (const focus of focuses) {
+      if (lines.length >= STARTER_COUNT) break
+      const line = focus.lines[rank]
+      if (!line || seen.has(line)) continue
+      seen.add(line)
+      lines.push(line)
+    }
+  }
+
+  return lines
+}
+
+/**
+ * What to call a loop built out of several intents.
+ *
+ * Their own words for what they came for, joined the way a person would say
+ * them. A generated title like "Confidence + Calm + Career" reads like a
+ * database row; "Confidence, calm and career" reads like something they said,
+ * and they can rename it in one tap anyway.
+ */
+export function loopTitleFor(focuses: Focus[]): string {
+  if (focuses.length === 0) return 'My first loop'
+  if (focuses.length === 1) return focuses[0].loopTitle
+
+  const labels = focuses.map((focus, index) =>
+    index === 0 ? focus.label : focus.label.toLowerCase(),
+  )
+  const last = labels.pop()!
+  return `${labels.join(', ')} and ${last}`
+}
+
 /**
  * Every curated line, deduplicated, in a stable order.
  *

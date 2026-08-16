@@ -9,10 +9,20 @@
 /** Which backend the worker managed to bring up. */
 export type StudioBackend = 'webgpu' | 'wasm'
 
+/**
+ * Which copy of the ONNX Runtime to execute the model with.
+ *
+ * See `engines/runtime.ts`. It is part of the request rather than a constant
+ * because ONNX Runtime can only be initialised once per worker — so trying the
+ * other one means a new worker, which means the page has to be able to say
+ * which one it wants.
+ */
+export type StudioRuntimeChoice = 'bundled' | 'cdn'
+
 /** Sent from the page to the worker. */
 export type StudioRequest =
   /** Bring the model up. Downloads it the first time, and only when asked. */
-  | { type: 'install'; backend: StudioBackend }
+  | { type: 'install'; backend: StudioBackend; runtime: StudioRuntimeChoice }
   /**
    * Bring the model up *only* if every file is already in the browser cache.
    *
@@ -21,7 +31,7 @@ export type StudioRequest =
    * megabytes, so a returning visitor gets their voice back automatically and
    * a new one is never charged for a decision they did not make.
    */
-  | { type: 'resume'; backend: StudioBackend }
+  | { type: 'resume'; backend: StudioBackend; runtime: StudioRuntimeChoice }
   | { type: 'synthesize'; id: number; text: string; voice: string; speed: number }
   /** Abandon a synthesis whose answer is no longer wanted. */
   | { type: 'cancel'; id: number }
@@ -57,7 +67,19 @@ export type StudioFailure =
   | 'download'
   /** No room. Safari's private mode and a full phone both land here. */
   | 'storage'
+  /**
+   * The engine itself would not load.
+   *
+   * Distinct from `unsupported`, and the distinction was expensive to learn:
+   * a WebAssembly runtime that could not be *fetched* is a network or blocking
+   * problem with a different remedy from a device that genuinely cannot run
+   * the graph, and telling somebody to close tabs when an ad blocker ate the
+   * runtime is advice that can never work. See `engines/runtime.ts`.
+   */
+  | 'runtime'
   /** The graph would not build, or the first inference threw. */
   | 'unsupported'
+  /** Nothing arrived for long enough that waiting further is not honest. */
+  | 'timeout'
   /** Somebody pressed Cancel. */
   | 'cancelled'

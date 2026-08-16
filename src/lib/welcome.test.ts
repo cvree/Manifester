@@ -125,9 +125,10 @@ describe('where a visitor lands', () => {
   it('resumes a half-finished introduction', () => {
     writeProgress({
       step: 'voice',
-      focusId: 'calm',
+      focusIds: ['calm'],
       text: 'I am safe in this moment, and this moment is enough.',
       voiceStyle: 'masculine',
+      wordsUnlocked: false,
     })
     // Still not onboarded — a saved journey is not a completed one.
     expect(launchDestination([])).toBe('/welcome')

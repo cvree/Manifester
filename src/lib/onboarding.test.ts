@@ -86,7 +86,15 @@ describe('first use', () => {
     // Private-mode Safari. The introduction shows every time, which is a
     // small annoyance; throwing on the launch route would be a white screen.
     expect(() => markOnboarded()).not.toThrow()
-    expect(() => writeProgress({ step: 'intent', focusId: null, text: '', voiceStyle: 'feminine' })).not.toThrow()
+    expect(() =>
+      writeProgress({
+        step: 'intent',
+        focusIds: [],
+        text: '',
+        voiceStyle: 'feminine',
+        wordsUnlocked: false,
+      }),
+    ).not.toThrow()
     expect(hasOnboarded()).toBe(false)
     expect(readProgress()).toBeNull()
     expect(shouldOnboard([])).toBe(true)
@@ -123,9 +131,12 @@ describe('versioning', () => {
 describe('a half-finished journey', () => {
   const progress = {
     step: 'voice',
-    focusId: 'calm',
+    // More than one, because that is what the intent step now produces and
+    // the order is load-bearing: the first one leads.
+    focusIds: ['calm', 'sleep'],
     text: 'I am safe in this moment.',
     voiceStyle: 'masculine' as const,
+    wordsUnlocked: false,
   }
 
   it('comes back after a refresh', () => {

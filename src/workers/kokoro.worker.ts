@@ -21,8 +21,20 @@
  *    surprised by a ninety-megabyte download.
  *  - **Samples are transferred, not copied.** A ten-second clip is a megabyte
  *    of floats, and this runs on phones.
+ *
+ * ── The engine, and where it comes from ─────────────────────────────────────
+ *
+ * The first thing that happens after `kokoro-js` is imported is that this
+ * worker overrules `transformers.js` about where the ONNX Runtime WebAssembly
+ * lives. That one line is the difference between Studio Voice working and
+ * Studio Voice failing identically on every desktop browser, and the reasoning
+ * is written out in `lib/tts/engines/runtime.ts`.
  */
 
+import {
+  CDN_WASM_PATH,
+  type StudioRuntime,
+} from '../lib/tts/engines/runtime'
 import type {
   StudioBackend,
   StudioFailure,
@@ -32,6 +44,8 @@ import type {
 
 /** The ONNX export this app speaks with. */
 const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX'
+
+const MODEL_BASE = `https://huggingface.co/${MODEL_ID}/resolve/main`
 
 /**
  * Which weights to fetch.
@@ -48,6 +62,20 @@ const DTYPE = 'q8'
 
 /** Kokoro's output rate. Fixed by the checkpoint. */
 const SAMPLE_RATE = 24_000
+
+/**
+ * The voices this app actually uses, by their Kokoro names.
+ *
+ * Kept in step with `lib/tts/voices.ts` by hand, and the duplication is
+ * deliberate: the worker must not import the page's module graph, and the only
+ * thing it needs from that table is which two of the twenty-eight voice packs
+ * are worth pulling into the cache so that "works offline" is true for Fen as
+ * well as for Ivy.
+ */
+const USED_VOICES = ['af_heart', 'am_fenrir']
+
+/** Where `kokoro-js` looks for a voice pack. Matched exactly, or it re-fetches. */
+const VOICE_CACHE = 'kokoro-voices'
 
 type KokoroModule = typeof import('kokoro-js')
 type KokoroInstance = InstanceType<KokoroModule['KokoroTTS']>
@@ -87,11 +115,10 @@ const post = (message: StudioResponse, transfer?: Transferable[]) => {
  * when it could have said Resume — never an unasked-for download.
  */
 function requiredUrls(): string[] {
-  const base = `https://huggingface.co/${MODEL_ID}/resolve/main`
   return [
-    `${base}/onnx/model_quantized.onnx`,
-    `${base}/tokenizer.json`,
-    `${base}/config.json`,
+    `${MODEL_BASE}/onnx/model_quantized.onnx`,
+    `${MODEL_BASE}/tokenizer.json`,
+    `${MODEL_BASE}/config.json`,
   ]
 }
 
@@ -108,6 +135,38 @@ async function isCached(): Promise<boolean> {
     // A browser that will not open a cache cannot tell us anything useful, and
     // guessing "yes" here would turn a resume into a silent download.
     return false
+  }
+}
+
+/**
+ * Pull both voice packs into the cache `kokoro-js` reads them from.
+ *
+ * Each is around half a megabyte and is fetched lazily, on the first line
+ * spoken in that voice — which means a device that installed the model, went
+ * offline, and then switched from Ivy to Fen would find that the voice it was
+ * promised works offline does not. Two small fetches at the end of a
+ * ninety-megabyte install fixes that permanently.
+ *
+ * Failures are swallowed on purpose. This runs *after* `ready` has been sent,
+ * and a voice pack that could not be pre-fetched is simply a voice pack that
+ * will be fetched the ordinary way later. It is not a reason to tell somebody
+ * their install did not work, because it did.
+ */
+async function warmVoices(): Promise<void> {
+  if (typeof caches === 'undefined') return
+  try {
+    const cache = await caches.open(VOICE_CACHE)
+    await Promise.all(
+      USED_VOICES.map(async (voice) => {
+        const url = `${MODEL_BASE}/voices/${voice}.bin`
+        if (await cache.match(url)) return
+        const response = await fetch(url)
+        if (!response.ok) return
+        await cache.put(url, response)
+      }),
+    )
+  } catch {
+    /* See above: best effort, never a failure the person hears about. */
   }
 }
 
@@ -144,21 +203,96 @@ class Progress {
   }
 }
 
+/**
+ * What kind of failure this was, from what the runtime said.
+ *
+ * The order matters: the engine's own loading failures are checked before the
+ * generic network words, because "failed to fetch dynamically imported module"
+ * contains *both* and only one of the two readings leads to advice that can
+ * actually help. See `StudioFailure` for what each one means on screen.
+ */
 function classify(error: unknown): StudioFailure {
   const message = String((error as Error)?.message ?? error ?? '').toLowerCase()
+
   if (message.includes('quota') || message.includes('storage')) return 'storage'
+
+  /*
+   * The engine, not the model.
+   *
+   * These are the strings ONNX Runtime produces when its WebAssembly could not
+   * be loaded or initialised at all — a blocked CDN, a stripped MIME type, a
+   * hardened browser. They used to fall through to `unsupported`, which is how
+   * a blocked network request came to be reported to everybody as a memory
+   * problem on their device.
+   */
+  if (
+    message.includes('no available backend') ||
+    message.includes('backend not found') ||
+    message.includes('dynamically imported module') ||
+    message.includes('initializewebassembly') ||
+    message.includes('ort-wasm') ||
+    message.includes('wasm backend')
+  ) {
+    return 'runtime'
+  }
+
   if (
     message.includes('fetch') ||
     message.includes('network') ||
     message.includes('load model') ||
-    message.includes('failed to load')
+    message.includes('failed to load') ||
+    message.includes('404') ||
+    message.includes('offline')
   ) {
     return 'download'
   }
+
   return 'unsupported'
 }
 
-async function bringUp(backend: StudioBackend, allowDownload: boolean): Promise<void> {
+/**
+ * Point `transformers.js` at the runtime this build ships with.
+ *
+ * Called once, immediately after the import that triggers its module-level
+ * defaults, and before anything asks for a session. The `bundled` case sets
+ * `wasmPaths` to `undefined` rather than to a path, because that is the state
+ * ONNX Runtime interprets as "use the copy that was bundled with the code that
+ * is calling me" — the asset Vite emitted next to this worker.
+ */
+async function configureRuntime(runtime: StudioRuntime): Promise<void> {
+  const { env } = await import('@huggingface/transformers')
+  const wasm = env.backends?.onnx?.wasm as
+    | { wasmPaths?: unknown; numThreads?: number; proxy?: boolean }
+    | undefined
+  if (!wasm) return
+
+  wasm.wasmPaths = runtime === 'cdn' ? CDN_WASM_PATH : undefined
+
+  /*
+   * One thread, stated rather than discovered.
+   *
+   * Multi-threaded WebAssembly needs `SharedArrayBuffer`, which needs
+   * cross-origin isolation, which needs COOP/COEP headers that GitHub Pages
+   * does not send and this app has no way to add. ONNX Runtime works this out
+   * for itself and falls back correctly — but it does so by way of two console
+   * warnings that read like something is broken, on the one feature people
+   * already suspect of being broken.
+   */
+  wasm.numThreads = 1
+
+  // Already the default, and worth pinning: the proxy spawns a second worker
+  // inside this one, which is a second thing that can fail to load.
+  wasm.proxy = false
+
+  // We are the ones who decide what is fetched, and it is never a local path.
+  env.allowLocalModels = false
+}
+
+async function bringUp(
+  backend: StudioBackend,
+  runtime: StudioRuntime,
+  allowDownload: boolean,
+): Promise<void> {
   if (tts && activeBackend === backend) {
     post({ type: 'ready', backend })
     return
@@ -172,7 +306,25 @@ async function bringUp(backend: StudioBackend, allowDownload: boolean): Promise<
     }
 
     const progress = new Progress()
-    const { KokoroTTS } = (await import('kokoro-js')) as KokoroModule
+
+    let KokoroTTS: KokoroModule['KokoroTTS']
+    try {
+      const module = (await import('kokoro-js')) as KokoroModule
+      KokoroTTS = module.KokoroTTS
+      await configureRuntime(runtime)
+    } catch (error) {
+      /*
+       * The worker's own code could not be loaded. Nothing below this point is
+       * reachable and no retry inside this worker can help, so it is reported
+       * as what it is rather than as a device that cannot run the model.
+       */
+      post({
+        type: 'failed',
+        reason: 'runtime',
+        message: String((error as Error)?.message ?? 'The voice engine could not be loaded.'),
+      })
+      return
+    }
 
     /*
      * WebGPU first, then the CPU, and the second attempt is not a retry of the
@@ -217,6 +369,8 @@ async function bringUp(backend: StudioBackend, allowDownload: boolean): Promise<
         activeBackend = device
         progress.send(null)
         post({ type: 'ready', backend: device })
+        // After `ready`, so it never delays somebody hearing their own words.
+        void warmVoices()
         return
       } catch (error) {
         lastError = error
@@ -276,10 +430,10 @@ self.onmessage = (event: MessageEvent<StudioRequest>) => {
 
   switch (message.type) {
     case 'install':
-      void bringUp(message.backend, true)
+      void bringUp(message.backend, message.runtime, true)
       break
     case 'resume':
-      void bringUp(message.backend, false)
+      void bringUp(message.backend, message.runtime, false)
       break
     case 'synthesize': {
       const { id, text, voice, speed } = message
