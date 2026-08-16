@@ -14,3 +14,8 @@ npm-debug.log*
 !.vscode/extensions.json
 dev-dist
 data
+
+# Kokoro weights and the Python environment `npm run speech:local` builds.
+# Both are ~400 MB of things that can be fetched again; the audio they produce
+# is what belongs in the repository.
+.cache

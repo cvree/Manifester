@@ -97,6 +97,31 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
+          /*
+           * The Studio Voice runtime: the worker bundle and the ONNX
+           * WebAssembly it loads. Together they are far too large to precache
+           * for the majority who never install the model, and far too
+           * important to leave uncached for the minority who do — "works
+           * offline after setup" is a promise the model files alone cannot
+           * keep, because without these two nothing can load them.
+           *
+           * So they are cached the first time the worker starts, which is the
+           * first time somebody presses Install. Content-hashed names, so
+           * `CacheFirst` with no expiry is safe for the same reason it is safe
+           * for the speech clips above.
+           */
+          {
+            urlPattern: ({ url }) =>
+              /kokoro\.worker-[^/]*\.js$/.test(url.pathname) ||
+              /\.wasm$/.test(url.pathname) ||
+              /ort-wasm[^/]*\.mjs$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'manifester-studio-voice',
+              expiration: { maxEntries: 16 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
         /*
          * The three AI provider SDKs are deliberately left out of the offline
@@ -108,7 +133,20 @@ export default defineConfig({
          * They stay in `dist` and load on demand the first time someone opens
          * the AI panel; the browser caches them normally from there.
          */
-        globIgnores: ['**/ai-provider-*.js'],
+        /*
+         * Two things stay out of the offline bundle, for the same reason.
+         *
+         * The AI provider SDK is ~360 KB and useless without a network, so
+         * precaching it taxes everybody who never turns the feature on — which
+         * is the default.
+         *
+         * The Studio Voice worker is 2.2 MB, and the model it loads is another
+         * ninety. Precaching the worker would mean every visitor downloads the
+         * runtime for a feature that explicitly promises to download nothing
+         * until they press Install — which would make the promise false in the
+         * only way that matters. It is runtime-cached instead, above.
+         */
+        globIgnores: ['**/ai-provider-*.js', '**/kokoro.worker-*.js'],
         navigateFallback: `${base}index.html`,
         cleanupOutdatedCaches: true,
         clientsClaim: true,

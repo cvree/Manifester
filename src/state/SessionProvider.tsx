@@ -257,6 +257,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   /* ── Voices ── */
 
+  /*
+   * Bring the on-device studio voice back, if this device has one.
+   *
+   * Nothing is downloaded here — see `watchStudioVoice`, which only re-opens
+   * files that are already on disk. Doing it from the provider rather than
+   * from the voice module means exactly one worker exists no matter how many
+   * screens ask about it, and none exists at all in a test that never mounts
+   * the app.
+   */
+  useEffect(() => tts.watchStudioVoice(), [])
+
   useEffect(() => {
     let cancelled = false
 

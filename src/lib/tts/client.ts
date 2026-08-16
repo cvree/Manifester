@@ -4,8 +4,14 @@
  * The resolution order is the whole performance story of this feature, and it
  * is deliberately arranged so that the expensive thing is last and rare:
  *
- *     memory  →  browser cache  →  static assets  →  server cache  →  engine
- *      µs           ~2 ms            ~10 ms           ~40 ms         ~1–3 s
+ *     memory → browser cache → static assets → on-device model → remote engine
+ *       µs         ~2 ms          ~10 ms           ~1–3 s          ~1–3 s
+ *
+ * The two engines at the end are tried in that order rather than the other way
+ * round, and it is a privacy decision before it is a performance one: if this
+ * device can say the sentence itself, the sentence does not leave the device.
+ * A remote engine only ever sees text that nothing local could speak, and on
+ * the static deployment there is no remote engine at all.
  *
  * Every layer above the engine writes into the layers above *it*, so a clip
  * gets cheaper every time it is heard: synthesised once anywhere, it is a disk
@@ -25,7 +31,7 @@
 import { cacheKey, clampSpeed, type CacheKeyInput } from './cacheKey'
 import { KOKORO_MODEL_VERSION } from './engines/kokoroModel'
 import { BrowserCache } from './browserCache'
-import { markFormatUnplayable, preferredFormat } from './formats'
+import { lookupOrder, markFormatUnplayable, preferredFormat } from './formats'
 import { StaticManifest } from './manifest'
 import { MemoryCache } from './memoryCache'
 import { PronunciationNormalizer } from './pronunciation/normalizer'
@@ -55,7 +61,14 @@ export interface ResolvedClip {
 }
 
 export interface TTSClientOptions {
-  engine: TTSEngine | null
+  /**
+   * The engines that can make a clip nothing had already, best first.
+   *
+   * A list rather than one, because a build can genuinely have two: the model
+   * running on this device, and a speech service behind the app. They are
+   * tried in the order given and the first one that answers wins.
+   */
+  engines: TTSEngine[]
   manifest: StaticManifest
   normalizer: PronunciationNormalizer
   /** The shared context, for decoding. Never created here. */
@@ -68,7 +81,7 @@ export interface TTSClientOptions {
 }
 
 export class TTSClient {
-  private engine: TTSEngine | null
+  private engines: TTSEngine[]
   private manifest: StaticManifest
   private normalizer: PronunciationNormalizer
   private getContext: () => AudioContext | null
@@ -83,7 +96,7 @@ export class TTSClient {
   private controller = new AbortController()
 
   constructor(options: TTSClientOptions) {
-    this.engine = options.engine
+    this.engines = options.engines
     this.manifest = options.manifest
     this.normalizer = options.normalizer
     this.getContext = options.getContext
@@ -138,7 +151,7 @@ export class TTSClient {
    */
   private modelVersion(): string {
     return (
-      this.engine?.descriptor.modelVersion ??
+      this.engines[0]?.descriptor.modelVersion ??
       this.manifest.modelVersion ??
       KOKORO_MODEL_VERSION
     )
@@ -167,7 +180,10 @@ export class TTSClient {
          * on an empty buffer says nothing about the codec, and acting on it
          * would condemn every future visit to the larger encoding.
          */
-        const next = markFormatUnplayable(format)
+        // Blame the container that actually failed, which is not always the
+        // one that was asked for: a clip resolved out of the cache or made on
+        // this device can arrive in a different encoding entirely.
+        const next = markFormatUnplayable(error.format)
         if (next && next !== format) return this.resolveAs(text, options, next)
       }
       throw error
@@ -204,9 +220,21 @@ export class TTSClient {
   async warm(text: string, options: ResolveOptions): Promise<void> {
     const format = preferredFormat()
     const key = this.keyFor(text, options)
-    const id = `${key}.${format}`
-    if (this.memory.has(id)) return
+    if (this.memory.has(key)) return
     await withSignal(this.obtain(text, options, format, key, 'default'), options.signal)
+  }
+
+  /**
+   * Change which engines are available, keeping every cache intact.
+   *
+   * Called when the on-device model finishes installing, which is the one
+   * moment during a session when the answer to "what can make a clip?"
+   * changes. Rebuilding the client instead would throw away the decoded
+   * buffers of everything already heard — the loop would stutter at exactly
+   * the moment the voice was supposed to get better.
+   */
+  setEngines(engines: TTSEngine[]): void {
+    this.engines = engines
   }
 
   /** Stop every fetch and synthesis in flight. */
@@ -225,11 +253,17 @@ export class TTSClient {
   ): Promise<ResolvedClip> {
     const mode: CacheMode = options.cache ?? 'default'
     const key = this.keyFor(text, options)
-    const id = `${key}.${format}`
 
-    // 1. Memory. The only layer with no asynchrony at all.
+    /*
+     * 1. Memory. The only layer with no asynchrony at all.
+     *
+     * Keyed by the clip rather than by the clip *and* its container: once it
+     * is decoded, which encoding it arrived in is a fact about the past. Two
+     * entries for one sentence would be two copies of the same 300 KB of PCM
+     * in a budget measured in megabytes.
+     */
     if (mode === 'default') {
-      const hit = this.memory.get(id)
+      const hit = this.memory.get(key)
       if (hit) return { key, buffer: hit, source: 'memory', format }
     }
 
@@ -248,9 +282,9 @@ export class TTSClient {
      * remembers it, and re-fetches everything as MP3 for the rest of time.
      * Which is exactly what it did, until this line.
      */
-    const buffer = await this.decode(clip.bytes.slice(0), format)
-    if (mode !== 'no-store') this.memory.set(id, buffer)
-    return { key, buffer, source: clip.source, format }
+    const buffer = await this.decode(clip.bytes.slice(0), clip.format)
+    if (mode !== 'no-store') this.memory.set(key, buffer)
+    return { key, buffer, source: clip.source, format: clip.format }
   }
 
   /**
@@ -296,6 +330,7 @@ export class TTSClient {
     const signal = this.controller.signal
     const speed = clampSpeed(options.speed)
     const language = (options.language ?? this.language).toLowerCase()
+    const order = lookupOrder(format)
 
     // A phrase with a recording of its own never goes near an engine.
     const override = this.normalizer.normalize(text).audio
@@ -305,23 +340,36 @@ export class TTSClient {
     }
 
     if (mode !== 'reload') {
-      // 2. What this device has heard before.
-      const stored = await this.browser.get(key, format)
-      if (stored) return { key, format, bytes: stored, source: 'browser-cache' }
+      // 2. What this device has heard before, in whatever encoding it kept.
+      const stored = await this.browser.find(key, order)
+      if (stored) {
+        return { key, format: stored.format, bytes: stored.bytes, source: 'browser-cache' }
+      }
 
       // 3. What shipped with the app.
-      const staticUrl = await this.manifest.urlFor(key, format)
-      if (staticUrl) {
-        const bytes = await this.fetchBytes(staticUrl, signal)
+      const shipped = await this.manifest.find(key, order)
+      if (shipped) {
+        const bytes = await this.fetchBytes(shipped.url, signal)
         if (bytes) {
-          await this.store(key, format, bytes, mode)
-          return { key, format, bytes, source: 'static' }
+          await this.store(key, shipped.format, bytes, mode)
+          return { key, format: shipped.format, bytes, source: 'static' }
         }
       }
     }
 
-    if (!this.engine) throw new NoEngineError()
+    if (this.engines.length === 0) throw new NoEngineError()
 
+    /*
+     * 4. Whichever engine can make it, in order of preference.
+     *
+     * Each is given the same request and the same two chances — "do you
+     * already have this?" then "make it" — and the first to answer ends the
+     * walk. An engine that throws is not fatal while another remains: the
+     * on-device model failing on a phone that has run out of memory should
+     * fall through to the service, not to silence. Only when they have all
+     * failed does the caller hear about it, and by then the honest answer is
+     * the device's own voice.
+     */
     const request = {
       text,
       voice: options.voice,
@@ -332,19 +380,32 @@ export class TTSClient {
       reload: mode === 'reload',
     }
 
-    // 4. What the server has already made for somebody else.
-    if (mode !== 'reload') {
-      const found = await this.engine.lookup(request, signal)
-      if (found) {
-        await this.store(key, found.format, found.bytes, mode)
-        return { key, format: found.format, bytes: found.bytes, source: 'server-cache' }
+    let lastError: unknown = null
+    for (const engine of this.engines) {
+      try {
+        if (mode !== 'reload') {
+          const found = await engine.lookup(request, signal)
+          if (found) {
+            await this.store(key, found.format, found.bytes, mode)
+            return {
+              key,
+              format: found.format,
+              bytes: found.bytes,
+              source: 'server-cache',
+            }
+          }
+        }
+
+        const made = await engine.synthesize(request, signal)
+        await this.store(key, made.format, made.bytes, mode)
+        return { key, format: made.format, bytes: made.bytes, source: made.source }
+      } catch (error) {
+        if (signal.aborted || options.signal?.aborted) throw error
+        lastError = error
       }
     }
 
-    // 5. The model.
-    const made = await this.engine.synthesize(request, signal)
-    await this.store(key, made.format, made.bytes, mode)
-    return { key, format: made.format, bytes: made.bytes, source: made.source }
+    throw lastError ?? new NoEngineError()
   }
 
   private async store(

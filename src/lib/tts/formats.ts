@@ -22,12 +22,33 @@
 import { readLocal, writeLocal } from '../storage'
 import type { AudioFormat } from './types'
 
-/** All formats the app can produce, best first. */
+/** The formats the app fetches, best first. */
 export const FORMATS: AudioFormat[] = ['opus', 'mp3']
 
 const MIME: Record<AudioFormat, string> = {
   opus: 'audio/ogg; codecs=opus',
   mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+}
+
+/**
+ * Every encoding a cached clip might already be in, best first.
+ *
+ * A clip is addressed by what it *says*, not by how it was compressed, so the
+ * same key can legitimately be on this device as Opus (downloaded), MP3 (this
+ * is an iPhone) or WAV (the on-device model made it). Looking for only the
+ * preferred one would mean a phone that has just synthesised a line locally
+ * turns round and synthesises it again the next time round the loop, which is
+ * the single most expensive mistake this layer could make.
+ *
+ * WAV is last because it is the largest, not because it is the worst: when a
+ * clip exists both ways the smaller one is already decoded or already local.
+ */
+export const CACHED_FORMATS: AudioFormat[] = ['opus', 'mp3', 'wav']
+
+/** The formats to look for, with `preferred` first and no duplicates. */
+export function lookupOrder(preferred: AudioFormat): AudioFormat[] {
+  return [preferred, ...CACHED_FORMATS.filter((format) => format !== preferred)]
 }
 
 /** Where a browser's own verdict on Opus is remembered between visits. */

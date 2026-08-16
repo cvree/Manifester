@@ -66,6 +66,19 @@ export function AppShell() {
    */
   const chromeHidden = immersive || stageExpanded
 
+  /*
+   * First use gets the room to itself.
+   *
+   * Not the full immersive treatment — the wordmark and the day/night toggle
+   * stay, because one is the only thing telling somebody what they have opened
+   * and the other matters most to the person doing this at midnight. What goes
+   * is the navigation: three tabs to Create, Player and Library, offered to
+   * somebody who has not yet been told what a loop is, are three ways to leave
+   * before the app has said anything. Skip is the way out, and it is on screen
+   * the whole time.
+   */
+  const onboarding = location.pathname === '/welcome'
+
   // Any route change, or ending the session, restores the normal chrome.
   useEffect(() => setNavRevealed(false), [location.pathname])
 
@@ -123,7 +136,10 @@ export function AppShell() {
           </NavLink>
 
           {/* Desktop navigation. The floating bar below is phone-only. */}
-          <nav aria-label="Main sections" className="hidden lg:block">
+          <nav
+            aria-label="Main sections"
+            className={cx('hidden', !onboarding && 'lg:block')}
+          >
             <ul className="surface-panel flex items-center gap-1 rounded-pill p-1.5 shadow-none">
               {TABS.map(({ to, label, icon: Icon }) => (
                 <li key={to}>
@@ -155,6 +171,7 @@ export function AppShell() {
           <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
+              hidden={onboarding}
               onClick={() => navigate('/about')}
               aria-label="About and install instructions"
               aria-current={location.pathname === '/about' ? 'page' : undefined}
@@ -190,7 +207,9 @@ export function AppShell() {
           // more again when the mini-player is docked above it.
           showMiniPlayer
             ? 'pb-[calc(11rem+env(safe-area-inset-bottom))] lg:pb-32'
-            : 'pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-16',
+            : onboarding
+              ? 'pb-[calc(2rem+env(safe-area-inset-bottom))] lg:pb-10'
+              : 'pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-16',
         )}
       >
         <Outlet />
@@ -230,8 +249,9 @@ export function AppShell() {
       {/* The phone's floating navigation. */}
       <nav
         aria-label="Main sections"
-        inert={chromeHidden}
-        aria-hidden={chromeHidden || undefined}
+        inert={chromeHidden || onboarding}
+        aria-hidden={chromeHidden || onboarding || undefined}
+        hidden={onboarding}
         className={cx(
           'pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 lg:hidden',
           'transition-[transform,opacity] duration-500 ease-[var(--ease-calm)]',

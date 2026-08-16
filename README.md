@@ -331,6 +331,46 @@ link to your sounds.
 
 ---
 
+## The first minute
+
+Opening Manifester for the first time is four screens, and it exists because the
+alternative — an empty text box and a Start button — is the worst possible first
+impression of an app whose entire value is the words it already has.
+
+```
+Welcome
+  → what do you want to strengthen?      15 themes, 8 tiles, one tap
+  → choose your first line                6 suggestions, tap to hear it
+  → who should read it?                   Ivy vs Fen, then Studio Voice
+  → begin
+```
+
+The shape of it is the argument, and three decisions carry most of the weight.
+
+**Tapping is answering.** There is no Next button on the theme grid or the line
+list: a tile *is* the answer, and a suggestion plays the moment it is touched.
+The audio for those six lines is fetched while the step is still being read, so
+the first tap is a decode rather than a request, and the second and third are
+nothing at all.
+
+**The voice is heard before it is sold.** Studio Voice is offered on step four,
+underneath two cards that have just demonstrated what it sounds like. Asking for
+a ninety-megabyte download from somebody who has not heard the voice is asking
+them to take it on faith; asking afterwards is the same offer, honestly made.
+**Maybe later** genuinely puts it away, and nothing about the session that
+follows is any different.
+
+**Skip is real, and it is on screen from the first frame.** It marks the
+introduction as seen, carries whatever was chosen into the editor, and never
+asks again. An introduction somebody has to escape is one they resent.
+
+The whole thing is designed to be finishable in well under a minute by somebody
+impatient, and the launch route only shows it to a device with nothing saved and
+no record of having seen it — a person with forty saved loops and a cleared
+`localStorage` goes straight to their player.
+
+---
+
 ## The breathing guide
 
 The guide is the part of Manifester you actually *do*, rather than listen to, so
@@ -737,21 +777,37 @@ so.
 ## The voice
 
 Manifester speaks in one of two voices of its own — **Ivy** and **Fen** — and
-they sound the same on an iPhone, an Android, a laptop and a tablet. They are
-[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0), run by
-[`remsky/Kokoro-FastAPI`](https://github.com/remsky/Kokoro-FastAPI) in a
-container behind this project's own small API. Nothing is paid for, nothing is
-metered, and no GPU is required.
+they sound the same on an iPhone, an Android, a laptop and a tablet. Both are
+[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0).
 
 | In the app | Logical name | Kokoro voice |
 | --- | --- | --- |
 | Ivy · feminine | `female_1` | `af_heart` |
 | Fen · masculine | `male_1` | `am_fenrir` |
 
-The device's own `speechSynthesis` voices are still there. They are no longer
-the default — they are the choice for anybody who prefers one, and the
-emergency fallback when the studio voice cannot be reached. A session never
-goes silent because a network did.
+There are two experiences, and the difference between them is only ever *whose
+words* they can read.
+
+**Standard Voice** works instantly, everywhere, with nothing to download. The
+device's own `speechSynthesis` reads anything the app has not already spoken,
+and it is the floor the whole feature stands on: a session never goes silent
+because something else was unavailable.
+
+**Studio Voice** is Ivy and Fen themselves. It arrives in two halves:
+
+- **Already spoken.** Around 120 curated affirmations, the writing helper's
+  whole vocabulary, the starter lines and the preview phrases are generated at
+  build time and shipped as static audio. A brand-new visitor, on a cold cache,
+  with no model and no backend anywhere, hears Ivy on their first tap.
+- **Installed on the device.** For *your* words, the same Kokoro checkpoint can
+  be downloaded once — ~90 MB — and run in a Web Worker, WebGPU where it exists
+  and WebAssembly where it does not. It is free, it works with no connection,
+  and the text never leaves the device. Nothing downloads until somebody presses
+  **Install Studio Voice**.
+
+A deployment may also have a **speech service** behind it (`docker compose up`,
+below), which is the fastest option where it exists and is not required
+anywhere. GitHub Pages runs with no TTS server at all.
 
 ### What the app says, and what it never has to know
 
@@ -768,7 +824,7 @@ inside [`src/lib/tts/`](src/lib/tts/), and nothing above that layer mentions
 Kokoro. Swapping in Qwen, Chatterbox, Cartesia or ElevenLabs later is a new file
 implementing `TTSEngine` — see *Changing engines*, below.
 
-### Why it feels instant: five places to look before the model
+### Why it feels instant: four places to look before any model
 
 Every clip is named by a SHA-256 of everything that decides how it sounds:
 
@@ -791,14 +847,25 @@ So a line is looked for in this order, and only the last step involves a model:
 | 1 | Memory (decoded `AudioBuffer`, LRU by bytes) | microseconds |
 | 2 | This device's IndexedDB cache | ~2 ms |
 | 3 | Clips generated at build time, served as static files | ~10 ms |
-| 4 | The API's own disk cache | ~40 ms |
-| 5 | Kokoro | 1–3 s |
+| 4 | Kokoro in a worker on this device, if installed | 1–3 s |
+| 5 | A speech service, if this deployment has one | ~40 ms cached, 1–3 s cold |
 | 6 | `speechSynthesis`, if every one of those failed | — |
 
 Each layer fills the ones above it, so a clip gets cheaper every time anybody
 hears it, and a loop played twice never touches the network again — including
 with the backend switched off, which is what makes a saved loop work offline in
 the installed app.
+
+Steps 4 and 5 are in that order on purpose, and it is a privacy decision before
+it is a performance one: **if this device can say the sentence itself, the
+sentence does not leave the device.** A remote engine only ever sees text
+nothing local could speak.
+
+Cache lookups are by clip rather than by container. The same key can be on a
+device as Opus (downloaded), MP3 (this is an iPhone) or WAV (the on-device model
+made it), and all three are the same audio — so a line synthesised locally is
+never synthesised twice because the browser would have preferred to download a
+different encoding.
 
 Identical requests are deduplicated on both sides: the browser collapses a
 preload and the line it was preparing for into one request, and the API collapses
@@ -870,28 +937,60 @@ KOKORO_URL=http://127.0.0.1:8880 npm run server
 
 ### Generating speech ahead of time
 
+Everything the app already knows it might say — the curated affirmation library,
+the starter lines, every line the writing helper can offer, the Studio Voice
+preview phrases and the voice sample — is spoken at build time in both voices
+and both encodings, and written to [`public/speech/`](public/speech/) with a
+manifest. They ship as ordinary static assets, which is what lets a brand-new
+device with a cold cache and no backend anywhere speak in the studio voice on
+the very first tap. The committed set is 258 clips, ~11 MB.
+
+Two engines can produce them, and they name their files identically.
+
+```bash
+npm run speech:setup     # once: a Python venv with onnxruntime and espeak-ng
+npm run speech:local     # no server, no Docker, no GPU — this is what the
+                         # committed clips were made with
+```
+
+[`scripts/kokoro_local.py`](scripts/kokoro_local.py) downloads the ONNX export
+and the voice packs to a gitignored `.cache/kokoro/` and runs the model on the
+CPU. Its front end is a direct port of `kokoro.js/src/phonemize.js`, so a
+pre-generated clip and the same sentence synthesised live in somebody's browser
+go through the same normalisation, the same espeak call and the same
+post-processing — which is the only way "shipped with the app" and "made on this
+device" can be the same voice rather than two similar ones. `npm run
+speech:check` proves that: it asserts the phoneme output for known lines and the
+178-symbol vocabulary the checkpoint was trained on.
+
 ```bash
 docker compose up -d kokoro
-npm run speech
+npm run speech           # the same output, via Kokoro-FastAPI
 ```
 
-This speaks everything the app already knows it might say — the starter lines,
-every line the writing helper can offer, the voice sample — in both voices, at
-the two speeds people actually use, in both encodings, and writes them to
-[`public/speech/`](public/speech/) with a manifest. They ship as ordinary static
-assets, so a brand-new device with a cold cache speaks in the studio voice on
-the very first tap.
-
-Regeneration is incremental by construction rather than by bookkeeping: a clip's
-name *is* the hash of its inputs, so "has this changed?" is answered by whether
-the file exists. Editing one phrase regenerates one phrase.
+Either way, regeneration is incremental by construction rather than by
+bookkeeping: a clip's name *is* the hash of its inputs, so "has this changed?"
+is answered by whether the file exists. Editing one phrase regenerates one
+phrase.
 
 ```bash
-npm run speech -- --force              # say everything again
-npm run speech -- --prune              # delete clips nothing refers to
-npm run speech -- --speeds 0.8,0.9,1   # other speeds
-npm run speech -- --formats opus       # one encoding only
+npm run speech:local -- --force              # say everything again
+npm run speech:local -- --prune              # delete clips nothing refers to
+npm run speech:local -- --speeds 0.8,0.9,1   # other speeds
+npm run speech:local -- --formats opus       # one encoding only
 ```
+
+Speeds are tiered, because every extra speed is another full copy of the library
+in the repository. Everything is generated at **0.9**, the app's default; the
+handful of phrases somebody hears in their first minute are also generated at
+**1.0**. Anything else falls through to whatever engine is present and is cached
+from there.
+
+[`src/lib/tts/pregenerated.test.ts`](src/lib/tts/pregenerated.test.ts) is the
+guard. It computes the keys the way the browser does and looks them up the way
+the browser does, so a phrase added without a regeneration — or a version bump
+without one — fails in CI rather than silently reading that line in a device
+voice on somebody's phone.
 
 ### Pronunciation
 
@@ -939,38 +1038,57 @@ interface TTSEngine {
 }
 ```
 
+There are two implementations of it already — the on-device model and the HTTP
+client — and the resolver takes a *list*, tried in order, falling through to the
+next when one cannot answer.
+
 To move to a different provider: write the engine (browser side), write the
 upstream client next to [`server/kokoro.mjs`](server/kokoro.mjs) (server side),
-point `buildEngine()` at it, and change `modelVersion`. That last step is what
-re-keys the cache: clips made by the old engine keep their names, are never
-looked up again, and the new engine's clips are made under new ones. No cache
-purge, no migration, no downtime.
+add it to `engines()` in [`src/lib/tts/index.ts`](src/lib/tts/index.ts), and
+change `modelVersion`. That last step is what re-keys the cache: clips made by
+the old engine keep their names, are never looked up again, and the new engine's
+clips are made under new ones. No cache purge, no migration, no downtime.
 
 The app itself does not change, because the app never knew.
 
-### Why Kokoro runs on a server and not in the browser
+### Studio Voice on the device
 
-It was built in-browser first, measured, and removed. Kokoro-82M via ONNX
-Runtime in a worker was a ~90 MB one-time download, fully offline afterwards,
-and it produced genuinely lovely audio.
+[`src/lib/tts/engines/browserKokoro.ts`](src/lib/tts/engines/browserKokoro.ts)
+and [`src/workers/kokoro.worker.ts`](src/workers/kokoro.worker.ts) run the same
+checkpoint in the browser, through
+[`kokoro-js`](https://github.com/hexgrad/kokoro/tree/main/kokoro.js). It is an
+ordinary `TTSEngine`, so nothing above the voice layer knows it exists.
 
-The problem was speed. On a 32-core desktop, **with cross-origin isolation
-enabled so ONNX Runtime could use threads**, synthesis ran at a real time factor
-of **≈3.3× — 3.3 seconds of compute per second of speech**:
+An earlier version of this project measured in-browser synthesis, found ≈3.3
+seconds of compute per second of speech on WebAssembly, and removed it. That
+number is still roughly right for the CPU path, and it is why the design here is
+not "run the model" but **"run the model for the things nothing else could
+cover"**:
 
-```
-chars=34   audio=2.6s   render=8.9s    rtf=3.47
-chars=127  audio=9.3s   render=30.4s   rtf=3.26
-chars=215  audio=14.5s  render=47.3s   rtf=3.26
-```
+- The clips a new visitor actually hears are pre-generated, so the first minute
+  never waits for inference.
+- The model is only asked for words somebody wrote themselves — and it is asked
+  once, because the result is cached in IndexedDB for ever after.
+- The loop preloads its next line while the current one is speaking, so the
+  synthesis happens during audio that is already playing rather than during
+  silence somebody is listening to.
+- WebGPU, where it exists, is roughly an order of magnitude faster than the
+  WebAssembly path and makes the difference academic.
 
-A phone would be several times slower again, and cross-origin isolation has to
-be faked through the service worker on GitHub Pages.
+The rest is failure handling, because on this path every failure is a device
+fact rather than a bug:
 
-The same model on a server has none of those problems: it synthesises a line
-once for everybody, the browser downloads ~15 KB of Opus rather than 90 MB of
-weights, and the result is cached so thoroughly that the second play is faster
-than the in-browser version could ever have been on its first.
+| Situation | What happens |
+| --- | --- |
+| WebGPU advertised but the pipeline will not build | The worker warms up with one real inference before reporting ready; if it throws, the session is re-opened on WebAssembly with the **same cached weights** — no second download |
+| Download interrupted, tab closed, tunnel | Partial files stay in the browser cache; **Install** resumes rather than restarting |
+| No room (private-mode Safari, a full phone) | Reported as a storage failure with a sentence about what to free; everything else keeps working |
+| Cache evicted between visits | `resume()` finds the files missing, quietly clears the installed flag, and offers a clean install |
+| Model up but out of memory mid-session | The resolver falls through to the next engine, then to the device voice |
+| Never installed | Exactly the app as it was: pre-generated studio audio, device voice for the rest |
+
+`dtype` is `q8` on both backends. `fp32` is the better-sounding choice for
+WebGPU and is 326 MB, and this app promised somebody ninety.
 
 ### Getting a good device voice
 
@@ -1064,7 +1182,7 @@ instructions live inside the app, under the voice picker.
 | PWA | `vite-plugin-pwa` (Workbox `generateSW`) |
 | Animation | GSAP + `@gsap/react` (`useGSAP`) |
 | Smooth scrolling | Lenis (`lenis/react`), on Create and About only |
-| Speech | Kokoro-82M behind our own Node API; Web Speech API as the fallback |
+| Speech | Kokoro-82M — pre-generated at build time, in the browser via `kokoro-js` + ONNX Runtime Web (WebGPU/WASM, in a worker), or behind our own Node API; Web Speech API as the fallback |
 | Speech cache | Content-addressed (SHA-256), in memory, IndexedDB, static assets and on the API's disk |
 | Sound | Web Audio API + `HTMLAudioElement` |
 | Storage | IndexedDB (hand-rolled wrapper, no dependency) + a little `localStorage` |
@@ -1724,9 +1842,10 @@ npm run preview
 ### With the voice
 
 The app runs perfectly well with `npm run dev` alone — with no speech service
-reachable it plays whatever is in `public/speech` and falls back to the device's
-own voice for everything else, which is exactly what the GitHub Pages build
-does. To develop against the real voice, start the containers first:
+reachable it plays whatever is in `public/speech`, offers Studio Voice for
+anything else, and falls back to the device's own voice if that is declined,
+which is exactly what the GitHub Pages build does. To develop against the
+service as well, start the containers first:
 
 ```bash
 docker compose up -d kokoro api   # the model, and the API in front of it
@@ -1761,12 +1880,16 @@ npm run server
 ```
 
 ```bash
-npm run speech
+npm run speech          # via Kokoro-FastAPI
+npm run speech:setup    # once, for the line below
+npm run speech:local    # via ONNX on this machine — no Docker, no GPU
+npm run speech:check    # prove the local front end still matches the browser's
 ```
 
 `npm run server` starts the speech API on its own, without Docker, against
-whatever `KOKORO_URL` points at. `npm run speech` pre-generates every phrase the
-app already knows — see [Generating speech ahead of time](#generating-speech-ahead-of-time).
+whatever `KOKORO_URL` points at. The `speech` scripts pre-generate every phrase
+the app already knows — see
+[Generating speech ahead of time](#generating-speech-ahead-of-time).
 
 `npm run icons` regenerates every PWA icon and the favicon from the single SVG
 motif in [`scripts/generate-icons.mjs`](scripts/generate-icons.mjs). The outputs
@@ -1867,6 +1990,13 @@ the result.
 src/
   components/     design system + composed UI
     Sheet.tsx             the one modal surface: bottom sheet / centred dialog
+    StudioVoicePanel      the offer, the download, the installed state and the
+                          five honest ways it can fail — one component, so an
+                          install started in onboarding and watched from
+                          settings is visibly the same install
+    onboarding/           the four first-use steps, the frame they sit in, and
+                          `useAudition` — hearing a line, knowing which one is
+                          speaking, and warming the rest
     BreathingVisualizer   all eight guide forms, plus the phase ring
     LivingCanvas          the canvas, the frame loop and the device ratio the
                           two drawn forms share — and nothing about what they
@@ -1883,7 +2013,7 @@ src/
     AppearanceSettings    the palette band, the night light and day/night
     DragBar.tsx           a band you drag, whose track is markup rather than
                           a background image on a pseudo-element
-  routes/         Create, Player, Library (loops + sounds), About
+  routes/         Welcome (first use), Create, Player, Library, About
   state/          Theme, Library (IndexedDB), Session (playback engines),
                   Stage (whether the player has taken over the screen)
   lib/
@@ -1937,6 +2067,20 @@ src/
                     the running engine has to hear about
     engagement.ts   when the install suggestion has been earned
     wordcraft.ts    the offline writing helper: rewrite rules, no model
+    affirmations.ts the curated library: fifteen themes, ninety lines, the
+                    Studio Voice preview phrases, and the three rules every
+                    line had to pass
+    onboarding.ts   whether somebody has been here before
+    launch.ts       which of the three first screens they get
+    tts/
+      index.ts          the four verbs, and the only place engine order is decided
+      client.ts         the resolution walk: memory → IndexedDB → shipped →
+                        on-device model → service
+      engines/
+        browserKokoro.ts  Studio Voice on the device: lifecycle, progress,
+                          failure classification, and a plain `TTSEngine`
+        kokoro.ts         the HTTP client for a deployment that has a service
+      wav.ts            float samples → the one container everything decodes
     ai/
       providers.ts    Gemini: key handling, model fallback, the calls
       errors.ts       failure kinds, recovery wording, timeout vs cancel
@@ -1945,6 +2089,8 @@ src/
       useCredentials.ts  one nullable value, shared by two screens
   workers/
     encode.worker.ts  mixes the timeline and encodes MP3/WAV
+    kokoro.worker.ts  Kokoro-82M beside the page: WebGPU with a warmed-up
+                      fallback to WebAssembly, and nothing downloaded unasked
   styles/
     theme.css     Cosmic Garden — surfaces, type scale, states, the visualiser
 ```
@@ -1971,9 +2117,11 @@ MANIFESTER_BASE=/ npm run build
 
 **Static, with no backend** — what GitHub Pages gets. The workflow builds with
 `VITE_TTS_ENDPOINT=""`, which tells the app there is no speech service rather
-than letting it discover that through failed requests. Anything
-`npm run speech` generated is committed and served as static assets; everything
-else is read by the device's own voice. Nothing is sent anywhere.
+than letting it discover that through failed requests. The pre-generated library
+is committed and served as static assets, so the studio voice works on the first
+tap; anybody who installs Studio Voice gets it for their own words too, on their
+own device. Everything else is read by the device's own voice, and nothing is
+sent anywhere in any of those three cases.
 
 **Whole, with the voice** — `docker compose up`, or the same two containers
 behind any reverse proxy. The API serves the built app and `/api/tts` from one
@@ -1989,10 +2137,14 @@ can never go stale, only unused.
 These come from the browser, not from Manifester, and no amount of code makes
 them go away:
 
-- **The studio voice needs the speech service to have been reachable at least
-  once.** A line nobody on this device has ever heard, with no network and no
-  backend, is read by the device's own voice instead. Everything already heard
-  plays offline, from IndexedDB, indefinitely.
+- **Words nobody has ever spoken need a model somewhere.** With Studio Voice
+  installed, that model is on the device and there is no limitation left — it
+  works on a plane. Without it, a line that is not in the shipped library and
+  has never been heard on this device is read by the device's own voice.
+  Everything already heard plays offline, from IndexedDB, indefinitely.
+- **Studio Voice needs somewhere to put ~90 MB.** Private browsing on Safari
+  refuses persistent storage outright, and a full phone refuses it eventually.
+  Both are reported as such, and neither breaks anything else.
 - **A device voice list is the device's.** iPhone, Android, Windows, and Mac
   each offer a different set. Manifester cannot add voices to that list — it can
   only rank what is there and tell you where to download better ones. This is

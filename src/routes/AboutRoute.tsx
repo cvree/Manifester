@@ -167,7 +167,7 @@ const SETTINGS: Array<{
     icon: VoiceIcon,
     name: 'Voice',
     where: 'Create → Customize, and Player → Levels',
-    what: 'Who reads the words, and how fast. Manifester’s own studio voices — Ivy and Fen — sound the same on every device; your phone’s own voices are there too if you prefer one. On the Player it can be changed mid-session, and lands on the next line.',
+    what: 'Who reads the words, and how fast. Manifester’s own studio voices — Ivy and Fen — sound the same on every device, and Studio Voice can be installed here so they read your own words too. Your phone’s own voices are there if you prefer one. On the Player it can be changed mid-session, and lands on the next line.',
   },
   {
     icon: WaveIcon,
@@ -244,10 +244,13 @@ const TROUBLE: Array<{ question: string; answer: ReactNode }> = [
       <>
         A studio voice never does, so this means the words are being read by
         your device instead — either because you chose one of its voices, or
-        because the studio voice could not be reached and Manifester carried on
-        rather than going quiet. The Voice panel says which is happening, and{' '}
-        <SectionLink id="voices">Getting the best voice</SectionLink> below has
-        the free fix for each platform if you are staying on a device voice.
+        because these particular words are ones you wrote and no studio voice is
+        installed. Installing{' '}
+        <strong className="text-ink">Studio Voice</strong> in the Voice panel is
+        the fix: after that Ivy and Fen read everything, including your own
+        words, entirely on your device. The Voice panel says which is happening,
+        and <SectionLink id="voices">Getting the best voice</SectionLink> below
+        has the free fix for each platform if you are staying on a device voice.
       </>
     ),
   },
@@ -569,10 +572,22 @@ export function AboutRoute() {
               kept on the device, so it plays again instantly and offline.
             </p>
             <p className="type-body mt-3">
+              Manifester ships with a library of affirmations already spoken in
+              both voices, so they play in the studio voice on any device with
+              nothing to set up. For your <em className="not-italic text-ink">own</em>{' '}
+              words there is{' '}
+              <strong className="text-ink">Studio Voice</strong>: a speech model
+              that runs on your device, downloaded once — about 90 MB — and free
+              for ever. Everything it says is generated where you are, so your
+              affirmations never leave the device, and it keeps working with no
+              connection at all. Nothing downloads until you press Install, and
+              you can install it any time from the Voice panel.
+            </p>
+            <p className="type-body mt-3">
               You can choose one of your device's own voices instead, under{' '}
               <em className="not-italic text-ink">Choose an exact voice</em>, and
-              that is also what Manifester falls back to if the studio voice
-              cannot be reached. Device voices vary enormously, and Manifester
+              that is also what Manifester falls back to if a studio voice is
+              not available. Device voices vary enormously, and Manifester
               labels how good each one is. If that label says{' '}
               <em className="not-italic text-ink">Basic</em>, your device is
               falling back to an old robotic synthesiser — and there is a free

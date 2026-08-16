@@ -295,3 +295,64 @@ export const BloomIcon = (props: IconProps) => (
     <path d="M12 12v9" />
   </Icon>
 )
+
+/* ── Focus glyphs ──────────────────────────────────────────────────────────
+ *
+ * One per theme in the onboarding chooser. Drawn rather than borrowed from an
+ * emoji set on purpose: eight coloured emoji in a grid look like a keyboard,
+ * and the point of that screen is that it looks like Manifester.
+ */
+
+/** School and studying. */
+export const BookIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M4 5.4A1.4 1.4 0 0 1 5.4 4H10a2.4 2.4 0 0 1 2 1.1A2.4 2.4 0 0 1 14 4h4.6A1.4 1.4 0 0 1 20 5.4v11.2a1.4 1.4 0 0 1-1.4 1.4H14a2.4 2.4 0 0 0-2 1.1 2.4 2.4 0 0 0-2-1.1H5.4A1.4 1.4 0 0 1 4 16.6Z" />
+    <path d="M12 6.5V19" />
+  </Icon>
+)
+
+/** Career and direction. */
+export const CompassIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="8.4" />
+    <path d="m15 9-1.7 4.3L9 15l1.7-4.3Z" />
+  </Icon>
+)
+
+/** Relationships. */
+export const HeartIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 19.6c-4.9-3-7.6-5.7-7.6-9A3.9 3.9 0 0 1 12 8.1a3.9 3.9 0 0 1 7.6 2.5c0 3.3-2.7 6-7.6 9Z" />
+  </Icon>
+)
+
+/** Fitness. */
+export const FlameIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 3.4c3.6 3 5.4 5.8 5.4 8.6a5.4 5.4 0 0 1-10.8 0c0-1.3.5-2.5 1.5-3.6.3 1.2.9 2 1.8 2.3-.4-2.8.3-5.2 2.1-7.3Z" />
+  </Icon>
+)
+
+/** Discipline — the long, dull climb. */
+export const MountainIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="m3.2 18.4 5.4-9.2 3.2 5.2 2.2-3.4 6.8 7.4Z" />
+    <path d="m8.6 9.2 1.9 3.2" />
+  </Icon>
+)
+
+/** Nighttime reflection. */
+export const StarIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="m12 4 2.3 5 5.4.6-4 3.7 1.1 5.3L12 15.9 7.2 18.6l1.1-5.3-4-3.7 5.4-.6Z" />
+  </Icon>
+)
+
+/** Personal growth. */
+export const GrowthIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 20V8.6" />
+    <path d="M12 12.4C12 9.6 9.8 7.6 6.6 7.4c-.2 3 1.6 5 5.4 5Z" />
+    <path d="M12 15.4c0-2.4 1.9-4.1 4.7-4.3.2 2.6-1.4 4.3-4.7 4.3Z" />
+  </Icon>
+)

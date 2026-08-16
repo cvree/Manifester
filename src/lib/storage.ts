@@ -195,6 +195,14 @@ export function writeLocal(key: string, value: string): void {
   }
 }
 
+export function removeLocal(key: string): void {
+  try {
+    localStorage.removeItem(`manifester:${key}`)
+  } catch {
+    /* Same as `writeLocal`: nothing to do and nothing worth reporting. */
+  }
+}
+
 export async function estimateUsage(): Promise<{
   usageBytes: number
   quotaBytes: number

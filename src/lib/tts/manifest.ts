@@ -91,4 +91,28 @@ export class StaticManifest {
     const path = clip?.formats?.[format]
     return path ? `${this.baseUrl}${path}` : null
   }
+
+  /**
+   * The best shipped encoding of a clip, given what this browser would rather
+   * have.
+   *
+   * A build may reasonably ship only one of the two — generating both doubles
+   * the repository — and a Safari that finds no MP3 for a phrase should fall
+   * back to the model rather than to nothing, while a Chrome that finds no
+   * Opus should simply take the MP3 it can also play perfectly well. Asking
+   * for one exact format cannot express that; asking in preference order can.
+   */
+  async find(
+    key: string,
+    formats: AudioFormat[],
+  ): Promise<{ url: string; format: AudioFormat } | null> {
+    const manifest = await this.load()
+    const clip = manifest.clips[key]
+    if (!clip?.formats) return null
+    for (const format of formats) {
+      const path = clip.formats[format]
+      if (path) return { url: `${this.baseUrl}${path}`, format }
+    }
+    return null
+  }
 }

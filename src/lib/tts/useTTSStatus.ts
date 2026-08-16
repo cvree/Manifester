@@ -8,13 +8,57 @@
  * makes an app feel unreliable even when nothing is broken.
  */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { tts, type TTSStatus } from './index'
+import { browserKokoro, type StudioSnapshot } from './engines/browserKokoro'
 
 export function useTTSStatus(): TTSStatus {
   const [status, setStatus] = useState<TTSStatus>(() => tts.getStatus())
   useEffect(() => tts.subscribe(setStatus), [])
   return status
+}
+
+export interface StudioVoiceControls extends StudioSnapshot {
+  /** 0–1 while installing, or `null` before any total is known. */
+  fraction: number | null
+  install: () => void
+  cancel: () => void
+  forget: () => void
+  /** True once the model is on this device and speaking. */
+  installed: boolean
+}
+
+/**
+ * The on-device model, as a React value with its two buttons attached.
+ *
+ * Both the onboarding voice moment and the Voice settings sheet render the
+ * same thing from this, which is deliberate: an install that reports 40% in
+ * one place and "not installed" in the other is the kind of inconsistency that
+ * makes somebody install it twice.
+ */
+export function useStudioVoice(): StudioVoiceControls {
+  const [snapshot, setSnapshot] = useState<StudioSnapshot>(() =>
+    browserKokoro.getSnapshot(),
+  )
+  useEffect(() => browserKokoro.subscribe(setSnapshot), [])
+
+  const install = useCallback(() => {
+    void browserKokoro.install()
+  }, [])
+  const cancel = useCallback(() => browserKokoro.cancelInstall(), [])
+  const forget = useCallback(() => browserKokoro.forget(), [])
+
+  return {
+    ...snapshot,
+    fraction:
+      snapshot.total > 0
+        ? Math.min(1, Math.max(0, snapshot.loaded / snapshot.total))
+        : null,
+    install,
+    cancel,
+    forget,
+    installed: snapshot.state === 'ready',
+  }
 }
 
 /**

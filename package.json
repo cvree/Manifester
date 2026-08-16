@@ -14,13 +14,17 @@
     "typecheck": "tsc -b --pretty",
     "icons": "node scripts/generate-icons.mjs",
     "server": "node server/index.mjs",
-    "speech": "node scripts/generate-speech.mjs"
+    "speech": "node scripts/generate-speech.mjs",
+    "speech:setup": "python3 -m venv .cache/kokoro/venv && .cache/kokoro/venv/bin/pip install --quiet onnxruntime numpy soundfile espeakng-loader phonemizer-fork",
+    "speech:local": "node scripts/generate-speech.mjs --engine local",
+    "speech:check": ".cache/kokoro/venv/bin/python scripts/kokoro_local.py --self-test"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
     "@google/genai": "^2.15.0",
     "@gsap/react": "^2.1.2",
     "gsap": "^3.15.0",
+    "kokoro-js": "^1.2.1",
     "lenis": "^1.3.25",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

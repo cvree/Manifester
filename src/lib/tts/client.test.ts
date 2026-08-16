@@ -60,6 +60,13 @@ function fakeStore() {
     put: vi.fn(async (key: string, format: AudioFormat, value: ArrayBuffer) => {
       held.set(`${key}.${format}`, value)
     }),
+    find: vi.fn(async (key: string, formats: AudioFormat[]) => {
+      for (const format of formats) {
+        const bytes = held.get(`${key}.${format}`)
+        if (bytes) return { bytes, format }
+      }
+      return null
+    }),
     usage: async () => 0,
     clear: async () => held.clear(),
   }
@@ -68,11 +75,16 @@ function fakeStore() {
 
 function build(
   engine: TTSEngine | null,
-  extras: { manifestJson?: unknown; store?: ReturnType<typeof fakeStore> } = {},
+  extras: {
+    manifestJson?: unknown
+    store?: ReturnType<typeof fakeStore>
+    /** More than one engine, in preference order. Overrides `engine`. */
+    engines?: TTSEngine[]
+  } = {},
 ) {
   const store = extras.store ?? fakeStore()
   const client = new TTSClient({
-    engine,
+    engines: extras.engines ?? (engine ? [engine] : []),
     manifest: new StaticManifest('/speech/'),
     normalizer: new PronunciationNormalizer({ supportsPhonemes: false }),
     getContext: fakeContext,
@@ -179,6 +191,117 @@ describe('resolution order', () => {
     const { client, store } = build(engine)
     await client.resolve('Hello there.', { ...options, cache: 'no-store' })
     expect(store.spy.put).not.toHaveBeenCalled()
+  })
+
+  /*
+   * A clip is addressed by what it says, not by how it is packed. Three ways
+   * that can now be violated, each of which costs a synthesis somebody waits
+   * for — or, on the on-device path, several seconds of a phone's battery.
+   */
+  it('takes a cached clip in any encoding rather than making it again', async () => {
+    const engine = fakeEngine()
+    const store = fakeStore()
+    const { client } = build(engine, { store })
+
+    // What the on-device model leaves behind, while this browser would rather
+    // download Opus.
+    const key = client.keyFor('Hello there.', options)
+    await store.cache.put(key, 'wav', bytes(11))
+
+    const clip = await client.resolve('Hello there.', options)
+    expect(clip.source).toBe('browser-cache')
+    expect(clip.format).toBe('wav')
+    expect(engine.synthesize).not.toHaveBeenCalled()
+  })
+
+  it('takes a shipped clip in the other encoding rather than reaching an engine', async () => {
+    const engine = fakeEngine()
+    const { client } = build(engine)
+    const key = client.keyFor('Hello there.', options)
+
+    // A build that generated MP3 only, seen by a browser that prefers Opus.
+    fetchMock.mockImplementation(async (url: string) => {
+      if (String(url).endsWith('manifest.json')) {
+        return new Response(
+          JSON.stringify({
+            version: 1,
+            clips: { [key]: { formats: { mp3: `ab/${key}.mp3` } } },
+          }),
+          { status: 200 },
+        )
+      }
+      return new Response(bytes(3), { status: 200 })
+    })
+
+    const clip = await client.resolve('Hello there.', options)
+    expect(clip.source).toBe('static')
+    expect(clip.format).toBe('mp3')
+    expect(engine.synthesize).not.toHaveBeenCalled()
+  })
+
+  it('remembers one decoded copy per clip, not one per container', async () => {
+    const engine = fakeEngine({
+      synthesize: vi.fn(async () => ({
+        bytes: bytes(2),
+        format: 'wav' as AudioFormat,
+        source: 'engine' as const,
+      })),
+    })
+    const { client } = build(engine)
+
+    // Synthesised as WAV, asked for again as whatever this browser prefers.
+    expect((await client.resolve('Hello there.', options)).source).toBe('engine')
+    expect((await client.resolve('Hello there.', options)).source).toBe('memory')
+    expect(engine.synthesize).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('several engines', () => {
+  it('asks the on-device model before the service', async () => {
+    const local = fakeEngine()
+    const remote = fakeEngine()
+    const { client } = build(null, { engines: [local, remote] })
+
+    const clip = await client.resolve('Hello there.', options)
+    expect(clip.source).toBe('engine')
+    expect(local.synthesize).toHaveBeenCalledTimes(1)
+    expect(remote.lookup).not.toHaveBeenCalled()
+    expect(remote.synthesize).not.toHaveBeenCalled()
+  })
+
+  it('falls through to the next engine when one cannot answer', async () => {
+    // A phone that has run out of memory mid-session. The service is still
+    // there, and falling back to it beats falling back to a device voice.
+    const local = fakeEngine({
+      synthesize: vi.fn(async () => {
+        throw new Error('out of memory')
+      }),
+    })
+    const remote = fakeEngine()
+    const { client } = build(null, { engines: [local, remote] })
+
+    const clip = await client.resolve('Hello there.', options)
+    expect(clip.source).toBe('engine')
+    expect(remote.synthesize).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports the last failure when every engine has failed', async () => {
+    const boom = () =>
+      fakeEngine({
+        synthesize: vi.fn(async () => {
+          throw new Error('nope')
+        }),
+      })
+    const { client } = build(null, { engines: [boom(), boom()] })
+
+    await expect(client.resolve('Hello there.', options)).rejects.toThrow('nope')
+  })
+
+  it('is a NoEngineError when there are none at all', async () => {
+    const { client } = build(null)
+    await expect(client.resolve('Hello there.', options)).rejects.toBeInstanceOf(
+      NoEngineError,
+    )
   })
 })
 

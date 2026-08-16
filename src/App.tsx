@@ -6,6 +6,7 @@ import { LaunchRoute } from './routes/LaunchRoute'
 import { LibraryRoute } from './routes/LibraryRoute'
 import { PlayerRoute } from './routes/PlayerRoute'
 import { SharedLoopRoute } from './routes/SharedLoopRoute'
+import { WelcomeRoute } from './routes/WelcomeRoute'
 import { LibraryProvider } from './state/LibraryProvider'
 import { PreferencesProvider } from './state/PreferencesProvider'
 import { SessionProvider } from './state/SessionProvider'
@@ -23,6 +24,7 @@ export default function App() {
                 <Routes>
                   <Route element={<AppShell />}>
                     <Route index element={<LaunchRoute />} />
+                    <Route path="/welcome" element={<WelcomeRoute />} />
                     <Route path="/create" element={<CreateRoute />} />
                     <Route path="/player" element={<PlayerRoute />} />
                     <Route path="/library" element={<LibraryRoute />} />

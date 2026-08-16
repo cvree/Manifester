@@ -1,4 +1,2595 @@
 {
   "version": 1,
-  "clips": {}
+  "generatedAt": "2026-08-16T06:10:39.183Z",
+  "engine": {
+    "id": "kokoro",
+    "modelVersion": "kokoro-82m-v1.0"
+  },
+  "versions": {
+    "voice": 1,
+    "pronunciation": 1,
+    "audio": 1
+  },
+  "clips": {
+    "f6bdce299ce542855f004faddd941c8d448d37356b672e4cc1feb6b00383bc5f": {
+      "text": "This is how your words will sound.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f6/f6bdce299ce542855f004faddd941c8d448d37356b672e4cc1feb6b00383bc5f.opus",
+        "mp3": "f6/f6bdce299ce542855f004faddd941c8d448d37356b672e4cc1feb6b00383bc5f.mp3"
+      }
+    },
+    "2ba94aed89812cd48efa1956122912ea6cdc8ac50b7aafb5f19e7939ccfa6136": {
+      "text": "This is how your words will sound.",
+      "voice": "female_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "2b/2ba94aed89812cd48efa1956122912ea6cdc8ac50b7aafb5f19e7939ccfa6136.opus",
+        "mp3": "2b/2ba94aed89812cd48efa1956122912ea6cdc8ac50b7aafb5f19e7939ccfa6136.mp3"
+      }
+    },
+    "a2977c7696db1bd23aa87857fb5341eb1d2a4688a811740912f63d0f0fafd5d3": {
+      "text": "This is how your words will sound.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "a2/a2977c7696db1bd23aa87857fb5341eb1d2a4688a811740912f63d0f0fafd5d3.opus",
+        "mp3": "a2/a2977c7696db1bd23aa87857fb5341eb1d2a4688a811740912f63d0f0fafd5d3.mp3"
+      }
+    },
+    "fcead45bf9ca492ca5626c8ae73f3923dd970249c4bdcf611f522e6a8dff5747": {
+      "text": "This is how your words will sound.",
+      "voice": "male_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "fc/fcead45bf9ca492ca5626c8ae73f3923dd970249c4bdcf611f522e6a8dff5747.opus",
+        "mp3": "fc/fcead45bf9ca492ca5626c8ae73f3923dd970249c4bdcf611f522e6a8dff5747.mp3"
+      }
+    },
+    "afc66a648b5a9d45252702473a18a58eaa084a293973fd96a183797b25d7da2b": {
+      "text": "Take a slow breath in, and let it go.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "af/afc66a648b5a9d45252702473a18a58eaa084a293973fd96a183797b25d7da2b.opus",
+        "mp3": "af/afc66a648b5a9d45252702473a18a58eaa084a293973fd96a183797b25d7da2b.mp3"
+      }
+    },
+    "1bd92d0d1ee08a4b954fe1907dc97c78a19cc78078bac597e1809718b1ae7faa": {
+      "text": "Take a slow breath in, and let it go.",
+      "voice": "female_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "1b/1bd92d0d1ee08a4b954fe1907dc97c78a19cc78078bac597e1809718b1ae7faa.opus",
+        "mp3": "1b/1bd92d0d1ee08a4b954fe1907dc97c78a19cc78078bac597e1809718b1ae7faa.mp3"
+      }
+    },
+    "554768a685c8b3a7a15dd62cf34984dc69e8a15c8634a1803e8169a291ba672a": {
+      "text": "Take a slow breath in, and let it go.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "55/554768a685c8b3a7a15dd62cf34984dc69e8a15c8634a1803e8169a291ba672a.opus",
+        "mp3": "55/554768a685c8b3a7a15dd62cf34984dc69e8a15c8634a1803e8169a291ba672a.mp3"
+      }
+    },
+    "a81af47e01dae0acfa1ae075d4719104f2cd5d2ed4a90ef4fc403327fc696337": {
+      "text": "Take a slow breath in, and let it go.",
+      "voice": "male_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "a8/a81af47e01dae0acfa1ae075d4719104f2cd5d2ed4a90ef4fc403327fc696337.opus",
+        "mp3": "a8/a81af47e01dae0acfa1ae075d4719104f2cd5d2ed4a90ef4fc403327fc696337.mp3"
+      }
+    },
+    "d7416cb8287b2661907a0396ab18ad460e9daf0c2a84138dc5a242e33a28aeff": {
+      "text": "Whatever you are carrying, you can set it down for a while.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "d7/d7416cb8287b2661907a0396ab18ad460e9daf0c2a84138dc5a242e33a28aeff.opus",
+        "mp3": "d7/d7416cb8287b2661907a0396ab18ad460e9daf0c2a84138dc5a242e33a28aeff.mp3"
+      }
+    },
+    "50deb2be767c053bc85d52409ce2c7e0b1884601152cc09d76057c422c2d3d3c": {
+      "text": "Whatever you are carrying, you can set it down for a while.",
+      "voice": "female_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "50/50deb2be767c053bc85d52409ce2c7e0b1884601152cc09d76057c422c2d3d3c.opus",
+        "mp3": "50/50deb2be767c053bc85d52409ce2c7e0b1884601152cc09d76057c422c2d3d3c.mp3"
+      }
+    },
+    "eb98e604d595915fbd80b49f613736e4b544c3ae9fbbd954b9dabbf61d4a4c74": {
+      "text": "Whatever you are carrying, you can set it down for a while.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "eb/eb98e604d595915fbd80b49f613736e4b544c3ae9fbbd954b9dabbf61d4a4c74.opus",
+        "mp3": "eb/eb98e604d595915fbd80b49f613736e4b544c3ae9fbbd954b9dabbf61d4a4c74.mp3"
+      }
+    },
+    "4d3c07caa244f6085b8dc5fc4ec125e350bcf2eeafa3efc06b6eadde83b26b1a": {
+      "text": "Whatever you are carrying, you can set it down for a while.",
+      "voice": "male_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "4d/4d3c07caa244f6085b8dc5fc4ec125e350bcf2eeafa3efc06b6eadde83b26b1a.opus",
+        "mp3": "4d/4d3c07caa244f6085b8dc5fc4ec125e350bcf2eeafa3efc06b6eadde83b26b1a.mp3"
+      }
+    },
+    "0eb3dd3162f8dc28c385df7434e8bb5ca909ce1174e7621fc9554fe59d0164ac": {
+      "text": "There is nothing to solve here, and nowhere else to be.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "0e/0eb3dd3162f8dc28c385df7434e8bb5ca909ce1174e7621fc9554fe59d0164ac.opus",
+        "mp3": "0e/0eb3dd3162f8dc28c385df7434e8bb5ca909ce1174e7621fc9554fe59d0164ac.mp3"
+      }
+    },
+    "d2d9319691de26e1bb2c78c9ac0ba134290c28f996723e1b74d1495452873415": {
+      "text": "There is nothing to solve here, and nowhere else to be.",
+      "voice": "female_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "d2/d2d9319691de26e1bb2c78c9ac0ba134290c28f996723e1b74d1495452873415.opus",
+        "mp3": "d2/d2d9319691de26e1bb2c78c9ac0ba134290c28f996723e1b74d1495452873415.mp3"
+      }
+    },
+    "f9ecbced69ffb38ed32d4d3e2060bd32efe6732ac70f10ed4bcb265c679f0fed": {
+      "text": "There is nothing to solve here, and nowhere else to be.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f9/f9ecbced69ffb38ed32d4d3e2060bd32efe6732ac70f10ed4bcb265c679f0fed.opus",
+        "mp3": "f9/f9ecbced69ffb38ed32d4d3e2060bd32efe6732ac70f10ed4bcb265c679f0fed.mp3"
+      }
+    },
+    "f30d30e6a0fb1d11cb37f0978a4b2cce9e36444b495a2699eddeb7c951f5b858": {
+      "text": "There is nothing to solve here, and nowhere else to be.",
+      "voice": "male_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "f3/f30d30e6a0fb1d11cb37f0978a4b2cce9e36444b495a2699eddeb7c951f5b858.opus",
+        "mp3": "f3/f30d30e6a0fb1d11cb37f0978a4b2cce9e36444b495a2699eddeb7c951f5b858.mp3"
+      }
+    },
+    "bdb63b1758b7ad75b137369c325b82faef16ae5dd5ee47e6c55fe9d831c3fbf8": {
+      "text": "These are your words. I am only holding them for you.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "bd/bdb63b1758b7ad75b137369c325b82faef16ae5dd5ee47e6c55fe9d831c3fbf8.opus",
+        "mp3": "bd/bdb63b1758b7ad75b137369c325b82faef16ae5dd5ee47e6c55fe9d831c3fbf8.mp3"
+      }
+    },
+    "e93e8bdb3fe6905e7acab603b6c38b4bc0ec759f1b4af0ba2b48509bb974b47e": {
+      "text": "These are your words. I am only holding them for you.",
+      "voice": "female_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "e9/e93e8bdb3fe6905e7acab603b6c38b4bc0ec759f1b4af0ba2b48509bb974b47e.opus",
+        "mp3": "e9/e93e8bdb3fe6905e7acab603b6c38b4bc0ec759f1b4af0ba2b48509bb974b47e.mp3"
+      }
+    },
+    "56494e9b0ffd5018076da87a9cfe3709e5586937683fb68e004c791e6979f4ce": {
+      "text": "These are your words. I am only holding them for you.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "56/56494e9b0ffd5018076da87a9cfe3709e5586937683fb68e004c791e6979f4ce.opus",
+        "mp3": "56/56494e9b0ffd5018076da87a9cfe3709e5586937683fb68e004c791e6979f4ce.mp3"
+      }
+    },
+    "12f6d47f9808ecdb3cfb8d8fc61a6f2aa3b602498589dc4a7e9c35d697c43ddc": {
+      "text": "These are your words. I am only holding them for you.",
+      "voice": "male_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "12/12f6d47f9808ecdb3cfb8d8fc61a6f2aa3b602498589dc4a7e9c35d697c43ddc.opus",
+        "mp3": "12/12f6d47f9808ecdb3cfb8d8fc61a6f2aa3b602498589dc4a7e9c35d697c43ddc.mp3"
+      }
+    },
+    "a9c4d85ba6068181b1ccd3b8ce87410bfad9b491b6ba1fe22b1b09f015d74a7e": {
+      "text": "I am allowed to move at my own pace.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "a9/a9c4d85ba6068181b1ccd3b8ce87410bfad9b491b6ba1fe22b1b09f015d74a7e.opus",
+        "mp3": "a9/a9c4d85ba6068181b1ccd3b8ce87410bfad9b491b6ba1fe22b1b09f015d74a7e.mp3"
+      }
+    },
+    "619dcdde8e482eeee4b7ac8cf106fcf4ce804498fd6c2f5dcc33267dd91170e2": {
+      "text": "I am allowed to move at my own pace.",
+      "voice": "female_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "61/619dcdde8e482eeee4b7ac8cf106fcf4ce804498fd6c2f5dcc33267dd91170e2.opus",
+        "mp3": "61/619dcdde8e482eeee4b7ac8cf106fcf4ce804498fd6c2f5dcc33267dd91170e2.mp3"
+      }
+    },
+    "57d475446f6fc76c6d3dd9474cb9da0875ef6bd25d659cbcd26864b216fbba03": {
+      "text": "I am allowed to move at my own pace.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "57/57d475446f6fc76c6d3dd9474cb9da0875ef6bd25d659cbcd26864b216fbba03.opus",
+        "mp3": "57/57d475446f6fc76c6d3dd9474cb9da0875ef6bd25d659cbcd26864b216fbba03.mp3"
+      }
+    },
+    "1f3e8b97a266f0ae54aa4691b67fbeca17357848e7a008afb63a331751ecae99": {
+      "text": "I am allowed to move at my own pace.",
+      "voice": "male_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "1f/1f3e8b97a266f0ae54aa4691b67fbeca17357848e7a008afb63a331751ecae99.opus",
+        "mp3": "1f/1f3e8b97a266f0ae54aa4691b67fbeca17357848e7a008afb63a331751ecae99.mp3"
+      }
+    },
+    "6dccaa9b1ee39498a0275ddb675e98aea67221acc36ca7e2c0610fcd1bc1b80b": {
+      "text": "I meet today with a steady, open heart.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "6d/6dccaa9b1ee39498a0275ddb675e98aea67221acc36ca7e2c0610fcd1bc1b80b.opus",
+        "mp3": "6d/6dccaa9b1ee39498a0275ddb675e98aea67221acc36ca7e2c0610fcd1bc1b80b.mp3"
+      }
+    },
+    "b4c10065dc597aa520e80dfae365a8abd9bdb37d497685e977e8b12756c06dce": {
+      "text": "I meet today with a steady, open heart.",
+      "voice": "female_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "b4/b4c10065dc597aa520e80dfae365a8abd9bdb37d497685e977e8b12756c06dce.opus",
+        "mp3": "b4/b4c10065dc597aa520e80dfae365a8abd9bdb37d497685e977e8b12756c06dce.mp3"
+      }
+    },
+    "3d6e08a8345eb79f2efd50d2e00495e867d00ab0a06f5e59a598dbdd1b67191d": {
+      "text": "I meet today with a steady, open heart.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "3d/3d6e08a8345eb79f2efd50d2e00495e867d00ab0a06f5e59a598dbdd1b67191d.opus",
+        "mp3": "3d/3d6e08a8345eb79f2efd50d2e00495e867d00ab0a06f5e59a598dbdd1b67191d.mp3"
+      }
+    },
+    "219ddb6fd6e08d40b54c6640d3ad31e3c6734451fcbd568dd0382682488aa20d": {
+      "text": "I meet today with a steady, open heart.",
+      "voice": "male_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "21/219ddb6fd6e08d40b54c6640d3ad31e3c6734451fcbd568dd0382682488aa20d.opus",
+        "mp3": "21/219ddb6fd6e08d40b54c6640d3ad31e3c6734451fcbd568dd0382682488aa20d.mp3"
+      }
+    },
+    "63233ea42948298edbb0985e3ddf941f10f789a84a03c137d2f5e39146b8ac7c": {
+      "text": "I trust myself to handle what this day brings.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "63/63233ea42948298edbb0985e3ddf941f10f789a84a03c137d2f5e39146b8ac7c.opus",
+        "mp3": "63/63233ea42948298edbb0985e3ddf941f10f789a84a03c137d2f5e39146b8ac7c.mp3"
+      }
+    },
+    "fa6c364e40b4e7e124a3dbcc63a4bfe7eb8674a343f9ef6a20c88615cc1e9e44": {
+      "text": "I trust myself to handle what this day brings.",
+      "voice": "female_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "fa/fa6c364e40b4e7e124a3dbcc63a4bfe7eb8674a343f9ef6a20c88615cc1e9e44.opus",
+        "mp3": "fa/fa6c364e40b4e7e124a3dbcc63a4bfe7eb8674a343f9ef6a20c88615cc1e9e44.mp3"
+      }
+    },
+    "a2fd918a9856bbf1e20051388f8198348bd0c89c30a1e1b1869a25c31f8cc8e3": {
+      "text": "I trust myself to handle what this day brings.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "a2/a2fd918a9856bbf1e20051388f8198348bd0c89c30a1e1b1869a25c31f8cc8e3.opus",
+        "mp3": "a2/a2fd918a9856bbf1e20051388f8198348bd0c89c30a1e1b1869a25c31f8cc8e3.mp3"
+      }
+    },
+    "2e5b913182a6014cb6ee6cd3a9adf55575fba05e163b20d011b29814a535a888": {
+      "text": "I trust myself to handle what this day brings.",
+      "voice": "male_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "2e/2e5b913182a6014cb6ee6cd3a9adf55575fba05e163b20d011b29814a535a888.opus",
+        "mp3": "2e/2e5b913182a6014cb6ee6cd3a9adf55575fba05e163b20d011b29814a535a888.mp3"
+      }
+    },
+    "e74db526a03490210eb2f1a315fafce580d2318a59b6db68096e48f8ae026887": {
+      "text": "I am becoming someone I am proud of.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "e7/e74db526a03490210eb2f1a315fafce580d2318a59b6db68096e48f8ae026887.opus",
+        "mp3": "e7/e74db526a03490210eb2f1a315fafce580d2318a59b6db68096e48f8ae026887.mp3"
+      }
+    },
+    "37c9ebe8c6011563d5e5b083f70a0fd48c66c8e28955582b7e21f92ad6f3f3f0": {
+      "text": "I am becoming someone I am proud of.",
+      "voice": "female_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "37/37c9ebe8c6011563d5e5b083f70a0fd48c66c8e28955582b7e21f92ad6f3f3f0.opus",
+        "mp3": "37/37c9ebe8c6011563d5e5b083f70a0fd48c66c8e28955582b7e21f92ad6f3f3f0.mp3"
+      }
+    },
+    "f969f8efb0de670d2854cb803ea40e14aa316e514b4a1f4b2cd2bb95bb3cfe0c": {
+      "text": "I am becoming someone I am proud of.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f9/f969f8efb0de670d2854cb803ea40e14aa316e514b4a1f4b2cd2bb95bb3cfe0c.opus",
+        "mp3": "f9/f969f8efb0de670d2854cb803ea40e14aa316e514b4a1f4b2cd2bb95bb3cfe0c.mp3"
+      }
+    },
+    "07293e7ec2317d27c0bc832d59946d42bffdc75aef7485eb7994913b087f522c": {
+      "text": "I am becoming someone I am proud of.",
+      "voice": "male_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "07/07293e7ec2317d27c0bc832d59946d42bffdc75aef7485eb7994913b087f522c.opus",
+        "mp3": "07/07293e7ec2317d27c0bc832d59946d42bffdc75aef7485eb7994913b087f522c.mp3"
+      }
+    },
+    "893a91ae374e9ecde9dc9a90307686e9a9505b4e0d65808e8aeb4726a89f1e2b": {
+      "text": "Rest is part of the work, not a break from it.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "89/893a91ae374e9ecde9dc9a90307686e9a9505b4e0d65808e8aeb4726a89f1e2b.opus",
+        "mp3": "89/893a91ae374e9ecde9dc9a90307686e9a9505b4e0d65808e8aeb4726a89f1e2b.mp3"
+      }
+    },
+    "7e23abf1e81362c3aecdb71f03b5112af919a476b09beec27e60aa40477e0bea": {
+      "text": "Rest is part of the work, not a break from it.",
+      "voice": "female_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "7e/7e23abf1e81362c3aecdb71f03b5112af919a476b09beec27e60aa40477e0bea.opus",
+        "mp3": "7e/7e23abf1e81362c3aecdb71f03b5112af919a476b09beec27e60aa40477e0bea.mp3"
+      }
+    },
+    "8415594ac4cba5ab936fb9aae0b084b7d0255def80272fc011bbee0f8becad77": {
+      "text": "Rest is part of the work, not a break from it.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "84/8415594ac4cba5ab936fb9aae0b084b7d0255def80272fc011bbee0f8becad77.opus",
+        "mp3": "84/8415594ac4cba5ab936fb9aae0b084b7d0255def80272fc011bbee0f8becad77.mp3"
+      }
+    },
+    "e93af6df4869d9d4dc23381d16c647e0ae1d5b2fe1be40609c72ac05a8f14394": {
+      "text": "Rest is part of the work, not a break from it.",
+      "voice": "male_1",
+      "speed": 1,
+      "language": "en-us",
+      "formats": {
+        "opus": "e9/e93af6df4869d9d4dc23381d16c647e0ae1d5b2fe1be40609c72ac05a8f14394.opus",
+        "mp3": "e9/e93af6df4869d9d4dc23381d16c647e0ae1d5b2fe1be40609c72ac05a8f14394.mp3"
+      }
+    },
+    "bcfb16c29e63bcab870c0a359961fdd0651587b34c607517f2f9eb0b894cacd8": {
+      "text": "I trust myself to figure this out.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "bc/bcfb16c29e63bcab870c0a359961fdd0651587b34c607517f2f9eb0b894cacd8.opus",
+        "mp3": "bc/bcfb16c29e63bcab870c0a359961fdd0651587b34c607517f2f9eb0b894cacd8.mp3"
+      }
+    },
+    "9ba02f630110b1e194d6dd1f38ad80f85e3c7aa9055754d709a8e7d8a81b85f0": {
+      "text": "I trust myself to figure this out.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "9b/9ba02f630110b1e194d6dd1f38ad80f85e3c7aa9055754d709a8e7d8a81b85f0.opus",
+        "mp3": "9b/9ba02f630110b1e194d6dd1f38ad80f85e3c7aa9055754d709a8e7d8a81b85f0.mp3"
+      }
+    },
+    "de88c633c62bd17e9d44c61f0730031e7ce769035d9f7ea55ac842fdca91896a": {
+      "text": "I have done hard things before.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "de/de88c633c62bd17e9d44c61f0730031e7ce769035d9f7ea55ac842fdca91896a.opus",
+        "mp3": "de/de88c633c62bd17e9d44c61f0730031e7ce769035d9f7ea55ac842fdca91896a.mp3"
+      }
+    },
+    "718d1bbe881046384e9582401c060933852d0b00660dde2794e94205347d7b11": {
+      "text": "I have done hard things before.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "71/718d1bbe881046384e9582401c060933852d0b00660dde2794e94205347d7b11.opus",
+        "mp3": "71/718d1bbe881046384e9582401c060933852d0b00660dde2794e94205347d7b11.mp3"
+      }
+    },
+    "5ce5c0b647f09a1d843491011035ec3f91281b19e0ddfe92512f3b5754e5dc06": {
+      "text": "I belong in the rooms I walk into.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "5c/5ce5c0b647f09a1d843491011035ec3f91281b19e0ddfe92512f3b5754e5dc06.opus",
+        "mp3": "5c/5ce5c0b647f09a1d843491011035ec3f91281b19e0ddfe92512f3b5754e5dc06.mp3"
+      }
+    },
+    "622e503702f4e03794edd1f01773300b4c6e930862d030874267ef0391a726be": {
+      "text": "I belong in the rooms I walk into.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "62/622e503702f4e03794edd1f01773300b4c6e930862d030874267ef0391a726be.opus",
+        "mp3": "62/622e503702f4e03794edd1f01773300b4c6e930862d030874267ef0391a726be.mp3"
+      }
+    },
+    "d59193e51a877f000e2d41e1b73b9ef380b73ffa30921a35ec3d120f26589138": {
+      "text": "I speak clearly and kindly, and my voice carries.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "d5/d59193e51a877f000e2d41e1b73b9ef380b73ffa30921a35ec3d120f26589138.opus",
+        "mp3": "d5/d59193e51a877f000e2d41e1b73b9ef380b73ffa30921a35ec3d120f26589138.mp3"
+      }
+    },
+    "906f3514d8f92ad6e4fbe2a2c41cece5d69997470b6a6a937bf9a47e8b65ee5f": {
+      "text": "I speak clearly and kindly, and my voice carries.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "90/906f3514d8f92ad6e4fbe2a2c41cece5d69997470b6a6a937bf9a47e8b65ee5f.opus",
+        "mp3": "90/906f3514d8f92ad6e4fbe2a2c41cece5d69997470b6a6a937bf9a47e8b65ee5f.mp3"
+      }
+    },
+    "6df4a3b1599c66216743cbf520ace55341eec597cb01f79f48b46b5e3f0e2921": {
+      "text": "I am steady, even when the day around me is not.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "6d/6df4a3b1599c66216743cbf520ace55341eec597cb01f79f48b46b5e3f0e2921.opus",
+        "mp3": "6d/6df4a3b1599c66216743cbf520ace55341eec597cb01f79f48b46b5e3f0e2921.mp3"
+      }
+    },
+    "dd8a4d9e54d43dd30bfde0af319691c70357fc80bf43443e0265fee6d0826283": {
+      "text": "I am steady, even when the day around me is not.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "dd/dd8a4d9e54d43dd30bfde0af319691c70357fc80bf43443e0265fee6d0826283.opus",
+        "mp3": "dd/dd8a4d9e54d43dd30bfde0af319691c70357fc80bf43443e0265fee6d0826283.mp3"
+      }
+    },
+    "755a9da43623fe2b162a6e151b39d14dafaf6671ffbe9346ae7ed066af1098eb": {
+      "text": "I do not need to be certain to begin.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "75/755a9da43623fe2b162a6e151b39d14dafaf6671ffbe9346ae7ed066af1098eb.opus",
+        "mp3": "75/755a9da43623fe2b162a6e151b39d14dafaf6671ffbe9346ae7ed066af1098eb.mp3"
+      }
+    },
+    "12e03e7c56696b19f8ef99df0c44e4d74128313eaf9366945e2e9930ca1846d9": {
+      "text": "I do not need to be certain to begin.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "12/12e03e7c56696b19f8ef99df0c44e4d74128313eaf9366945e2e9930ca1846d9.opus",
+        "mp3": "12/12e03e7c56696b19f8ef99df0c44e4d74128313eaf9366945e2e9930ca1846d9.mp3"
+      }
+    },
+    "3a2a4d100fbba3ab9ea29963bce747be560975790ff19790e0622fdfd86d8944": {
+      "text": "My breath is slow, and my body is following it.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "3a/3a2a4d100fbba3ab9ea29963bce747be560975790ff19790e0622fdfd86d8944.opus",
+        "mp3": "3a/3a2a4d100fbba3ab9ea29963bce747be560975790ff19790e0622fdfd86d8944.mp3"
+      }
+    },
+    "a1a134e3ad9c20f913dcf034951e4ca624eb601914b0e6129ed5b57c6209ed3b": {
+      "text": "My breath is slow, and my body is following it.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "a1/a1a134e3ad9c20f913dcf034951e4ca624eb601914b0e6129ed5b57c6209ed3b.opus",
+        "mp3": "a1/a1a134e3ad9c20f913dcf034951e4ca624eb601914b0e6129ed5b57c6209ed3b.mp3"
+      }
+    },
+    "f7d566991a3117af98f58552dca154f0a1c6ab795aa5d983251f1fe09d5926c5": {
+      "text": "I am safe in this moment, and this moment is enough.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f7/f7d566991a3117af98f58552dca154f0a1c6ab795aa5d983251f1fe09d5926c5.opus",
+        "mp3": "f7/f7d566991a3117af98f58552dca154f0a1c6ab795aa5d983251f1fe09d5926c5.mp3"
+      }
+    },
+    "d35c956d8dafe00b8db9b2bd2823c807f9ebfb3bf849c6ce9608bb1571b27c94": {
+      "text": "I am safe in this moment, and this moment is enough.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "d3/d35c956d8dafe00b8db9b2bd2823c807f9ebfb3bf849c6ce9608bb1571b27c94.opus",
+        "mp3": "d3/d35c956d8dafe00b8db9b2bd2823c807f9ebfb3bf849c6ce9608bb1571b27c94.mp3"
+      }
+    },
+    "5071a7086f451ed0c139d7389773ae66031506749cbe8bf58bfacf9560878746": {
+      "text": "I let my shoulders drop and my jaw soften.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "50/5071a7086f451ed0c139d7389773ae66031506749cbe8bf58bfacf9560878746.opus",
+        "mp3": "50/5071a7086f451ed0c139d7389773ae66031506749cbe8bf58bfacf9560878746.mp3"
+      }
+    },
+    "568bb5723f7b48a1b498914c857a1d18358bb7af7c3892fea4c5eb533a52796a": {
+      "text": "I let my shoulders drop and my jaw soften.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "56/568bb5723f7b48a1b498914c857a1d18358bb7af7c3892fea4c5eb533a52796a.opus",
+        "mp3": "56/568bb5723f7b48a1b498914c857a1d18358bb7af7c3892fea4c5eb533a52796a.mp3"
+      }
+    },
+    "ccfaf1fa6f112cab2cc66d3198ed098216935dfb42d0af9ba16e22dbe40f9744": {
+      "text": "This feeling is loud, and it is not in charge.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "cc/ccfaf1fa6f112cab2cc66d3198ed098216935dfb42d0af9ba16e22dbe40f9744.opus",
+        "mp3": "cc/ccfaf1fa6f112cab2cc66d3198ed098216935dfb42d0af9ba16e22dbe40f9744.mp3"
+      }
+    },
+    "0e26bf0b110fdd0c833504cd55c19209c3efcff6dfa82c4ab8409e77130563b9": {
+      "text": "This feeling is loud, and it is not in charge.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "0e/0e26bf0b110fdd0c833504cd55c19209c3efcff6dfa82c4ab8409e77130563b9.opus",
+        "mp3": "0e/0e26bf0b110fdd0c833504cd55c19209c3efcff6dfa82c4ab8409e77130563b9.mp3"
+      }
+    },
+    "9175b4751d1af15062efc77dfb4e86eb9f7b1d37d163b3803629126203a08354": {
+      "text": "I return to my breath as many times as I need to.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "91/9175b4751d1af15062efc77dfb4e86eb9f7b1d37d163b3803629126203a08354.opus",
+        "mp3": "91/9175b4751d1af15062efc77dfb4e86eb9f7b1d37d163b3803629126203a08354.mp3"
+      }
+    },
+    "f49b43757bcc67b0592a9697a60caeeb7dfe09045140ce31fe3c2919d830d462": {
+      "text": "I return to my breath as many times as I need to.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f4/f49b43757bcc67b0592a9697a60caeeb7dfe09045140ce31fe3c2919d830d462.opus",
+        "mp3": "f4/f49b43757bcc67b0592a9697a60caeeb7dfe09045140ce31fe3c2919d830d462.mp3"
+      }
+    },
+    "29f466884dad5935c8fb14c3dcad088ed8339df876f96f0adfddb8e5aea75c6c": {
+      "text": "Nothing here needs solving in the next minute.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "29/29f466884dad5935c8fb14c3dcad088ed8339df876f96f0adfddb8e5aea75c6c.opus",
+        "mp3": "29/29f466884dad5935c8fb14c3dcad088ed8339df876f96f0adfddb8e5aea75c6c.mp3"
+      }
+    },
+    "def7a22668d1214111afea925d74034078ab342cbd127598832c53cfc31d0f45": {
+      "text": "Nothing here needs solving in the next minute.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "de/def7a22668d1214111afea925d74034078ab342cbd127598832c53cfc31d0f45.opus",
+        "mp3": "de/def7a22668d1214111afea925d74034078ab342cbd127598832c53cfc31d0f45.mp3"
+      }
+    },
+    "24014bfdc4e141376a841243541d6113eb8e43d2477ceaf7ba72ca09ebe58ce9": {
+      "text": "I begin, and beginning is the hard part.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "24/24014bfdc4e141376a841243541d6113eb8e43d2477ceaf7ba72ca09ebe58ce9.opus",
+        "mp3": "24/24014bfdc4e141376a841243541d6113eb8e43d2477ceaf7ba72ca09ebe58ce9.mp3"
+      }
+    },
+    "bad37e239b813e5406ef697ffe7fb54540675bb1fa440536bafae4147f0e6db7": {
+      "text": "I begin, and beginning is the hard part.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ba/bad37e239b813e5406ef697ffe7fb54540675bb1fa440536bafae4147f0e6db7.opus",
+        "mp3": "ba/bad37e239b813e5406ef697ffe7fb54540675bb1fa440536bafae4147f0e6db7.mp3"
+      }
+    },
+    "3dbd86ea1a2af287c1c4064d66c0bf31419226426ab064f178f7a4016cf1392b": {
+      "text": "Small steps still count as moving.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "3d/3dbd86ea1a2af287c1c4064d66c0bf31419226426ab064f178f7a4016cf1392b.opus",
+        "mp3": "3d/3dbd86ea1a2af287c1c4064d66c0bf31419226426ab064f178f7a4016cf1392b.mp3"
+      }
+    },
+    "48c63edcdcee6e609d70fc6bae56fb1c7e06774a4256d62dee93640fd2908e89": {
+      "text": "Small steps still count as moving.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "48/48c63edcdcee6e609d70fc6bae56fb1c7e06774a4256d62dee93640fd2908e89.opus",
+        "mp3": "48/48c63edcdcee6e609d70fc6bae56fb1c7e06774a4256d62dee93640fd2908e89.mp3"
+      }
+    },
+    "1ddbb47f9a8549e0fbe3b6c5590ca5e97dc854e944030281d5b1ae6d5c6bb6e1": {
+      "text": "I do not wait to feel ready.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "1d/1ddbb47f9a8549e0fbe3b6c5590ca5e97dc854e944030281d5b1ae6d5c6bb6e1.opus",
+        "mp3": "1d/1ddbb47f9a8549e0fbe3b6c5590ca5e97dc854e944030281d5b1ae6d5c6bb6e1.mp3"
+      }
+    },
+    "7973de5aa6e1e69325dc61fcef59c68fc7241c3bcf0490d68c829ed01227350b": {
+      "text": "I do not wait to feel ready.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "79/7973de5aa6e1e69325dc61fcef59c68fc7241c3bcf0490d68c829ed01227350b.opus",
+        "mp3": "79/7973de5aa6e1e69325dc61fcef59c68fc7241c3bcf0490d68c829ed01227350b.mp3"
+      }
+    },
+    "90bce0fc38e924202f25b2235afd5a0bba1433be9774db9f1a541779eaaff326": {
+      "text": "I do one thing today that I will be glad of tomorrow.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "90/90bce0fc38e924202f25b2235afd5a0bba1433be9774db9f1a541779eaaff326.opus",
+        "mp3": "90/90bce0fc38e924202f25b2235afd5a0bba1433be9774db9f1a541779eaaff326.mp3"
+      }
+    },
+    "78be495ba19def811c804f899f70cec6aaccc7556459c0a735091e165b8d782e": {
+      "text": "I do one thing today that I will be glad of tomorrow.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "78/78be495ba19def811c804f899f70cec6aaccc7556459c0a735091e165b8d782e.opus",
+        "mp3": "78/78be495ba19def811c804f899f70cec6aaccc7556459c0a735091e165b8d782e.mp3"
+      }
+    },
+    "c7dca7cb3aa1214b26855916bef8a15803a8669e91214fb7feed623cbf673fe7": {
+      "text": "Momentum starts with the next five minutes.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c7/c7dca7cb3aa1214b26855916bef8a15803a8669e91214fb7feed623cbf673fe7.opus",
+        "mp3": "c7/c7dca7cb3aa1214b26855916bef8a15803a8669e91214fb7feed623cbf673fe7.mp3"
+      }
+    },
+    "70383152277da7f6a4dc0cb12ee4b3c5f96baac45947fa3f5c6935dddfe19c49": {
+      "text": "Momentum starts with the next five minutes.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "70/70383152277da7f6a4dc0cb12ee4b3c5f96baac45947fa3f5c6935dddfe19c49.opus",
+        "mp3": "70/70383152277da7f6a4dc0cb12ee4b3c5f96baac45947fa3f5c6935dddfe19c49.mp3"
+      }
+    },
+    "5e9d0ddfb08479d6dd1834b1ef91516c3ffd805d7c6ed9268b406b8354babcb5": {
+      "text": "I would rather start badly than not start.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "5e/5e9d0ddfb08479d6dd1834b1ef91516c3ffd805d7c6ed9268b406b8354babcb5.opus",
+        "mp3": "5e/5e9d0ddfb08479d6dd1834b1ef91516c3ffd805d7c6ed9268b406b8354babcb5.mp3"
+      }
+    },
+    "d2c21f33f6bf43fde522e8c8055a0ab9d81372746b190ee32821f191ce77087f": {
+      "text": "I would rather start badly than not start.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "d2/d2c21f33f6bf43fde522e8c8055a0ab9d81372746b190ee32821f191ce77087f.opus",
+        "mp3": "d2/d2c21f33f6bf43fde522e8c8055a0ab9d81372746b190ee32821f191ce77087f.mp3"
+      }
+    },
+    "224794928458eb46fd06d56de556bb404c3a5f28d79c3948149d78d4a4105cc0": {
+      "text": "I keep the promises I make to myself.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "22/224794928458eb46fd06d56de556bb404c3a5f28d79c3948149d78d4a4105cc0.opus",
+        "mp3": "22/224794928458eb46fd06d56de556bb404c3a5f28d79c3948149d78d4a4105cc0.mp3"
+      }
+    },
+    "cf60021f499e23022dcdb534acd89fe889b517e818628f270fc54b49e6f5f73e": {
+      "text": "I keep the promises I make to myself.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "cf/cf60021f499e23022dcdb534acd89fe889b517e818628f270fc54b49e6f5f73e.opus",
+        "mp3": "cf/cf60021f499e23022dcdb534acd89fe889b517e818628f270fc54b49e6f5f73e.mp3"
+      }
+    },
+    "f86ad8cfebf813911ff996f6b61b6c3475f54e788f8b94585217380a8f39bcd9": {
+      "text": "I do good work at a pace I can keep.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f8/f86ad8cfebf813911ff996f6b61b6c3475f54e788f8b94585217380a8f39bcd9.opus",
+        "mp3": "f8/f86ad8cfebf813911ff996f6b61b6c3475f54e788f8b94585217380a8f39bcd9.mp3"
+      }
+    },
+    "62876a968f0efb51112c66b7af5184392d7af1e1933a1cd9862866f1f471cd4c": {
+      "text": "I do good work at a pace I can keep.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "62/62876a968f0efb51112c66b7af5184392d7af1e1933a1cd9862866f1f471cd4c.opus",
+        "mp3": "62/62876a968f0efb51112c66b7af5184392d7af1e1933a1cd9862866f1f471cd4c.mp3"
+      }
+    },
+    "3e5a7c2c423b4b4d593c6ae9053d1a4042b3b947144641898c514fde57eab954": {
+      "text": "I show up on the days I do not feel like it.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "3e/3e5a7c2c423b4b4d593c6ae9053d1a4042b3b947144641898c514fde57eab954.opus",
+        "mp3": "3e/3e5a7c2c423b4b4d593c6ae9053d1a4042b3b947144641898c514fde57eab954.mp3"
+      }
+    },
+    "aecb646269d86dad971e71028047ed2dac2619e9201b5ccbaf4cc6b259790c77": {
+      "text": "I show up on the days I do not feel like it.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ae/aecb646269d86dad971e71028047ed2dac2619e9201b5ccbaf4cc6b259790c77.opus",
+        "mp3": "ae/aecb646269d86dad971e71028047ed2dac2619e9201b5ccbaf4cc6b259790c77.mp3"
+      }
+    },
+    "6c98fceca876682a550f0c233826e331b1dcf6df148441a9d7b150714e1766a3": {
+      "text": "My attention comes back to one thing at a time.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "6c/6c98fceca876682a550f0c233826e331b1dcf6df148441a9d7b150714e1766a3.opus",
+        "mp3": "6c/6c98fceca876682a550f0c233826e331b1dcf6df148441a9d7b150714e1766a3.mp3"
+      }
+    },
+    "c4dc09eb39129886bc306435446b19086e1265f22b4dac76fac34beec42014af": {
+      "text": "My attention comes back to one thing at a time.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c4/c4dc09eb39129886bc306435446b19086e1265f22b4dac76fac34beec42014af.opus",
+        "mp3": "c4/c4dc09eb39129886bc306435446b19086e1265f22b4dac76fac34beec42014af.mp3"
+      }
+    },
+    "00c5838f6db591276703feae65b2ef56274c23dd94bfbe04bca359597f18f46b": {
+      "text": "I finish what I start, one session at a time.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "00/00c5838f6db591276703feae65b2ef56274c23dd94bfbe04bca359597f18f46b.opus",
+        "mp3": "00/00c5838f6db591276703feae65b2ef56274c23dd94bfbe04bca359597f18f46b.mp3"
+      }
+    },
+    "41c5a5412645e11832be156e41e4a9f2cee53cc5589929e66e566a0d2b7be44e": {
+      "text": "I finish what I start, one session at a time.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "41/41c5a5412645e11832be156e41e4a9f2cee53cc5589929e66e566a0d2b7be44e.opus",
+        "mp3": "41/41c5a5412645e11832be156e41e4a9f2cee53cc5589929e66e566a0d2b7be44e.mp3"
+      }
+    },
+    "2c724f71e8fe9b2afc6d1135dccb403b12b7ab53ac940839445e6e446c7f1bc6": {
+      "text": "Consistency is something I build, not something I have.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "2c/2c724f71e8fe9b2afc6d1135dccb403b12b7ab53ac940839445e6e446c7f1bc6.opus",
+        "mp3": "2c/2c724f71e8fe9b2afc6d1135dccb403b12b7ab53ac940839445e6e446c7f1bc6.mp3"
+      }
+    },
+    "3cc36d8a698e3613c5a438d888c8a377a70cf6b732fd65775833aa30a19bf792": {
+      "text": "Consistency is something I build, not something I have.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "3c/3cc36d8a698e3613c5a438d888c8a377a70cf6b732fd65775833aa30a19bf792.opus",
+        "mp3": "3c/3cc36d8a698e3613c5a438d888c8a377a70cf6b732fd65775833aa30a19bf792.mp3"
+      }
+    },
+    "3bc3da4203a73bf8800848c258eccbf2d7abea47b59502e7ecd05a71201b9d56": {
+      "text": "I am enough, exactly as I am today.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "3b/3bc3da4203a73bf8800848c258eccbf2d7abea47b59502e7ecd05a71201b9d56.opus",
+        "mp3": "3b/3bc3da4203a73bf8800848c258eccbf2d7abea47b59502e7ecd05a71201b9d56.mp3"
+      }
+    },
+    "2216d1e9c279073b1157bba8763c302c87c3a108aff13dbf335a73c806f01356": {
+      "text": "I am enough, exactly as I am today.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "22/2216d1e9c279073b1157bba8763c302c87c3a108aff13dbf335a73c806f01356.opus",
+        "mp3": "22/2216d1e9c279073b1157bba8763c302c87c3a108aff13dbf335a73c806f01356.mp3"
+      }
+    },
+    "f6324e88cf94e952ee6f0ee72e4e62c211112486ee0148e3f8ec87084cf999bb": {
+      "text": "My worth was never something I had to earn.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f6/f6324e88cf94e952ee6f0ee72e4e62c211112486ee0148e3f8ec87084cf999bb.opus",
+        "mp3": "f6/f6324e88cf94e952ee6f0ee72e4e62c211112486ee0148e3f8ec87084cf999bb.mp3"
+      }
+    },
+    "6e7fe1aa9f2d538f7ac15ce6a37c1494999d3fe69702d0e41396d955870c18fe": {
+      "text": "My worth was never something I had to earn.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "6e/6e7fe1aa9f2d538f7ac15ce6a37c1494999d3fe69702d0e41396d955870c18fe.opus",
+        "mp3": "6e/6e7fe1aa9f2d538f7ac15ce6a37c1494999d3fe69702d0e41396d955870c18fe.mp3"
+      }
+    },
+    "032847212d1b6049d3456378861426bbb0ca6c94973ca79debbbbdff131d5c77": {
+      "text": "I am allowed to take up space.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "03/032847212d1b6049d3456378861426bbb0ca6c94973ca79debbbbdff131d5c77.opus",
+        "mp3": "03/032847212d1b6049d3456378861426bbb0ca6c94973ca79debbbbdff131d5c77.mp3"
+      }
+    },
+    "7039790b7e90977fb6819749cf41c814a86e3a75e227d74cbc449eca3d652092": {
+      "text": "I am allowed to take up space.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "70/7039790b7e90977fb6819749cf41c814a86e3a75e227d74cbc449eca3d652092.opus",
+        "mp3": "70/7039790b7e90977fb6819749cf41c814a86e3a75e227d74cbc449eca3d652092.mp3"
+      }
+    },
+    "731eff551bdcec9c1a82aba1d58d58e0a1c9af06e773a98ad862211a32488189": {
+      "text": "I like the person I am becoming.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "73/731eff551bdcec9c1a82aba1d58d58e0a1c9af06e773a98ad862211a32488189.opus",
+        "mp3": "73/731eff551bdcec9c1a82aba1d58d58e0a1c9af06e773a98ad862211a32488189.mp3"
+      }
+    },
+    "d39238a9e8e1cfafe629d2fb8d98aa90d46f990be24568090f8ecfed8cdec2c5": {
+      "text": "I like the person I am becoming.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "d3/d39238a9e8e1cfafe629d2fb8d98aa90d46f990be24568090f8ecfed8cdec2c5.opus",
+        "mp3": "d3/d39238a9e8e1cfafe629d2fb8d98aa90d46f990be24568090f8ecfed8cdec2c5.mp3"
+      }
+    },
+    "648d1881694c4af00dde6649a03caed3780ae5a0e65e65556383cdebee89536c": {
+      "text": "I deserve the same kindness I give everyone else.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "64/648d1881694c4af00dde6649a03caed3780ae5a0e65e65556383cdebee89536c.opus",
+        "mp3": "64/648d1881694c4af00dde6649a03caed3780ae5a0e65e65556383cdebee89536c.mp3"
+      }
+    },
+    "16f395c034fd4bb9ba1da03ae3f5c808a6d3013997c3e4f9cd42a66ea58c3c69": {
+      "text": "I deserve the same kindness I give everyone else.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "16/16f395c034fd4bb9ba1da03ae3f5c808a6d3013997c3e4f9cd42a66ea58c3c69.opus",
+        "mp3": "16/16f395c034fd4bb9ba1da03ae3f5c808a6d3013997c3e4f9cd42a66ea58c3c69.mp3"
+      }
+    },
+    "50ac2a2b1ce46f9dd515b1e9ff04c834d8584baa3287668b964d60002ae53408": {
+      "text": "I do not have to be impressive to be worth loving.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "50/50ac2a2b1ce46f9dd515b1e9ff04c834d8584baa3287668b964d60002ae53408.opus",
+        "mp3": "50/50ac2a2b1ce46f9dd515b1e9ff04c834d8584baa3287668b964d60002ae53408.mp3"
+      }
+    },
+    "21fe66751417556b5d95c3cd8213f3bd776d5803d824b3125b29b675080d01bb": {
+      "text": "I do not have to be impressive to be worth loving.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "21/21fe66751417556b5d95c3cd8213f3bd776d5803d824b3125b29b675080d01bb.opus",
+        "mp3": "21/21fe66751417556b5d95c3cd8213f3bd776d5803d824b3125b29b675080d01bb.mp3"
+      }
+    },
+    "369601452a2d15f2ac0933a6e89134361fb585062c09172bd40b01f6ee7f6133": {
+      "text": "The day is finished, and I am allowed to put it down.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "36/369601452a2d15f2ac0933a6e89134361fb585062c09172bd40b01f6ee7f6133.opus",
+        "mp3": "36/369601452a2d15f2ac0933a6e89134361fb585062c09172bd40b01f6ee7f6133.mp3"
+      }
+    },
+    "221636817338426f566856cedb1c4c104f8a567c91ea0c15af24f7bc46134cf0": {
+      "text": "The day is finished, and I am allowed to put it down.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "22/221636817338426f566856cedb1c4c104f8a567c91ea0c15af24f7bc46134cf0.opus",
+        "mp3": "22/221636817338426f566856cedb1c4c104f8a567c91ea0c15af24f7bc46134cf0.mp3"
+      }
+    },
+    "52b53803d212459ca479a973fb034fa2b2161480e3d57fec1e8d8b96a537e141": {
+      "text": "My body knows how to sleep, and I let it.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "52/52b53803d212459ca479a973fb034fa2b2161480e3d57fec1e8d8b96a537e141.opus",
+        "mp3": "52/52b53803d212459ca479a973fb034fa2b2161480e3d57fec1e8d8b96a537e141.mp3"
+      }
+    },
+    "df9a5206692ddb731430a6c5481f43eaf689b54d1973fe9690a9d50bb193ab46": {
+      "text": "My body knows how to sleep, and I let it.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "df/df9a5206692ddb731430a6c5481f43eaf689b54d1973fe9690a9d50bb193ab46.opus",
+        "mp3": "df/df9a5206692ddb731430a6c5481f43eaf689b54d1973fe9690a9d50bb193ab46.mp3"
+      }
+    },
+    "360c7bf9e46e092da26cffd2b7edaf7308701744244cf7d368bc525137eab22f": {
+      "text": "I release today, breath by breath.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "36/360c7bf9e46e092da26cffd2b7edaf7308701744244cf7d368bc525137eab22f.opus",
+        "mp3": "36/360c7bf9e46e092da26cffd2b7edaf7308701744244cf7d368bc525137eab22f.mp3"
+      }
+    },
+    "ffa8124ebca020f1ea6beb1e0bd7bee9bff1aa67f5db327303272abd61651c58": {
+      "text": "I release today, breath by breath.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ff/ffa8124ebca020f1ea6beb1e0bd7bee9bff1aa67f5db327303272abd61651c58.opus",
+        "mp3": "ff/ffa8124ebca020f1ea6beb1e0bd7bee9bff1aa67f5db327303272abd61651c58.mp3"
+      }
+    },
+    "c9c3ebfcc1b9971a76007a58839b71c3544ae76df2cd3ce0a67fa8d87c9adbdb": {
+      "text": "Everything left over will still be there tomorrow.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c9/c9c3ebfcc1b9971a76007a58839b71c3544ae76df2cd3ce0a67fa8d87c9adbdb.opus",
+        "mp3": "c9/c9c3ebfcc1b9971a76007a58839b71c3544ae76df2cd3ce0a67fa8d87c9adbdb.mp3"
+      }
+    },
+    "d3b450e26b0a7d966c3871d8fcc33a124e8f717d60f2156ebd26d37747436b09": {
+      "text": "Everything left over will still be there tomorrow.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "d3/d3b450e26b0a7d966c3871d8fcc33a124e8f717d60f2156ebd26d37747436b09.opus",
+        "mp3": "d3/d3b450e26b0a7d966c3871d8fcc33a124e8f717d60f2156ebd26d37747436b09.mp3"
+      }
+    },
+    "7dd3860bf7595b30130c490f6b6511eeda39724900b8efa7bd78d47305f72bdd": {
+      "text": "I am warm, I am safe, and I am sinking into rest.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "7d/7dd3860bf7595b30130c490f6b6511eeda39724900b8efa7bd78d47305f72bdd.opus",
+        "mp3": "7d/7dd3860bf7595b30130c490f6b6511eeda39724900b8efa7bd78d47305f72bdd.mp3"
+      }
+    },
+    "0c418f02c3fc22bd64ae3312d40938a2bfd06226bb8e4a8d81b09351feb477ec": {
+      "text": "I am warm, I am safe, and I am sinking into rest.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "0c/0c418f02c3fc22bd64ae3312d40938a2bfd06226bb8e4a8d81b09351feb477ec.opus",
+        "mp3": "0c/0c418f02c3fc22bd64ae3312d40938a2bfd06226bb8e4a8d81b09351feb477ec.mp3"
+      }
+    },
+    "542484ca7ab814e79cd21e080d16effecf63bed142cc184faf24789a401a8732": {
+      "text": "I let my thoughts drift past without following them.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "54/542484ca7ab814e79cd21e080d16effecf63bed142cc184faf24789a401a8732.opus",
+        "mp3": "54/542484ca7ab814e79cd21e080d16effecf63bed142cc184faf24789a401a8732.mp3"
+      }
+    },
+    "bec45e1f979c628ff5a7d489d2c4efe3be7f5c828dfa48493593b7374925f855": {
+      "text": "I let my thoughts drift past without following them.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "be/bec45e1f979c628ff5a7d489d2c4efe3be7f5c828dfa48493593b7374925f855.opus",
+        "mp3": "be/bec45e1f979c628ff5a7d489d2c4efe3be7f5c828dfa48493593b7374925f855.mp3"
+      }
+    },
+    "b79a0ab82761add95e7c388835f7e8ccb9b08157f8305884e2cb49948cf6ad4d": {
+      "text": "I treat my body like someone I love.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "b7/b79a0ab82761add95e7c388835f7e8ccb9b08157f8305884e2cb49948cf6ad4d.opus",
+        "mp3": "b7/b79a0ab82761add95e7c388835f7e8ccb9b08157f8305884e2cb49948cf6ad4d.mp3"
+      }
+    },
+    "0c79f83464cef91222fe0ef582fb77a9c87955e4f83bdf22e61d99d2d398e763": {
+      "text": "I treat my body like someone I love.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "0c/0c79f83464cef91222fe0ef582fb77a9c87955e4f83bdf22e61d99d2d398e763.opus",
+        "mp3": "0c/0c79f83464cef91222fe0ef582fb77a9c87955e4f83bdf22e61d99d2d398e763.mp3"
+      }
+    },
+    "604d55c495258b49cd626c7e2c3ebf8b038863258193148f9ad408ead1e51b18": {
+      "text": "I give my body rest, water and kindness.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "60/604d55c495258b49cd626c7e2c3ebf8b038863258193148f9ad408ead1e51b18.opus",
+        "mp3": "60/604d55c495258b49cd626c7e2c3ebf8b038863258193148f9ad408ead1e51b18.mp3"
+      }
+    },
+    "f70a42f91b6268aabec444442099878de87001638993bb9ddabe5f1c02a6e39b": {
+      "text": "I give my body rest, water and kindness.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f7/f70a42f91b6268aabec444442099878de87001638993bb9ddabe5f1c02a6e39b.opus",
+        "mp3": "f7/f70a42f91b6268aabec444442099878de87001638993bb9ddabe5f1c02a6e39b.mp3"
+      }
+    },
+    "f9ad3fe0503196cc6087d51f74f9c915e7574fd017e361b952f05fb7f08b1827": {
+      "text": "I listen to what my body is telling me.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f9/f9ad3fe0503196cc6087d51f74f9c915e7574fd017e361b952f05fb7f08b1827.opus",
+        "mp3": "f9/f9ad3fe0503196cc6087d51f74f9c915e7574fd017e361b952f05fb7f08b1827.mp3"
+      }
+    },
+    "cf341f427965e68a84eb438f519b1b6a5bcd917ae5497c80af56126dfee4572d": {
+      "text": "I listen to what my body is telling me.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "cf/cf341f427965e68a84eb438f519b1b6a5bcd917ae5497c80af56126dfee4572d.opus",
+        "mp3": "cf/cf341f427965e68a84eb438f519b1b6a5bcd917ae5497c80af56126dfee4572d.mp3"
+      }
+    },
+    "e43fb041f02972e5c45817750659983254ad75ef70486c9f3bf992c90e72b746": {
+      "text": "I am at home in my body.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "e4/e43fb041f02972e5c45817750659983254ad75ef70486c9f3bf992c90e72b746.opus",
+        "mp3": "e4/e43fb041f02972e5c45817750659983254ad75ef70486c9f3bf992c90e72b746.mp3"
+      }
+    },
+    "66039275b6872de1ea5407d9aafe6ca3346f4726032eb5a6cdee82d0e8347658": {
+      "text": "I am at home in my body.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "66/66039275b6872de1ea5407d9aafe6ca3346f4726032eb5a6cdee82d0e8347658.opus",
+        "mp3": "66/66039275b6872de1ea5407d9aafe6ca3346f4726032eb5a6cdee82d0e8347658.mp3"
+      }
+    },
+    "a6b00771bf17a21da19c20751e95c89c7abda49d58507bf32fe26bec3da123af": {
+      "text": "I look after myself before I am running on empty.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "a6/a6b00771bf17a21da19c20751e95c89c7abda49d58507bf32fe26bec3da123af.opus",
+        "mp3": "a6/a6b00771bf17a21da19c20751e95c89c7abda49d58507bf32fe26bec3da123af.mp3"
+      }
+    },
+    "2f9267949a6c52611fd6fd726319df503d71f134ca2ce4cb23c1ede33147b816": {
+      "text": "I look after myself before I am running on empty.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "2f/2f9267949a6c52611fd6fd726319df503d71f134ca2ce4cb23c1ede33147b816.opus",
+        "mp3": "2f/2f9267949a6c52611fd6fd726319df503d71f134ca2ce4cb23c1ede33147b816.mp3"
+      }
+    },
+    "a6621981183d98c43dd0ada32d8f6b56b109c8f46b43d28f5cee831069f421f2": {
+      "text": "Taking care of myself is not something I put off.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "a6/a6621981183d98c43dd0ada32d8f6b56b109c8f46b43d28f5cee831069f421f2.opus",
+        "mp3": "a6/a6621981183d98c43dd0ada32d8f6b56b109c8f46b43d28f5cee831069f421f2.mp3"
+      }
+    },
+    "b3ee7e905399c46e5cd2bbc393757490328f71a1d76d56214582a1670112b10f": {
+      "text": "Taking care of myself is not something I put off.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "b3/b3ee7e905399c46e5cd2bbc393757490328f71a1d76d56214582a1670112b10f.opus",
+        "mp3": "b3/b3ee7e905399c46e5cd2bbc393757490328f71a1d76d56214582a1670112b10f.mp3"
+      }
+    },
+    "ad07db4fe822d17efcffe8f110be07c406443ecd700a07aab866df10a342789d": {
+      "text": "I am allowed to be a beginner at this.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ad/ad07db4fe822d17efcffe8f110be07c406443ecd700a07aab866df10a342789d.opus",
+        "mp3": "ad/ad07db4fe822d17efcffe8f110be07c406443ecd700a07aab866df10a342789d.mp3"
+      }
+    },
+    "c1e05be00ea3222c1a49e5a8bdf7d5dd7ae6c969057b6773c522cd8344093018": {
+      "text": "I am allowed to be a beginner at this.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c1/c1e05be00ea3222c1a49e5a8bdf7d5dd7ae6c969057b6773c522cd8344093018.opus",
+        "mp3": "c1/c1e05be00ea3222c1a49e5a8bdf7d5dd7ae6c969057b6773c522cd8344093018.mp3"
+      }
+    },
+    "0673ceb42ea85d532119939c7143ba3ddb26885c627852c72017edbea39ccd4d": {
+      "text": "I learn this one piece at a time.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "06/0673ceb42ea85d532119939c7143ba3ddb26885c627852c72017edbea39ccd4d.opus",
+        "mp3": "06/0673ceb42ea85d532119939c7143ba3ddb26885c627852c72017edbea39ccd4d.mp3"
+      }
+    },
+    "c38953ef868c826bcaa3eb0ddeca1ca78f2bcb469c053d58ab8bc83ea61bd873": {
+      "text": "I learn this one piece at a time.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c3/c38953ef868c826bcaa3eb0ddeca1ca78f2bcb469c053d58ab8bc83ea61bd873.opus",
+        "mp3": "c3/c38953ef868c826bcaa3eb0ddeca1ca78f2bcb469c053d58ab8bc83ea61bd873.mp3"
+      }
+    },
+    "36c8d17d673fedea589d0cde18fb48116993ccf77395b92897256cbdf972ae01": {
+      "text": "I can concentrate for the next twenty minutes.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "36/36c8d17d673fedea589d0cde18fb48116993ccf77395b92897256cbdf972ae01.opus",
+        "mp3": "36/36c8d17d673fedea589d0cde18fb48116993ccf77395b92897256cbdf972ae01.mp3"
+      }
+    },
+    "9890c4b6cdfe6ce572f6ac4e4a5d722dd11bb8292290af07c59fc88a398ea78e": {
+      "text": "I can concentrate for the next twenty minutes.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "98/9890c4b6cdfe6ce572f6ac4e4a5d722dd11bb8292290af07c59fc88a398ea78e.opus",
+        "mp3": "98/9890c4b6cdfe6ce572f6ac4e4a5d722dd11bb8292290af07c59fc88a398ea78e.mp3"
+      }
+    },
+    "549b3b2346b37ea23d37cf0d42d23e466bce176b478ce4929dd726a8a5f249a1": {
+      "text": "Understanding comes from practice, and I am practising.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "54/549b3b2346b37ea23d37cf0d42d23e466bce176b478ce4929dd726a8a5f249a1.opus",
+        "mp3": "54/549b3b2346b37ea23d37cf0d42d23e466bce176b478ce4929dd726a8a5f249a1.mp3"
+      }
+    },
+    "ed920163852f10564a58bbcc984e936827541b04224330f9ddeb48e97af93585": {
+      "text": "Understanding comes from practice, and I am practising.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ed/ed920163852f10564a58bbcc984e936827541b04224330f9ddeb48e97af93585.opus",
+        "mp3": "ed/ed920163852f10564a58bbcc984e936827541b04224330f9ddeb48e97af93585.mp3"
+      }
+    },
+    "fcbd714d9dcadddcf559fcf12a97f432c7c430f37173ebfd13ed794ec538b0ea": {
+      "text": "I am prepared, and I trust what I know.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "fc/fcbd714d9dcadddcf559fcf12a97f432c7c430f37173ebfd13ed794ec538b0ea.opus",
+        "mp3": "fc/fcbd714d9dcadddcf559fcf12a97f432c7c430f37173ebfd13ed794ec538b0ea.mp3"
+      }
+    },
+    "388771aedcf1f0e83efaad0f2749743a61cee48057b3827824e1ce2be390865e": {
+      "text": "I am prepared, and I trust what I know.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "38/388771aedcf1f0e83efaad0f2749743a61cee48057b3827824e1ce2be390865e.opus",
+        "mp3": "38/388771aedcf1f0e83efaad0f2749743a61cee48057b3827824e1ce2be390865e.mp3"
+      }
+    },
+    "9da23fe069c4675808dc0ba69a8c8244b1050e68da2c91ce3700a9b5fa3adf5f": {
+      "text": "A hard subject is not a verdict on me.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "9d/9da23fe069c4675808dc0ba69a8c8244b1050e68da2c91ce3700a9b5fa3adf5f.opus",
+        "mp3": "9d/9da23fe069c4675808dc0ba69a8c8244b1050e68da2c91ce3700a9b5fa3adf5f.mp3"
+      }
+    },
+    "c9402e44131dab39577433e0b053170b7c0c8928c11d3c796e1ee39092055a7f": {
+      "text": "A hard subject is not a verdict on me.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c9/c9402e44131dab39577433e0b053170b7c0c8928c11d3c796e1ee39092055a7f.opus",
+        "mp3": "c9/c9402e44131dab39577433e0b053170b7c0c8928c11d3c796e1ee39092055a7f.mp3"
+      }
+    },
+    "98156dae7d4434a472c1becb5995b847398221e02fcd6666c9de7aae568c1ef0": {
+      "text": "I am building something steady, one ordinary day at a time.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "98/98156dae7d4434a472c1becb5995b847398221e02fcd6666c9de7aae568c1ef0.opus",
+        "mp3": "98/98156dae7d4434a472c1becb5995b847398221e02fcd6666c9de7aae568c1ef0.mp3"
+      }
+    },
+    "e88a53f6b1f2f0e5654be7151ba456a9efeb9df5eef354aa31fa8ae33571868e": {
+      "text": "I am building something steady, one ordinary day at a time.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "e8/e88a53f6b1f2f0e5654be7151ba456a9efeb9df5eef354aa31fa8ae33571868e.opus",
+        "mp3": "e8/e88a53f6b1f2f0e5654be7151ba456a9efeb9df5eef354aa31fa8ae33571868e.mp3"
+      }
+    },
+    "e26c9691f60188e4a07da719aaf7d5f1f2fbd6660b4853a6b7e31838ada8e454": {
+      "text": "I finish what matters and let the rest go.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "e2/e26c9691f60188e4a07da719aaf7d5f1f2fbd6660b4853a6b7e31838ada8e454.opus",
+        "mp3": "e2/e26c9691f60188e4a07da719aaf7d5f1f2fbd6660b4853a6b7e31838ada8e454.mp3"
+      }
+    },
+    "367b77f3014507e795b24ad67c9f6c6da4801c4015c8337273f3e9972958e3d5": {
+      "text": "I finish what matters and let the rest go.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "36/367b77f3014507e795b24ad67c9f6c6da4801c4015c8337273f3e9972958e3d5.opus",
+        "mp3": "36/367b77f3014507e795b24ad67c9f6c6da4801c4015c8337273f3e9972958e3d5.mp3"
+      }
+    },
+    "22854ed30e7c04d2584a3c6ba210d1e0f3475f545700734fff5af5cfd73f2dbd": {
+      "text": "My work is good enough to send.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "22/22854ed30e7c04d2584a3c6ba210d1e0f3475f545700734fff5af5cfd73f2dbd.opus",
+        "mp3": "22/22854ed30e7c04d2584a3c6ba210d1e0f3475f545700734fff5af5cfd73f2dbd.mp3"
+      }
+    },
+    "f942c9fc6747e32633421d89ca04b5900353d1ec590766a0018f5958413c8a9e": {
+      "text": "My work is good enough to send.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f9/f942c9fc6747e32633421d89ca04b5900353d1ec590766a0018f5958413c8a9e.opus",
+        "mp3": "f9/f942c9fc6747e32633421d89ca04b5900353d1ec590766a0018f5958413c8a9e.mp3"
+      }
+    },
+    "8ec27989aa9e5281c4473a5de878e14546f75817114cc7721a0a2f1d12f37e14": {
+      "text": "I say what I think in the room I am in.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "8e/8ec27989aa9e5281c4473a5de878e14546f75817114cc7721a0a2f1d12f37e14.opus",
+        "mp3": "8e/8ec27989aa9e5281c4473a5de878e14546f75817114cc7721a0a2f1d12f37e14.mp3"
+      }
+    },
+    "43ab2d41a5365586b69618c88763ab65577b546b072fab61dc53488022721710": {
+      "text": "I say what I think in the room I am in.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "43/43ab2d41a5365586b69618c88763ab65577b546b072fab61dc53488022721710.opus",
+        "mp3": "43/43ab2d41a5365586b69618c88763ab65577b546b072fab61dc53488022721710.mp3"
+      }
+    },
+    "320cfefb1e1cd32c8acf2a67df55a160df1658abbb8ed52e6999695d29f764ef": {
+      "text": "I am becoming the person this work needs me to be.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "32/320cfefb1e1cd32c8acf2a67df55a160df1658abbb8ed52e6999695d29f764ef.opus",
+        "mp3": "32/320cfefb1e1cd32c8acf2a67df55a160df1658abbb8ed52e6999695d29f764ef.mp3"
+      }
+    },
+    "d687e3669326e356c5ccc3c3af631a219d46187319066f5cd4e92b8deed8a500": {
+      "text": "I am becoming the person this work needs me to be.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "d6/d687e3669326e356c5ccc3c3af631a219d46187319066f5cd4e92b8deed8a500.opus",
+        "mp3": "d6/d687e3669326e356c5ccc3c3af631a219d46187319066f5cd4e92b8deed8a500.mp3"
+      }
+    },
+    "fc0618e5d74031d16aaeb64238295cc1eb5946c421bc65243576c11663a185e3": {
+      "text": "I can ask for what my work is worth.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "fc/fc0618e5d74031d16aaeb64238295cc1eb5946c421bc65243576c11663a185e3.opus",
+        "mp3": "fc/fc0618e5d74031d16aaeb64238295cc1eb5946c421bc65243576c11663a185e3.mp3"
+      }
+    },
+    "dc7631c6e7f945948edff4db925f4a020ba3f01c67ba4f25edac753f4951879c": {
+      "text": "I can ask for what my work is worth.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "dc/dc7631c6e7f945948edff4db925f4a020ba3f01c67ba4f25edac753f4951879c.opus",
+        "mp3": "dc/dc7631c6e7f945948edff4db925f4a020ba3f01c67ba4f25edac753f4951879c.mp3"
+      }
+    },
+    "c47444c5a77e56932a83aef788c729751babac3e87685e6b4de2cc399bfed9bd": {
+      "text": "I am easy to love, and I let myself be loved.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c4/c47444c5a77e56932a83aef788c729751babac3e87685e6b4de2cc399bfed9bd.opus",
+        "mp3": "c4/c47444c5a77e56932a83aef788c729751babac3e87685e6b4de2cc399bfed9bd.mp3"
+      }
+    },
+    "8c837a1cdda709a1712c4fc6c87abe84f665a63e1444bd1e379e743652e8b889": {
+      "text": "I am easy to love, and I let myself be loved.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "8c/8c837a1cdda709a1712c4fc6c87abe84f665a63e1444bd1e379e743652e8b889.opus",
+        "mp3": "8c/8c837a1cdda709a1712c4fc6c87abe84f665a63e1444bd1e379e743652e8b889.mp3"
+      }
+    },
+    "9651d68833585f4d8add0e58bb5abc0cdd30e40d24334ffe14604a7428edfac6": {
+      "text": "I let people see the real version of me.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "96/9651d68833585f4d8add0e58bb5abc0cdd30e40d24334ffe14604a7428edfac6.opus",
+        "mp3": "96/9651d68833585f4d8add0e58bb5abc0cdd30e40d24334ffe14604a7428edfac6.mp3"
+      }
+    },
+    "8feb8c15701cb07a6e2aba3da596827a46a2b112e55c137f3ec62b46a3fe04d2": {
+      "text": "I let people see the real version of me.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "8f/8feb8c15701cb07a6e2aba3da596827a46a2b112e55c137f3ec62b46a3fe04d2.opus",
+        "mp3": "8f/8feb8c15701cb07a6e2aba3da596827a46a2b112e55c137f3ec62b46a3fe04d2.mp3"
+      }
+    },
+    "ba590948f7d56ab48dbff7ab53455c86dcdb8f276fddc3103a6c94b885a89b09": {
+      "text": "I choose people who are gentle with me.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ba/ba590948f7d56ab48dbff7ab53455c86dcdb8f276fddc3103a6c94b885a89b09.opus",
+        "mp3": "ba/ba590948f7d56ab48dbff7ab53455c86dcdb8f276fddc3103a6c94b885a89b09.mp3"
+      }
+    },
+    "f00fac229befde8dab7920ac3b817550ad0d958a3f808c7585f45c5f3735eafc": {
+      "text": "I choose people who are gentle with me.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f0/f00fac229befde8dab7920ac3b817550ad0d958a3f808c7585f45c5f3735eafc.opus",
+        "mp3": "f0/f00fac229befde8dab7920ac3b817550ad0d958a3f808c7585f45c5f3735eafc.mp3"
+      }
+    },
+    "40f45b5673f0b62d976ade71fcf62982eeaca7eb94c5043d75b3ab2b36a59b75": {
+      "text": "I say what I need, clearly and without apology.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "40/40f45b5673f0b62d976ade71fcf62982eeaca7eb94c5043d75b3ab2b36a59b75.opus",
+        "mp3": "40/40f45b5673f0b62d976ade71fcf62982eeaca7eb94c5043d75b3ab2b36a59b75.mp3"
+      }
+    },
+    "a9a56b51859cc4e10a98e3cf10ae16fe1e80e570c11966060c5a39f1c526e0f4": {
+      "text": "I say what I need, clearly and without apology.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "a9/a9a56b51859cc4e10a98e3cf10ae16fe1e80e570c11966060c5a39f1c526e0f4.opus",
+        "mp3": "a9/a9a56b51859cc4e10a98e3cf10ae16fe1e80e570c11966060c5a39f1c526e0f4.mp3"
+      }
+    },
+    "8de4396b84949a6e9880f0ce179d8cace2ba71671a3ca82bf6d29c0e359b8643": {
+      "text": "I give the kind of love I would like to receive.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "8d/8de4396b84949a6e9880f0ce179d8cace2ba71671a3ca82bf6d29c0e359b8643.opus",
+        "mp3": "8d/8de4396b84949a6e9880f0ce179d8cace2ba71671a3ca82bf6d29c0e359b8643.mp3"
+      }
+    },
+    "3c74bb1f33b12614387a4c8f93969768e93a89dac5019bbd08ef3d00f0945122": {
+      "text": "I give the kind of love I would like to receive.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "3c/3c74bb1f33b12614387a4c8f93969768e93a89dac5019bbd08ef3d00f0945122.opus",
+        "mp3": "3c/3c74bb1f33b12614387a4c8f93969768e93a89dac5019bbd08ef3d00f0945122.mp3"
+      }
+    },
+    "9398392865ed89e69bfdd45bd58176604c7eae106b5292e0ea8299e30db0de01": {
+      "text": "I am surrounded by people who are glad I exist.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "93/9398392865ed89e69bfdd45bd58176604c7eae106b5292e0ea8299e30db0de01.opus",
+        "mp3": "93/9398392865ed89e69bfdd45bd58176604c7eae106b5292e0ea8299e30db0de01.mp3"
+      }
+    },
+    "eb1a9e3b3385ac960a68dbc132e3b35d596d04562814133316e3f3c4beb9d977": {
+      "text": "I am surrounded by people who are glad I exist.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "eb/eb1a9e3b3385ac960a68dbc132e3b35d596d04562814133316e3f3c4beb9d977.opus",
+        "mp3": "eb/eb1a9e3b3385ac960a68dbc132e3b35d596d04562814133316e3f3c4beb9d977.mp3"
+      }
+    },
+    "2bc175df59cb1081fe0c1d3aed14fd4782d933244e7f650aa686a6576adf275c": {
+      "text": "I notice the ordinary things that are going right.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "2b/2bc175df59cb1081fe0c1d3aed14fd4782d933244e7f650aa686a6576adf275c.opus",
+        "mp3": "2b/2bc175df59cb1081fe0c1d3aed14fd4782d933244e7f650aa686a6576adf275c.mp3"
+      }
+    },
+    "c2c30eb9bde72b710d5d0f4e127c338322c21a83015846d92c4130cc9f2f538c": {
+      "text": "I notice the ordinary things that are going right.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c2/c2c30eb9bde72b710d5d0f4e127c338322c21a83015846d92c4130cc9f2f538c.opus",
+        "mp3": "c2/c2c30eb9bde72b710d5d0f4e127c338322c21a83015846d92c4130cc9f2f538c.mp3"
+      }
+    },
+    "95b363836587682c27bdd9d7ff9d7a60ab13e7e354afb517df63e5e666289c4b": {
+      "text": "Small good things count, and I let them count.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "95/95b363836587682c27bdd9d7ff9d7a60ab13e7e354afb517df63e5e666289c4b.opus",
+        "mp3": "95/95b363836587682c27bdd9d7ff9d7a60ab13e7e354afb517df63e5e666289c4b.mp3"
+      }
+    },
+    "8d60476504fecce30ed0a619a4fdfbbaf4f4fafc0b0aac450f7527a98110d0a4": {
+      "text": "Small good things count, and I let them count.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "8d/8d60476504fecce30ed0a619a4fdfbbaf4f4fafc0b0aac450f7527a98110d0a4.opus",
+        "mp3": "8d/8d60476504fecce30ed0a619a4fdfbbaf4f4fafc0b0aac450f7527a98110d0a4.mp3"
+      }
+    },
+    "1e0e48248cf64c99bb2ce456ab69a09ccc70f173bd1064f5541e372856c04258": {
+      "text": "I am thankful for the people who make my life softer.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "1e/1e0e48248cf64c99bb2ce456ab69a09ccc70f173bd1064f5541e372856c04258.opus",
+        "mp3": "1e/1e0e48248cf64c99bb2ce456ab69a09ccc70f173bd1064f5541e372856c04258.mp3"
+      }
+    },
+    "c94ebc6d3f70006a7da9fe6f3d4a786f21a9f2ba67cdbe6c7363e03c7f62276f": {
+      "text": "I am thankful for the people who make my life softer.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c9/c94ebc6d3f70006a7da9fe6f3d4a786f21a9f2ba67cdbe6c7363e03c7f62276f.opus",
+        "mp3": "c9/c94ebc6d3f70006a7da9fe6f3d4a786f21a9f2ba67cdbe6c7363e03c7f62276f.mp3"
+      }
+    },
+    "be72101d7e8879bea29a57a159f0b3507541014f4fac83c695394c79794546b5": {
+      "text": "I have enough for today, and today is what I am living.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "be/be72101d7e8879bea29a57a159f0b3507541014f4fac83c695394c79794546b5.opus",
+        "mp3": "be/be72101d7e8879bea29a57a159f0b3507541014f4fac83c695394c79794546b5.mp3"
+      }
+    },
+    "9d3d7cc7075cff7489af77a584194c366ccfe172b0b106077553f79f291917b6": {
+      "text": "I have enough for today, and today is what I am living.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "9d/9d3d7cc7075cff7489af77a584194c366ccfe172b0b106077553f79f291917b6.opus",
+        "mp3": "9d/9d3d7cc7075cff7489af77a584194c366ccfe172b0b106077553f79f291917b6.mp3"
+      }
+    },
+    "d13276f902099bb1df51ee347411564eb864f9dfe7d1ff105004e2372086005e": {
+      "text": "There is something here worth being glad about.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "d1/d13276f902099bb1df51ee347411564eb864f9dfe7d1ff105004e2372086005e.opus",
+        "mp3": "d1/d13276f902099bb1df51ee347411564eb864f9dfe7d1ff105004e2372086005e.mp3"
+      }
+    },
+    "1b2d86f6d5567787358f25705451b5ff0c2fc072093b0a72ef43f7cbcf5d22c6": {
+      "text": "There is something here worth being glad about.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "1b/1b2d86f6d5567787358f25705451b5ff0c2fc072093b0a72ef43f7cbcf5d22c6.opus",
+        "mp3": "1b/1b2d86f6d5567787358f25705451b5ff0c2fc072093b0a72ef43f7cbcf5d22c6.mp3"
+      }
+    },
+    "db43c23204d97815d49a71968bebc174557010800fdaff25319f8e1eb54a6531": {
+      "text": "I thank the version of me who set this up.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "db/db43c23204d97815d49a71968bebc174557010800fdaff25319f8e1eb54a6531.opus",
+        "mp3": "db/db43c23204d97815d49a71968bebc174557010800fdaff25319f8e1eb54a6531.mp3"
+      }
+    },
+    "769b9578a0bab24a5cf97af9ca65ca2d28f84719149904dbc51b46ed77413702": {
+      "text": "I thank the version of me who set this up.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "76/769b9578a0bab24a5cf97af9ca65ca2d28f84719149904dbc51b46ed77413702.opus",
+        "mp3": "76/769b9578a0bab24a5cf97af9ca65ca2d28f84719149904dbc51b46ed77413702.mp3"
+      }
+    },
+    "6222e9bf6382c9e82220682dc524955ace311efbc3f15fd0d0d44a36f29a1067": {
+      "text": "I move today in a way that feels good.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "62/6222e9bf6382c9e82220682dc524955ace311efbc3f15fd0d0d44a36f29a1067.opus",
+        "mp3": "62/6222e9bf6382c9e82220682dc524955ace311efbc3f15fd0d0d44a36f29a1067.mp3"
+      }
+    },
+    "5c315808c8b223628b79d592b80d1b3eb300d500909cca53957cf38b502266c8": {
+      "text": "I move today in a way that feels good.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "5c/5c315808c8b223628b79d592b80d1b3eb300d500909cca53957cf38b502266c8.opus",
+        "mp3": "5c/5c315808c8b223628b79d592b80d1b3eb300d500909cca53957cf38b502266c8.mp3"
+      }
+    },
+    "75ec97d8d97930cbdcce82d8b65b5b401cd502436802ec6483fe4e602e820c30": {
+      "text": "My body carries me through every day, and I thank it.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "75/75ec97d8d97930cbdcce82d8b65b5b401cd502436802ec6483fe4e602e820c30.opus",
+        "mp3": "75/75ec97d8d97930cbdcce82d8b65b5b401cd502436802ec6483fe4e602e820c30.mp3"
+      }
+    },
+    "e3f040320cf76ddf65ce26fcab930e12988b3005cd64cccf65fd56b5f6198eb5": {
+      "text": "My body carries me through every day, and I thank it.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "e3/e3f040320cf76ddf65ce26fcab930e12988b3005cd64cccf65fd56b5f6198eb5.opus",
+        "mp3": "e3/e3f040320cf76ddf65ce26fcab930e12988b3005cd64cccf65fd56b5f6198eb5.mp3"
+      }
+    },
+    "5cf38d79961d6f529f1a62ebcbb8d74e700ebe17b3d8193fbab7498618550e77": {
+      "text": "I am stronger than I was a month ago.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "5c/5cf38d79961d6f529f1a62ebcbb8d74e700ebe17b3d8193fbab7498618550e77.opus",
+        "mp3": "5c/5cf38d79961d6f529f1a62ebcbb8d74e700ebe17b3d8193fbab7498618550e77.mp3"
+      }
+    },
+    "ac3d72b3492e492decc752707bdfa8eeb4881a5a3b866f3532d619593b2846a6": {
+      "text": "I am stronger than I was a month ago.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ac/ac3d72b3492e492decc752707bdfa8eeb4881a5a3b866f3532d619593b2846a6.opus",
+        "mp3": "ac/ac3d72b3492e492decc752707bdfa8eeb4881a5a3b866f3532d619593b2846a6.mp3"
+      }
+    },
+    "c8847001cd3aaf61e3160377eef9bb581d3456189ddedf72c0f721125a77bca5": {
+      "text": "I keep going for one more minute.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c8/c8847001cd3aaf61e3160377eef9bb581d3456189ddedf72c0f721125a77bca5.opus",
+        "mp3": "c8/c8847001cd3aaf61e3160377eef9bb581d3456189ddedf72c0f721125a77bca5.mp3"
+      }
+    },
+    "41c04cbf79aa5c2728fd553fa3be55547c09fb794ce4e4e08f03bab69957f073": {
+      "text": "I keep going for one more minute.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "41/41c04cbf79aa5c2728fd553fa3be55547c09fb794ce4e4e08f03bab69957f073.opus",
+        "mp3": "41/41c04cbf79aa5c2728fd553fa3be55547c09fb794ce4e4e08f03bab69957f073.mp3"
+      }
+    },
+    "8e8e708cd2598a48ed15b77fd3e5a46fd9dd46e89ad74832dc819a87d1394067": {
+      "text": "Showing up is the whole workout.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "8e/8e8e708cd2598a48ed15b77fd3e5a46fd9dd46e89ad74832dc819a87d1394067.opus",
+        "mp3": "8e/8e8e708cd2598a48ed15b77fd3e5a46fd9dd46e89ad74832dc819a87d1394067.mp3"
+      }
+    },
+    "d05d3dc5fc71a26d1708ff78b50465774262ac681c9c9388d30cea4ec13fb802": {
+      "text": "Showing up is the whole workout.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "d0/d05d3dc5fc71a26d1708ff78b50465774262ac681c9c9388d30cea4ec13fb802.opus",
+        "mp3": "d0/d05d3dc5fc71a26d1708ff78b50465774262ac681c9c9388d30cea4ec13fb802.mp3"
+      }
+    },
+    "a097afd0bef248ba6501a1103409223b2ba86556c0ff6bccdce8b83e953eb38c": {
+      "text": "I train for how I want to feel, not how I want to look.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "a0/a097afd0bef248ba6501a1103409223b2ba86556c0ff6bccdce8b83e953eb38c.opus",
+        "mp3": "a0/a097afd0bef248ba6501a1103409223b2ba86556c0ff6bccdce8b83e953eb38c.mp3"
+      }
+    },
+    "ec2918138875ac5c8ed8405c7b90247f791d2c2836170134fd80d7cd34207354": {
+      "text": "I train for how I want to feel, not how I want to look.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ec/ec2918138875ac5c8ed8405c7b90247f791d2c2836170134fd80d7cd34207354.opus",
+        "mp3": "ec/ec2918138875ac5c8ed8405c7b90247f791d2c2836170134fd80d7cd34207354.mp3"
+      }
+    },
+    "ba6b2d8ab34ae8416ff5d1d18f25ad0ce3511f8ef995237a4b44d3a07d9d0ad3": {
+      "text": "I am proud of how far I have already come.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ba/ba6b2d8ab34ae8416ff5d1d18f25ad0ce3511f8ef995237a4b44d3a07d9d0ad3.opus",
+        "mp3": "ba/ba6b2d8ab34ae8416ff5d1d18f25ad0ce3511f8ef995237a4b44d3a07d9d0ad3.mp3"
+      }
+    },
+    "669c74863f086fa3f216e0bac65b17a0fdf48206c216ab20cd858d8c8c12c978": {
+      "text": "I am proud of how far I have already come.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "66/669c74863f086fa3f216e0bac65b17a0fdf48206c216ab20cd858d8c8c12c978.opus",
+        "mp3": "66/669c74863f086fa3f216e0bac65b17a0fdf48206c216ab20cd858d8c8c12c978.mp3"
+      }
+    },
+    "51c3c5a301a64f2d02775b196988a6d4165b2513c72c116dee2a8782fb02b806": {
+      "text": "What I practise, I become.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "51/51c3c5a301a64f2d02775b196988a6d4165b2513c72c116dee2a8782fb02b806.opus",
+        "mp3": "51/51c3c5a301a64f2d02775b196988a6d4165b2513c72c116dee2a8782fb02b806.mp3"
+      }
+    },
+    "eebd77650e8404fe275ef14c0495e2d9a9de6e93fc161c947bf57c7932ec4a51": {
+      "text": "What I practise, I become.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ee/eebd77650e8404fe275ef14c0495e2d9a9de6e93fc161c947bf57c7932ec4a51.opus",
+        "mp3": "ee/eebd77650e8404fe275ef14c0495e2d9a9de6e93fc161c947bf57c7932ec4a51.mp3"
+      }
+    },
+    "5639931efd5820dbfd8ed600cd9299085ff84a3e673b988f9ee821a228a75802": {
+      "text": "I am on my own timeline, and it is the right one.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "56/5639931efd5820dbfd8ed600cd9299085ff84a3e673b988f9ee821a228a75802.opus",
+        "mp3": "56/5639931efd5820dbfd8ed600cd9299085ff84a3e673b988f9ee821a228a75802.mp3"
+      }
+    },
+    "ac4e81485fb0ad3aa72299560ca9414675531f6e01f8297838b9a2272268d0fa": {
+      "text": "I am on my own timeline, and it is the right one.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ac/ac4e81485fb0ad3aa72299560ca9414675531f6e01f8297838b9a2272268d0fa.opus",
+        "mp3": "ac/ac4e81485fb0ad3aa72299560ca9414675531f6e01f8297838b9a2272268d0fa.mp3"
+      }
+    },
+    "c75b62447e49759a06ebd8e106db8d2d11dc5e0c119239f50086033494d24c60": {
+      "text": "I choose how I speak to myself.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c7/c75b62447e49759a06ebd8e106db8d2d11dc5e0c119239f50086033494d24c60.opus",
+        "mp3": "c7/c75b62447e49759a06ebd8e106db8d2d11dc5e0c119239f50086033494d24c60.mp3"
+      }
+    },
+    "4c9a434572e77ab4a3a1ce35aaa7ed40027a58465b05fcb1f65250ab28e665d2": {
+      "text": "I choose how I speak to myself.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "4c/4c9a434572e77ab4a3a1ce35aaa7ed40027a58465b05fcb1f65250ab28e665d2.opus",
+        "mp3": "4c/4c9a434572e77ab4a3a1ce35aaa7ed40027a58465b05fcb1f65250ab28e665d2.mp3"
+      }
+    },
+    "713a798ea6a75788b9f16f458edea6a705f1537d2da11afbba950f6f4a4f13f6": {
+      "text": "I forgive myself for what I did not know then.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "71/713a798ea6a75788b9f16f458edea6a705f1537d2da11afbba950f6f4a4f13f6.opus",
+        "mp3": "71/713a798ea6a75788b9f16f458edea6a705f1537d2da11afbba950f6f4a4f13f6.mp3"
+      }
+    },
+    "f0487e673de2770577fa1b2fc0c9be12abd473a6662d98278c0f1dc90175bae1": {
+      "text": "I forgive myself for what I did not know then.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f0/f0487e673de2770577fa1b2fc0c9be12abd473a6662d98278c0f1dc90175bae1.opus",
+        "mp3": "f0/f0487e673de2770577fa1b2fc0c9be12abd473a6662d98278c0f1dc90175bae1.mp3"
+      }
+    },
+    "e2ae5be0425ee50740978e94c6e41d9662d813617ea31191eaa8f4f905299def": {
+      "text": "I am allowed to change my mind about who I am.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "e2/e2ae5be0425ee50740978e94c6e41d9662d813617ea31191eaa8f4f905299def.opus",
+        "mp3": "e2/e2ae5be0425ee50740978e94c6e41d9662d813617ea31191eaa8f4f905299def.mp3"
+      }
+    },
+    "be6f3ab5c7e35418ba6df762a7e476acd3fcf242423487323c99ed8d9825353e": {
+      "text": "I am allowed to change my mind about who I am.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "be/be6f3ab5c7e35418ba6df762a7e476acd3fcf242423487323c99ed8d9825353e.opus",
+        "mp3": "be/be6f3ab5c7e35418ba6df762a7e476acd3fcf242423487323c99ed8d9825353e.mp3"
+      }
+    },
+    "211e1369f94ea7148d9a9459c676c6d59e7cce882a2bdfcbc0cd5534cfbc2db5": {
+      "text": "I meet today as it is, not as I feared it would be.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "21/211e1369f94ea7148d9a9459c676c6d59e7cce882a2bdfcbc0cd5534cfbc2db5.opus",
+        "mp3": "21/211e1369f94ea7148d9a9459c676c6d59e7cce882a2bdfcbc0cd5534cfbc2db5.mp3"
+      }
+    },
+    "9297553c37b1c0b75fcc6aa69f5162994ee2dcf72c335acb42c122644e91322b": {
+      "text": "I meet today as it is, not as I feared it would be.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "92/9297553c37b1c0b75fcc6aa69f5162994ee2dcf72c335acb42c122644e91322b.opus",
+        "mp3": "92/9297553c37b1c0b75fcc6aa69f5162994ee2dcf72c335acb42c122644e91322b.mp3"
+      }
+    },
+    "546e5d0800e72ea2fedc54fbd67f8131cff42322d13ec22cc503ef64f07792b1": {
+      "text": "Today has room in it for something good.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "54/546e5d0800e72ea2fedc54fbd67f8131cff42322d13ec22cc503ef64f07792b1.opus",
+        "mp3": "54/546e5d0800e72ea2fedc54fbd67f8131cff42322d13ec22cc503ef64f07792b1.mp3"
+      }
+    },
+    "de924ccab2b320120661aa4a3a30411544ead50c07e3b69fe34085e2bd5d462b": {
+      "text": "Today has room in it for something good.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "de/de924ccab2b320120661aa4a3a30411544ead50c07e3b69fe34085e2bd5d462b.opus",
+        "mp3": "de/de924ccab2b320120661aa4a3a30411544ead50c07e3b69fe34085e2bd5d462b.mp3"
+      }
+    },
+    "923505e7b0f3b2261de75e5f30c79814330cc8a41ce1b36a61cc9756410994b3": {
+      "text": "I set the tone for this day, and I choose a kind one.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "92/923505e7b0f3b2261de75e5f30c79814330cc8a41ce1b36a61cc9756410994b3.opus",
+        "mp3": "92/923505e7b0f3b2261de75e5f30c79814330cc8a41ce1b36a61cc9756410994b3.mp3"
+      }
+    },
+    "25a1957c979da69046175cd3db7ca624fe2e1b5268b32094061640183870116f": {
+      "text": "I set the tone for this day, and I choose a kind one.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "25/25a1957c979da69046175cd3db7ca624fe2e1b5268b32094061640183870116f.opus",
+        "mp3": "25/25a1957c979da69046175cd3db7ca624fe2e1b5268b32094061640183870116f.mp3"
+      }
+    },
+    "1f0201d05c51fba175854a6beaac2f7f9c65f1f4628b9876b0b48fec84052c18": {
+      "text": "I start where I am, with what I have.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "1f/1f0201d05c51fba175854a6beaac2f7f9c65f1f4628b9876b0b48fec84052c18.opus",
+        "mp3": "1f/1f0201d05c51fba175854a6beaac2f7f9c65f1f4628b9876b0b48fec84052c18.mp3"
+      }
+    },
+    "58aa9005db87b66653196901f4c3a04d225d68d9f3d2a598fc8ef3ca69af201b": {
+      "text": "I start where I am, with what I have.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "58/58aa9005db87b66653196901f4c3a04d225d68d9f3d2a598fc8ef3ca69af201b.opus",
+        "mp3": "58/58aa9005db87b66653196901f4c3a04d225d68d9f3d2a598fc8ef3ca69af201b.mp3"
+      }
+    },
+    "fb6ae7142a895d629e86143c5c3d8aa7d3887006076825243e71b5a0fcd8040a": {
+      "text": "The first hour of today is mine.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "fb/fb6ae7142a895d629e86143c5c3d8aa7d3887006076825243e71b5a0fcd8040a.opus",
+        "mp3": "fb/fb6ae7142a895d629e86143c5c3d8aa7d3887006076825243e71b5a0fcd8040a.mp3"
+      }
+    },
+    "a2f79cea343257031c88c6af45c49077a549de2d8cc93bf2613e0986aa85fea1": {
+      "text": "The first hour of today is mine.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "a2/a2f79cea343257031c88c6af45c49077a549de2d8cc93bf2613e0986aa85fea1.opus",
+        "mp3": "a2/a2f79cea343257031c88c6af45c49077a549de2d8cc93bf2613e0986aa85fea1.mp3"
+      }
+    },
+    "01110649eb1aee29730a57f999a327bdcac43f3b36d957b98d46d659a7a5bd38": {
+      "text": "I am awake, and that is enough to begin with.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "01/01110649eb1aee29730a57f999a327bdcac43f3b36d957b98d46d659a7a5bd38.opus",
+        "mp3": "01/01110649eb1aee29730a57f999a327bdcac43f3b36d957b98d46d659a7a5bd38.mp3"
+      }
+    },
+    "f1efb6794ba69e9337e609db3473665af6f44f51e81e5066e83c0d2012ec5aea": {
+      "text": "I am awake, and that is enough to begin with.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f1/f1efb6794ba69e9337e609db3473665af6f44f51e81e5066e83c0d2012ec5aea.opus",
+        "mp3": "f1/f1efb6794ba69e9337e609db3473665af6f44f51e81e5066e83c0d2012ec5aea.mp3"
+      }
+    },
+    "da3bc93c165fdfd1a824174386b6821576eba7bbc997322a52bc0fbe15caaefa": {
+      "text": "Whatever this day held, I am still here at the end of it.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "da/da3bc93c165fdfd1a824174386b6821576eba7bbc997322a52bc0fbe15caaefa.opus",
+        "mp3": "da/da3bc93c165fdfd1a824174386b6821576eba7bbc997322a52bc0fbe15caaefa.mp3"
+      }
+    },
+    "c4e67ed41b3de0e3b6955323b332d488f636dbf2bd896cb421dc0ed37b84cc2d": {
+      "text": "Whatever this day held, I am still here at the end of it.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c4/c4e67ed41b3de0e3b6955323b332d488f636dbf2bd896cb421dc0ed37b84cc2d.opus",
+        "mp3": "c4/c4e67ed41b3de0e3b6955323b332d488f636dbf2bd896cb421dc0ed37b84cc2d.mp3"
+      }
+    },
+    "0bfd309a2f364192d5154c743ad0ff7b0c052a155bfb04b4f01c3dc6379da3a9": {
+      "text": "I did what I could with the day I had.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "0b/0bfd309a2f364192d5154c743ad0ff7b0c052a155bfb04b4f01c3dc6379da3a9.opus",
+        "mp3": "0b/0bfd309a2f364192d5154c743ad0ff7b0c052a155bfb04b4f01c3dc6379da3a9.mp3"
+      }
+    },
+    "c0fc79a8e98a333cd284db1302f8e012058717f8188700f30dfce51c2de69a38": {
+      "text": "I did what I could with the day I had.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c0/c0fc79a8e98a333cd284db1302f8e012058717f8188700f30dfce51c2de69a38.opus",
+        "mp3": "c0/c0fc79a8e98a333cd284db1302f8e012058717f8188700f30dfce51c2de69a38.mp3"
+      }
+    },
+    "37b07ed17a56c52d34633d6d04d4be4e6f55c28b8a7b88a0ed0839c62988f880": {
+      "text": "I am allowed to leave today unfinished.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "37/37b07ed17a56c52d34633d6d04d4be4e6f55c28b8a7b88a0ed0839c62988f880.opus",
+        "mp3": "37/37b07ed17a56c52d34633d6d04d4be4e6f55c28b8a7b88a0ed0839c62988f880.mp3"
+      }
+    },
+    "5f02c76e0d0dfa81bf93370b60a98c95bbeefa3672be968b206c54b585acc108": {
+      "text": "I am allowed to leave today unfinished.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "5f/5f02c76e0d0dfa81bf93370b60a98c95bbeefa3672be968b206c54b585acc108.opus",
+        "mp3": "5f/5f02c76e0d0dfa81bf93370b60a98c95bbeefa3672be968b206c54b585acc108.mp3"
+      }
+    },
+    "5d5f6c62f0ba3be69befadc6b1c8b7c0cc6ecbacecdba9ad620510ad6aa43eee": {
+      "text": "Tomorrow gets a fresh version of me.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "5d/5d5f6c62f0ba3be69befadc6b1c8b7c0cc6ecbacecdba9ad620510ad6aa43eee.opus",
+        "mp3": "5d/5d5f6c62f0ba3be69befadc6b1c8b7c0cc6ecbacecdba9ad620510ad6aa43eee.mp3"
+      }
+    },
+    "762701f96e2bf732b776fe2018ca2d2ed12bfa61a716d17af757ae776a70dcfb": {
+      "text": "Tomorrow gets a fresh version of me.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "76/762701f96e2bf732b776fe2018ca2d2ed12bfa61a716d17af757ae776a70dcfb.opus",
+        "mp3": "76/762701f96e2bf732b776fe2018ca2d2ed12bfa61a716d17af757ae776a70dcfb.mp3"
+      }
+    },
+    "a6f736fd591259e076e5d858d7beb40772acc865dee26e63351be8d502106e12": {
+      "text": "I let the day go without going over it again.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "a6/a6f736fd591259e076e5d858d7beb40772acc865dee26e63351be8d502106e12.opus",
+        "mp3": "a6/a6f736fd591259e076e5d858d7beb40772acc865dee26e63351be8d502106e12.mp3"
+      }
+    },
+    "5b412e1f63b992a5d653386961b3ef8bfe1dc4d2025b08e475b73e061abdf7ed": {
+      "text": "I let the day go without going over it again.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "5b/5b412e1f63b992a5d653386961b3ef8bfe1dc4d2025b08e475b73e061abdf7ed.opus",
+        "mp3": "5b/5b412e1f63b992a5d653386961b3ef8bfe1dc4d2025b08e475b73e061abdf7ed.mp3"
+      }
+    },
+    "bca89389a53585137f64fb67a566f6e0b7530b8819d266b5b7c39d6f2a99a48e": {
+      "text": "I am doing better than I give myself credit for.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "bc/bca89389a53585137f64fb67a566f6e0b7530b8819d266b5b7c39d6f2a99a48e.opus",
+        "mp3": "bc/bca89389a53585137f64fb67a566f6e0b7530b8819d266b5b7c39d6f2a99a48e.mp3"
+      }
+    },
+    "fc3783351bbd569fb3532407ac7573a7571463ac67bf7b1d35dcebe70cd7d82b": {
+      "text": "I am doing better than I give myself credit for.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "fc/fc3783351bbd569fb3532407ac7573a7571463ac67bf7b1d35dcebe70cd7d82b.opus",
+        "mp3": "fc/fc3783351bbd569fb3532407ac7573a7571463ac67bf7b1d35dcebe70cd7d82b.mp3"
+      }
+    },
+    "c7d729fc3d3646c0eba83f90f02040cf1ec08903831276d05d2e02e7b2127e8a": {
+      "text": "I can feel calm and still have things to do.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c7/c7d729fc3d3646c0eba83f90f02040cf1ec08903831276d05d2e02e7b2127e8a.opus",
+        "mp3": "c7/c7d729fc3d3646c0eba83f90f02040cf1ec08903831276d05d2e02e7b2127e8a.mp3"
+      }
+    },
+    "0df4bf3cedc08699db9f8674a34f5a09ac718ae7b57ae665b1b8573284a54516": {
+      "text": "I can feel calm and still have things to do.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "0d/0df4bf3cedc08699db9f8674a34f5a09ac718ae7b57ae665b1b8573284a54516.opus",
+        "mp3": "0d/0df4bf3cedc08699db9f8674a34f5a09ac718ae7b57ae665b1b8573284a54516.mp3"
+      }
+    },
+    "18ec54484714068863561e10a538aaae0bfc71ce0ccd8ae23d74b6731e03f46c": {
+      "text": "This moment asks nothing of me but breathing.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "18/18ec54484714068863561e10a538aaae0bfc71ce0ccd8ae23d74b6731e03f46c.opus",
+        "mp3": "18/18ec54484714068863561e10a538aaae0bfc71ce0ccd8ae23d74b6731e03f46c.mp3"
+      }
+    },
+    "34fd43789e2f85fb8b660f9087f33b90e99e2037b6e03e9ce201360d5f7787eb": {
+      "text": "This moment asks nothing of me but breathing.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "34/34fd43789e2f85fb8b660f9087f33b90e99e2037b6e03e9ce201360d5f7787eb.opus",
+        "mp3": "34/34fd43789e2f85fb8b660f9087f33b90e99e2037b6e03e9ce201360d5f7787eb.mp3"
+      }
+    },
+    "c63268b02fda885b19c729edac2571919bfe6fa08bf7a4f5c5925057002249d5": {
+      "text": "I trust the way I see things.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c6/c63268b02fda885b19c729edac2571919bfe6fa08bf7a4f5c5925057002249d5.opus",
+        "mp3": "c6/c63268b02fda885b19c729edac2571919bfe6fa08bf7a4f5c5925057002249d5.mp3"
+      }
+    },
+    "59cf2c4d9deca29bde5e713210a80a8815ee4d233294aeab0965656e6f7c1aff": {
+      "text": "I trust the way I see things.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "59/59cf2c4d9deca29bde5e713210a80a8815ee4d233294aeab0965656e6f7c1aff.opus",
+        "mp3": "59/59cf2c4d9deca29bde5e713210a80a8815ee4d233294aeab0965656e6f7c1aff.mp3"
+      }
+    },
+    "3752f645b9e9948ec410da7060122f91dfb8a3f46f1a67796a936574ee44e0ff": {
+      "text": "I take up my full space, and I have every right to it.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "37/3752f645b9e9948ec410da7060122f91dfb8a3f46f1a67796a936574ee44e0ff.opus",
+        "mp3": "37/3752f645b9e9948ec410da7060122f91dfb8a3f46f1a67796a936574ee44e0ff.mp3"
+      }
+    },
+    "67f563ffdecb2023c387eb4c1dc185875a5e0e5548f60da79e094a95618c0c20": {
+      "text": "I take up my full space, and I have every right to it.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "67/67f563ffdecb2023c387eb4c1dc185875a5e0e5548f60da79e094a95618c0c20.opus",
+        "mp3": "67/67f563ffdecb2023c387eb4c1dc185875a5e0e5548f60da79e094a95618c0c20.mp3"
+      }
+    },
+    "21c4c1148b13a555ac6ab1cd63236144b5cf55c7d00ed2850eaf536e7bf3d751": {
+      "text": "I am allowed to want what I want.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "21/21c4c1148b13a555ac6ab1cd63236144b5cf55c7d00ed2850eaf536e7bf3d751.opus",
+        "mp3": "21/21c4c1148b13a555ac6ab1cd63236144b5cf55c7d00ed2850eaf536e7bf3d751.mp3"
+      }
+    },
+    "45fa4a3c53fa4fb2415f976f9ffee40daa0263d2b61035d0432cc272c2fc7d0f": {
+      "text": "I am allowed to want what I want.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "45/45fa4a3c53fa4fb2415f976f9ffee40daa0263d2b61035d0432cc272c2fc7d0f.opus",
+        "mp3": "45/45fa4a3c53fa4fb2415f976f9ffee40daa0263d2b61035d0432cc272c2fc7d0f.mp3"
+      }
+    },
+    "c6ab03acd1e6cb187a8b053bebac1d874ef36dd7487ac82efc7d6d42e24551df": {
+      "text": "My heart is open, and it is also looked after.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c6/c6ab03acd1e6cb187a8b053bebac1d874ef36dd7487ac82efc7d6d42e24551df.opus",
+        "mp3": "c6/c6ab03acd1e6cb187a8b053bebac1d874ef36dd7487ac82efc7d6d42e24551df.mp3"
+      }
+    },
+    "c70e2c65523b8dc370699a62c9cfa18aead39cb115b6e3b0da0e7a87a9bfcbed": {
+      "text": "My heart is open, and it is also looked after.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "c7/c70e2c65523b8dc370699a62c9cfa18aead39cb115b6e3b0da0e7a87a9bfcbed.opus",
+        "mp3": "c7/c70e2c65523b8dc370699a62c9cfa18aead39cb115b6e3b0da0e7a87a9bfcbed.mp3"
+      }
+    },
+    "ef3e40c82221a664e9a48cd59a5729bf371b7cee70953cbc94ddc65050234a1f": {
+      "text": "I am open to receiving good things.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ef/ef3e40c82221a664e9a48cd59a5729bf371b7cee70953cbc94ddc65050234a1f.opus",
+        "mp3": "ef/ef3e40c82221a664e9a48cd59a5729bf371b7cee70953cbc94ddc65050234a1f.mp3"
+      }
+    },
+    "85a98c15c3d003d9f71e8a2220006920c423edca6eba62f1b9791f489cdc29f4": {
+      "text": "I am open to receiving good things.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "85/85a98c15c3d003d9f71e8a2220006920c423edca6eba62f1b9791f489cdc29f4.opus",
+        "mp3": "85/85a98c15c3d003d9f71e8a2220006920c423edca6eba62f1b9791f489cdc29f4.mp3"
+      }
+    },
+    "8a920588936f7534d6fa75b62d51f01e4ff7b472a9251b3ed0ac9710df95900c": {
+      "text": "I handle money with calm attention.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "8a/8a920588936f7534d6fa75b62d51f01e4ff7b472a9251b3ed0ac9710df95900c.opus",
+        "mp3": "8a/8a920588936f7534d6fa75b62d51f01e4ff7b472a9251b3ed0ac9710df95900c.mp3"
+      }
+    },
+    "3b0010398bfe5e91113e61f4e122596602776104850f49e7df7c10a9c6abbbac": {
+      "text": "I handle money with calm attention.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "3b/3b0010398bfe5e91113e61f4e122596602776104850f49e7df7c10a9c6abbbac.opus",
+        "mp3": "3b/3b0010398bfe5e91113e61f4e122596602776104850f49e7df7c10a9c6abbbac.mp3"
+      }
+    },
+    "376777378137f0883a138dc94034733637e3c51b72d86e76392e257b91ccd97a": {
+      "text": "There is room in my life for more than I have now.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "37/376777378137f0883a138dc94034733637e3c51b72d86e76392e257b91ccd97a.opus",
+        "mp3": "37/376777378137f0883a138dc94034733637e3c51b72d86e76392e257b91ccd97a.mp3"
+      }
+    },
+    "84b43dfed6b218d13f9111726c892b24f5fc49d413fe66b319ac861720254da7": {
+      "text": "There is room in my life for more than I have now.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "84/84b43dfed6b218d13f9111726c892b24f5fc49d413fe66b319ac861720254da7.opus",
+        "mp3": "84/84b43dfed6b218d13f9111726c892b24f5fc49d413fe66b319ac861720254da7.mp3"
+      }
+    },
+    "d45a0cff7a494892a91c432a4e2d941997b88b79756b183932a2ca49ce80f2b0": {
+      "text": "I notice opportunities, and I am willing to take them.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "d4/d45a0cff7a494892a91c432a4e2d941997b88b79756b183932a2ca49ce80f2b0.opus",
+        "mp3": "d4/d45a0cff7a494892a91c432a4e2d941997b88b79756b183932a2ca49ce80f2b0.mp3"
+      }
+    },
+    "5de0ea4f47d2d0c2814e99f37e5a18bb9d75bfdec84c1648bf9ee7bfc9b6a6df": {
+      "text": "I notice opportunities, and I am willing to take them.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "5d/5de0ea4f47d2d0c2814e99f37e5a18bb9d75bfdec84c1648bf9ee7bfc9b6a6df.opus",
+        "mp3": "5d/5de0ea4f47d2d0c2814e99f37e5a18bb9d75bfdec84c1648bf9ee7bfc9b6a6df.mp3"
+      }
+    },
+    "f9fe14fd6c2d34193dc74ffc654ebc957702c808f84e8c7ec44b7d77467e2a7d": {
+      "text": "I give and I receive, and both feel natural.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f9/f9fe14fd6c2d34193dc74ffc654ebc957702c808f84e8c7ec44b7d77467e2a7d.opus",
+        "mp3": "f9/f9fe14fd6c2d34193dc74ffc654ebc957702c808f84e8c7ec44b7d77467e2a7d.mp3"
+      }
+    },
+    "3ce19ef97be0ba35c0737cbf2caa06804f1e0a9170e0598d16044e371520398e": {
+      "text": "I give and I receive, and both feel natural.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "3c/3ce19ef97be0ba35c0737cbf2caa06804f1e0a9170e0598d16044e371520398e.opus",
+        "mp3": "3c/3ce19ef97be0ba35c0737cbf2caa06804f1e0a9170e0598d16044e371520398e.mp3"
+      }
+    },
+    "5ee4dbd94e2c3d8d62fd6d87c2cc91e10d0053a7f48020bda2a2c184382c1253": {
+      "text": "I am allowed to feel this, and I am allowed to set it down.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "5e/5ee4dbd94e2c3d8d62fd6d87c2cc91e10d0053a7f48020bda2a2c184382c1253.opus",
+        "mp3": "5e/5ee4dbd94e2c3d8d62fd6d87c2cc91e10d0053a7f48020bda2a2c184382c1253.mp3"
+      }
+    },
+    "9b71e9dd67f985534983db682edb85c80b96a203d49e6f8954ae23fbe2ce0451": {
+      "text": "I am allowed to feel this, and I am allowed to set it down.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "9b/9b71e9dd67f985534983db682edb85c80b96a203d49e6f8954ae23fbe2ce0451.opus",
+        "mp3": "9b/9b71e9dd67f985534983db682edb85c80b96a203d49e6f8954ae23fbe2ce0451.mp3"
+      }
+    },
+    "e3f3a70bff57a21b2a0df78e5b95034508ab4b3c17357b8d401b0c95330f8b7b": {
+      "text": "What happened to me is not who I am.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "e3/e3f3a70bff57a21b2a0df78e5b95034508ab4b3c17357b8d401b0c95330f8b7b.opus",
+        "mp3": "e3/e3f3a70bff57a21b2a0df78e5b95034508ab4b3c17357b8d401b0c95330f8b7b.mp3"
+      }
+    },
+    "1b0c3bfc8cd3abcb2d53ad0699658678ece39011b9eeee8557da65a0c2c7df58": {
+      "text": "What happened to me is not who I am.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "1b/1b0c3bfc8cd3abcb2d53ad0699658678ece39011b9eeee8557da65a0c2c7df58.opus",
+        "mp3": "1b/1b0c3bfc8cd3abcb2d53ad0699658678ece39011b9eeee8557da65a0c2c7df58.mp3"
+      }
+    },
+    "10f6b8bf3a0b6c5e066204871e29a3f284b9ee5abef76531ed7f45dfca52521f": {
+      "text": "I am healing at the speed healing takes.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "10/10f6b8bf3a0b6c5e066204871e29a3f284b9ee5abef76531ed7f45dfca52521f.opus",
+        "mp3": "10/10f6b8bf3a0b6c5e066204871e29a3f284b9ee5abef76531ed7f45dfca52521f.mp3"
+      }
+    },
+    "63ec3513218be41fb2b453fa55736624f615298694ae435fae57a5757e3d8bb9": {
+      "text": "I am healing at the speed healing takes.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "63/63ec3513218be41fb2b453fa55736624f615298694ae435fae57a5757e3d8bb9.opus",
+        "mp3": "63/63ec3513218be41fb2b453fa55736624f615298694ae435fae57a5757e3d8bb9.mp3"
+      }
+    },
+    "6be3ee8ffd129ab51bad38bdc2cf8c8541a5e10f61bbd7d7aaf7211892287be5": {
+      "text": "I can hold sadness and still have a good day.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "6b/6be3ee8ffd129ab51bad38bdc2cf8c8541a5e10f61bbd7d7aaf7211892287be5.opus",
+        "mp3": "6b/6be3ee8ffd129ab51bad38bdc2cf8c8541a5e10f61bbd7d7aaf7211892287be5.mp3"
+      }
+    },
+    "391a3d413ce2de0377daf32389b63eb4ed5041279ef08a98f6f9054bf79628aa": {
+      "text": "I can hold sadness and still have a good day.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "39/391a3d413ce2de0377daf32389b63eb4ed5041279ef08a98f6f9054bf79628aa.opus",
+        "mp3": "39/391a3d413ce2de0377daf32389b63eb4ed5041279ef08a98f6f9054bf79628aa.mp3"
+      }
+    },
+    "b3f253522b5f8b9b633f450ef0b11c74f111b9b1f1814e83fd3547b0f80ed625": {
+      "text": "I am gentle with the part of me that is still sore.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "b3/b3f253522b5f8b9b633f450ef0b11c74f111b9b1f1814e83fd3547b0f80ed625.opus",
+        "mp3": "b3/b3f253522b5f8b9b633f450ef0b11c74f111b9b1f1814e83fd3547b0f80ed625.mp3"
+      }
+    },
+    "2f5080729792b52b01dbcf3bdc46eca6523ae9c57f1e2893ce6137dad5d27195": {
+      "text": "I am gentle with the part of me that is still sore.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "2f/2f5080729792b52b01dbcf3bdc46eca6523ae9c57f1e2893ce6137dad5d27195.opus",
+        "mp3": "2f/2f5080729792b52b01dbcf3bdc46eca6523ae9c57f1e2893ce6137dad5d27195.mp3"
+      }
+    },
+    "ebf4c8bcb4fe2b3ad0b40c547bf9917e651e335d452f09d69533611ef38eb83d": {
+      "text": "Whatever this day holds, I am still here at the end of it.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "eb/ebf4c8bcb4fe2b3ad0b40c547bf9917e651e335d452f09d69533611ef38eb83d.opus",
+        "mp3": "eb/ebf4c8bcb4fe2b3ad0b40c547bf9917e651e335d452f09d69533611ef38eb83d.mp3"
+      }
+    },
+    "fccd27f6a69a69f237265aacbb45cdccee2a76eaa7306ad0e35fef03976df01b": {
+      "text": "Whatever this day holds, I am still here at the end of it.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "fc/fccd27f6a69a69f237265aacbb45cdccee2a76eaa7306ad0e35fef03976df01b.opus",
+        "mp3": "fc/fccd27f6a69a69f237265aacbb45cdccee2a76eaa7306ad0e35fef03976df01b.mp3"
+      }
+    },
+    "e9048c84ae26f07df88999b32e7dff3850d6472d4cd67af9cad9a7d78a7d1060": {
+      "text": "I am becoming someone I would be glad to know.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "e9/e9048c84ae26f07df88999b32e7dff3850d6472d4cd67af9cad9a7d78a7d1060.opus",
+        "mp3": "e9/e9048c84ae26f07df88999b32e7dff3850d6472d4cd67af9cad9a7d78a7d1060.mp3"
+      }
+    },
+    "ea0fab64427f28462ecc0dc218ce892b5804381bb5f129dea5e2da671370a7c3": {
+      "text": "I am becoming someone I would be glad to know.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "ea/ea0fab64427f28462ecc0dc218ce892b5804381bb5f129dea5e2da671370a7c3.opus",
+        "mp3": "ea/ea0fab64427f28462ecc0dc218ce892b5804381bb5f129dea5e2da671370a7c3.mp3"
+      }
+    },
+    "f59b8e425dd3c5a4aa662f23f0fc8d2bede29b455bbf0da4731c40b078c89d61": {
+      "text": "I return to these words whenever I need them.",
+      "voice": "female_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "f5/f59b8e425dd3c5a4aa662f23f0fc8d2bede29b455bbf0da4731c40b078c89d61.opus",
+        "mp3": "f5/f59b8e425dd3c5a4aa662f23f0fc8d2bede29b455bbf0da4731c40b078c89d61.mp3"
+      }
+    },
+    "7e73e01002887b9cb164b72572dd55d3af225b2b44529eef3f800d60f4ea90b5": {
+      "text": "I return to these words whenever I need them.",
+      "voice": "male_1",
+      "speed": 0.9,
+      "language": "en-us",
+      "formats": {
+        "opus": "7e/7e73e01002887b9cb164b72572dd55d3af225b2b44529eef3f800d60f4ea90b5.opus",
+        "mp3": "7e/7e73e01002887b9cb164b72572dd55d3af225b2b44529eef3f800d60f4ea90b5.mp3"
+      }
+    }
+  }
 }

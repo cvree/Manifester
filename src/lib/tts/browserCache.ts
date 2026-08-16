@@ -83,6 +83,28 @@ export class BrowserCache {
     }
   }
 
+  /**
+   * The first encoding of this clip that this device happens to hold.
+   *
+   * Asking for one exact format was the original shape of this, and it was
+   * subtly wrong the moment a second producer existed: a line synthesised on
+   * the device is stored as WAV, the resolver then asks for Opus because that
+   * is what this browser prefers to download, misses, and synthesises the same
+   * sentence again. Every layer above is content-addressed by what the clip
+   * says rather than by how it is packed, and this is where that has to be
+   * true in practice.
+   */
+  async find(
+    key: string,
+    formats: AudioFormat[],
+  ): Promise<{ bytes: ArrayBuffer; format: AudioFormat } | null> {
+    for (const format of formats) {
+      const bytes = await this.get(key, format)
+      if (bytes) return { bytes, format }
+    }
+    return null
+  }
+
   async put(key: string, format: AudioFormat, bytes: ArrayBuffer): Promise<void> {
     const db = await this.open()
     if (!db) return

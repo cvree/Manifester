@@ -7,6 +7,7 @@ import type { LoopSettings } from '../lib/types'
 import type { RankedVoice, VoiceTier } from '../lib/voiceRanking'
 import { BetterVoicesPanel } from './BetterVoicesPanel'
 import { FieldLabel } from './Card'
+import { StudioVoicePanel } from './StudioVoicePanel'
 import { Disclosure } from './Disclosure'
 import { PlayIcon } from './Icons'
 import { Slider } from './Slider'
@@ -167,18 +168,32 @@ export function VoiceSettings({
 
         <p className="mt-2.5 text-[0.82rem] leading-snug text-ink-faint">
           {usingStudio
-            ? 'Studio voices are Manifester’s own, and they sound the same on every phone, tablet and computer. They are free, they run on our server rather than a paid service, and clips you have already heard play again with no connection at all.'
+            ? 'Studio voices are Manifester’s own, and they sound the same on every phone, tablet and computer. They are free, and clips you have already heard play again with no connection at all.'
             : 'Device voices come from your phone or browser, not from Manifester, so the list differs on every device. Feminine and masculine are a best guess from the voice name — there is no gender field to read.'}
         </p>
 
-        {settings.voiceSource === 'studio' && !studioAvailable && (
+        {/*
+          The honest sentence about what *this* device can do, which has three
+          different answers now rather than two.
+        */}
+        {settings.voiceSource === 'studio' && !status.unlimited && (
           <p className="mt-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-sunken)] p-3 text-[0.82rem] leading-snug text-ink-muted">
             {status.degraded
-              ? 'The studio voice cannot be reached from here, so this device’s own voice is reading instead. Lines this device has already heard still play in the studio voice.'
-              : 'This copy of Manifester has no speech service behind it, so your device’s own voice reads anything that did not ship with the app. Everything else works exactly the same.'}
+              ? 'The speech service cannot be reached from here, so this device’s own voice reads anything that did not ship with the app. Lines you have already heard still play in the studio voice.'
+              : studioAvailable
+                ? 'Manifester ships a library of affirmations already spoken in Ivy and Fen, and those play in the studio voice on any device. Install Studio Voice below and your own words are read in it too.'
+                : 'Your device’s own voice is reading. Install Studio Voice below to have Ivy or Fen read every line instead.'}
           </p>
         )}
       </div>
+
+      {/*
+        The offer, and the state of it, in the place somebody comes looking for
+        it. The same component the first-run screen uses, so an install started
+        there and opened here is visibly the same install rather than a second
+        one.
+      */}
+      <StudioVoicePanel />
 
       {!usingStudio && (
         <BetterVoicesPanel current={resolvedDeviceVoice} voicesReady={voicesReady} />

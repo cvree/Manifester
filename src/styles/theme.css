@@ -958,6 +958,108 @@
   animation: menu-in-up 180ms var(--ease-calm) both;
 }
 
+/* ── First use ──────────────────────────────────────────────── */
+
+/*
+ * The download that has not said how big it is yet.
+ *
+ * `transformers.js` reports per-file totals only once each file's first chunk
+ * has landed, so for the first second there is genuinely no denominator. A bar
+ * sitting at 0% during that second reads as a stall, and a bar guessing at 40%
+ * would be a lie; a sweep says "working" and claims nothing.
+ */
+@keyframes studio-indeterminate {
+  from {
+    transform: translate3d(-110%, 0, 0);
+  }
+  to {
+    transform: translate3d(310%, 0, 0);
+  }
+}
+
+.animate-studio-indeterminate {
+  animation: studio-indeterminate 1.4s var(--ease-calm) infinite;
+}
+
+/*
+ * Each onboarding step arrives as one settled movement rather than as a page.
+ *
+ * Slightly longer and slightly further than `rise-in`, because a step is the
+ * whole screen changing its mind — and slightly *slower* than feels obvious,
+ * because the first thirty seconds of this app are the pitch for what it is
+ * like to use it.
+ */
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-step-in {
+  animation: step-in 460ms var(--ease-calm) both;
+}
+
+/*
+ * A tile that has just been chosen, holding the eye for the beat before the
+ * step changes. Without it the transition begins before the tap has been
+ * acknowledged and the choice feels unregistered.
+ */
+@keyframes choice-settle {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-choice-settle {
+  animation: choice-settle 340ms var(--ease-calm) both;
+}
+
+/* The halo behind the opening title, breathing at rest. */
+@keyframes welcome-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.06);
+  }
+}
+
+.animate-welcome-glow {
+  animation: welcome-glow 7s var(--ease-calm) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-step-in,
+  .animate-choice-settle,
+  .animate-welcome-glow,
+  .animate-studio-indeterminate {
+    animation: none;
+  }
+
+  /*
+   * The sweep is the only thing telling somebody the download is alive, so
+   * with motion off it becomes a still bar rather than nothing at all.
+   */
+  .animate-studio-indeterminate {
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
 /* ── Scrollbars ─────────────────────────────────────────────── */
 
 /*

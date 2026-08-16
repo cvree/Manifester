@@ -19,8 +19,16 @@
  */
 export type LogicalVoice = 'female_1' | 'male_1'
 
-/** The two encodings the app ships and plays. See `formats.ts`. */
-export type AudioFormat = 'opus' | 'mp3'
+/**
+ * The encodings a clip can arrive in. See `formats.ts`.
+ *
+ * `opus` and `mp3` are what gets shipped and fetched — one small, one
+ * universal. `wav` is never downloaded and never pre-generated: it is what the
+ * on-device model produces, wrapped in the cheapest container that every
+ * browser decodes, and it exists as a format only so that locally synthesised
+ * audio can travel through the same caches as everything else.
+ */
+export type AudioFormat = 'opus' | 'mp3' | 'wav'
 
 /** Everything that decides what a clip sounds like. */
 export interface SpeechRequest {

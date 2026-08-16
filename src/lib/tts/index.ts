@@ -22,6 +22,7 @@ import type { AudioBus } from '../audioBus'
 import type { RankedVoice } from '../voiceRanking'
 import { TTSClient, NoEngineError, type ResolveOptions } from './client'
 import { DEFAULT_CONFIG, type TTSConfig } from './config'
+import { browserKokoro, type StudioSnapshot } from './engines/browserKokoro'
 import { KokoroEngine } from './engines/kokoro'
 import { FallbackVoice } from './fallback'
 import { StaticManifest } from './manifest'
@@ -52,6 +53,16 @@ export interface TTSStatus {
   lastSource: ClipSource | 'fallback' | null
   /** True when the studio voice has been asked for and could not be had. */
   degraded: boolean
+  /**
+   * True when *anything at all* can be said in the studio voice here.
+   *
+   * The distinction that matters to the interface. `engine: 'studio'` can be
+   * true on a build that only has a shelf of pre-generated clips, where a line
+   * somebody typed themselves still falls back to the device. This is the
+   * stronger claim: there is a model on this device, so their own words are
+   * read by Ivy or Fen too.
+   */
+  unlimited: boolean
 }
 
 export interface SpeakSettings extends SpeakOptions {
@@ -91,7 +102,8 @@ const DEFAULT_SPEAK: Required<
 
 class TTS {
   private config: TTSConfig = { ...DEFAULT_CONFIG }
-  private engine: TTSEngine | null = null
+  /** The service behind this build, when there is one. */
+  private remote: TTSEngine | null = null
   private normalizer: PronunciationNormalizer
   private manifest: StaticManifest
   private client: TTSClient
@@ -109,6 +121,7 @@ class TTS {
     loading: false,
     lastSource: null,
     degraded: false,
+    unlimited: false,
   }
   /** Resolves once the engine has said which model version it is running. */
   private ready: Promise<void> | null = null
@@ -130,17 +143,37 @@ class TTS {
       supportsPhonemes: false,
     })
     this.manifest = new StaticManifest(this.config.staticBase)
-    this.engine = this.buildEngine()
+    this.remote = this.buildRemote()
     this.player = new AudioPlayer(() => this.context())
     this.client = new TTSClient({
-      engine: this.engine,
+      engines: this.engines(),
       manifest: this.manifest,
       normalizer: this.normalizer,
       getContext: () => this.context(),
       staticBase: this.config.staticBase,
       language: this.config.language,
     })
-    this.status.engine = this.engine ? 'studio' : 'device'
+    this.status.engine = this.remote ? 'studio' : 'device'
+  }
+
+  /**
+   * The engines, best first.
+   *
+   * On-device before remote, always. The model on this phone is free, private
+   * and works on a plane; the service is none of those, and is only reached
+   * for what the phone could not say itself. On the GitHub Pages build the
+   * second entry does not exist at all.
+   */
+  private engines(): TTSEngine[] {
+    const list: TTSEngine[] = []
+    if (browserKokoro.getSnapshot().state === 'ready') list.push(browserKokoro)
+    if (this.remote) list.push(this.remote)
+    return list
+  }
+
+  /** Re-read which engines exist, without disturbing anything already cached. */
+  private refreshEngines(): void {
+    this.client.setEngines(this.engines())
   }
 
   /* ── Wiring ───────────────────────────────────────────────── */
@@ -160,17 +193,54 @@ class TTS {
     this.config = { ...this.config, ...overrides }
     this.normalizer.setScopes(this.config.scopes)
     this.manifest = new StaticManifest(this.config.staticBase)
-    this.engine = this.buildEngine()
+    this.remote = this.buildRemote()
     this.ready = null
     this.client = new TTSClient({
-      engine: this.engine,
+      engines: this.engines(),
       manifest: this.manifest,
       normalizer: this.normalizer,
       getContext: () => this.context(),
       staticBase: this.config.staticBase,
       language: this.config.language,
     })
-    this.publish({ engine: this.engine ? 'studio' : 'device' })
+    this.publish({ engine: this.remote ? 'studio' : 'device' })
+  }
+
+  /* ── The on-device model ──────────────────────────────────────── */
+
+  /**
+   * Start watching the on-device model, and bring it back if it is installed.
+   *
+   * Called once, from the provider that owns the session. Deliberately not
+   * done at module load: creating a worker is a side effect, and a module that
+   * spawns one the moment it is imported cannot be unit tested and cannot be
+   * imported by anything that does not want a model.
+   */
+  watchStudioVoice(): () => void {
+    const unsubscribe = browserKokoro.subscribe((snapshot) => {
+      this.refreshEngines()
+      const ready = snapshot.state === 'ready'
+      this.publish({
+        unlimited: ready,
+        // A model on the device settles the question for everything, including
+        // lines nobody could have pre-generated.
+        ...(ready ? { engine: 'studio' as const, degraded: false } : {}),
+      })
+      // A voice that has just arrived should be used by the *next* line, and
+      // a failure should not leave a stale "resting" flag suppressing it.
+      if (ready) this.engineFailedAt = 0
+    })
+    void browserKokoro.resume()
+    return unsubscribe
+  }
+
+  /** Download and start the on-device model. From a deliberate press only. */
+  installStudioVoice(): Promise<boolean> {
+    return browserKokoro.install()
+  }
+
+  get studio(): StudioSnapshot {
+    return browserKokoro.getSnapshot()
   }
 
   /** Device voices, for the fallback path. */
@@ -301,7 +371,7 @@ class TTS {
     return this.bus?.context ?? null
   }
 
-  private buildEngine(): TTSEngine | null {
+  private buildRemote(): TTSEngine | null {
     if (!this.config.endpoint) return null
     return new KokoroEngine({
       endpoint: this.config.endpoint,
@@ -320,7 +390,7 @@ class TTS {
    * afterwards; a backend that is not there answers instantly with `false`.
    */
   private warmUp(): Promise<void> {
-    if (!this.engine) {
+    if (!this.remote) {
       /*
        * No service, but possibly a shelf full of speech.
        *
@@ -338,16 +408,21 @@ class TTS {
       }
       return this.ready
     }
+    const remote = this.remote
     if (!this.ready) {
-      this.ready = this.engine
+      this.ready = remote
         .probe()
         .then((ok) => {
+          // A model on this device already answered the question, and the
+          // service being unreachable does not un-answer it.
+          if (this.status.unlimited) return
           this.publish({
             engine: ok ? 'studio' : 'device',
             degraded: !ok,
           })
         })
         .catch(() => {
+          if (this.status.unlimited) return
           this.publish({ engine: 'device', degraded: true })
         })
     }
@@ -503,7 +578,8 @@ class TTS {
       next.engine === this.status.engine &&
       next.loading === this.status.loading &&
       next.lastSource === this.status.lastSource &&
-      next.degraded === this.status.degraded
+      next.degraded === this.status.degraded &&
+      next.unlimited === this.status.unlimited
     ) {
       return
     }
@@ -523,3 +599,11 @@ export const tts = new TTS()
 
 export type { LogicalVoice, SpeakOutcome } from './types'
 export { VOICE_PROFILES, voiceProfile, voiceForStyle } from './voices'
+export {
+  browserKokoro,
+  studioVoiceSupported,
+  webGpuAvailable,
+  STUDIO_DOWNLOAD_MB,
+  type StudioSnapshot,
+  type StudioState,
+} from './engines/browserKokoro'
