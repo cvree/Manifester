@@ -362,6 +362,52 @@ describe('deduplication', () => {
   })
 })
 
+describe('what an engine is actually asked to say', () => {
+  /**
+   * The dictionary reaching the model that runs on the device.
+   *
+   * Every clip that ships with the app is generated from the *normalised*
+   * reading of its line — that is what makes a pre-generated affirmation and
+   * the same sentence spoken on somebody's phone one voice saying one thing
+   * rather than two readings under one cache key. The on-device engine was
+   * handed the raw text instead, so the dictionary quietly stopped applying to
+   * exactly the lines it exists for: the ones somebody typed themselves.
+   */
+  it('hands over the words as written and as the dictionary reads them', async () => {
+    const engine = fakeEngine()
+    const client = new TTSClient({
+      engines: [engine],
+      manifest: new StaticManifest('/speech/'),
+      normalizer: new PronunciationNormalizer({
+        supportsPhonemes: false,
+        entries: [{ term: 'REM', say: 'rem', scope: 'core' }],
+      }),
+      getContext: fakeContext,
+      browserCache: fakeStore().cache,
+      staticBase: '/speech/',
+    })
+
+    await client.resolve('I rest in REM sleep.', options)
+
+    const request = (engine.synthesize as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as EngineRequest
+    // The backend has the dictionary too, and renders it with phonemes on.
+    expect(request.text).toBe('I rest in REM sleep.')
+    // An engine that speaks the words directly gets them ready to speak.
+    expect(request.spoken).toBe('I rest in rem sleep.')
+  })
+
+  it('falls back to the written form when no rule touched the line', async () => {
+    const engine = fakeEngine()
+    const { client } = build(engine)
+    await client.resolve('Hello there.', options)
+
+    const request = (engine.synthesize as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as EngineRequest
+    expect(request.spoken).toBe('Hello there.')
+  })
+})
+
 describe('when there is nothing to fall back on', () => {
   it('says so plainly rather than hanging', async () => {
     const { client } = build(null)

@@ -31,6 +31,7 @@
  * is written out in `lib/tts/engines/runtime.ts`.
  */
 
+import { describeCheck, inspectSpeech } from '../lib/tts/engines/audioCheck'
 import {
   CDN_WASM_PATH,
   type StudioRuntime,
@@ -51,18 +52,34 @@ const MODEL_BASE = `https://huggingface.co/${MODEL_ID}/resolve/main`
 /**
  * Which weights to fetch.
  *
- * `q8` on both backends, deliberately. The obvious choice for WebGPU is `fp32`
- * — it is what the upstream demo uses and it is unquestionably the better
- * sounding of the two — but it is 326 MB, and this app promised somebody a
- * hundred. Quantised is ~86 MB, is very hard to tell apart on a phone speaker
- * at 24 kHz, and means the WebGPU→WASM fallback below costs nothing: the same
- * files are already on disk, so a device whose GPU path fails re-opens the
- * session on the CPU without downloading anything a second time.
+ * `q8`, and it is inseparable from the fact that this app only ever runs the
+ * model on `wasm`. Upstream `kokoro-js` treats the two as a pair — quantised
+ * weights on the CPU, full precision on the GPU — and the pairing is not a
+ * performance preference, it is the difference between speech and noise on the
+ * devices where the GPU path silently corrupts its output. `runtime.ts` has
+ * the whole account of why the GPU is not attempted here at all.
+ *
+ * Which leaves the size, and quantised is the only option that keeps the
+ * promise on the install card: ~86 MB against 326 MB for `fp32`. It is very
+ * hard to tell apart on a phone speaker at 24 kHz, and it is the same weights
+ * on every device, so the CDN-runtime fallback costs nothing — the files are
+ * already on disk and only the engine loading them changes.
  */
 const DTYPE = 'q8'
 
 /** Kokoro's output rate. Fixed by the checkpoint. */
 const SAMPLE_RATE = 24_000
+
+/**
+ * What the model is asked to say before this device is told it has a voice.
+ *
+ * A whole short sentence rather than the single word this used to be, because
+ * the point of it changed: it is no longer only proof that inference runs, it
+ * is the sample the checks in `audioCheck.ts` are run against, and a statistic
+ * taken over half a second of one word is a statistic worth very little.
+ * Nobody hears it — it is generated, measured and thrown away.
+ */
+const WARM_UP_LINE = 'Ready when you are.'
 
 /**
  * The voices this app actually uses, by their Kokoro names.
@@ -77,6 +94,30 @@ const USED_VOICES = ['af_heart', 'am_fenrir']
 
 /** Where `kokoro-js` looks for a voice pack. Matched exactly, or it re-fetches. */
 const VOICE_CACHE = 'kokoro-voices'
+
+/** Where `kokoro-js` fetches a voice pack from. Matched exactly, or it re-fetches. */
+const voiceUrl = (voice: string) => `${MODEL_BASE}/voices/${voice}.bin`
+
+/**
+ * Exactly how big a voice pack is, and why that number is checked.
+ *
+ * A Kokoro voice is not a recording, it is a style tensor: 510 rows — one per
+ * possible token count — of 256 `float32` weights, which the model is handed
+ * alongside the phonemes. `kokoro-js` reads the row it needs by *offset*, with
+ * no length check of its own.
+ *
+ * So a voice pack that arrives short is the quietest catastrophe in this
+ * feature. Nothing throws. The slice lands past the end of the buffer, or half
+ * inside it, and the model is conditioned on whatever was there — which comes
+ * back as a voice-shaped noise rather than as an error. Worse, the truncated
+ * bytes are then in a `Cache` keyed by their URL, so every later line, every
+ * later session and every later reinstall reads the same bad half-megabyte and
+ * produces the same noise, and nothing anywhere in the app could reach it.
+ *
+ * One multiplication is enough to make that impossible: a pack of the wrong
+ * length is deleted rather than trusted, and fetched again.
+ */
+const VOICE_BYTES = 510 * 256 * 4
 
 /** Where `transformers.js` keeps the weights, the tokeniser and the config. */
 const MODEL_CACHE = 'transformers-cache'
@@ -169,11 +210,35 @@ async function discard(): Promise<void> {
   }
   try {
     const voices = await caches.open(VOICE_CACHE)
-    await Promise.all(
-      USED_VOICES.map((voice) => voices.delete(`${MODEL_BASE}/voices/${voice}.bin`)),
-    )
+    await Promise.all(USED_VOICES.map((voice) => voices.delete(voiceUrl(voice))))
   } catch {
     /* As above. */
+  }
+}
+
+/**
+ * Throw away any voice pack that is not the size a voice pack is.
+ *
+ * Cheap — it reads the cache and never the network — and it runs before the
+ * model is brought up rather than after, so that the warm-up below is speaking
+ * with weights that have actually been checked. See `VOICE_BYTES` for what a
+ * short one does and why nothing else would ever notice it.
+ */
+async function pruneVoices(): Promise<void> {
+  if (typeof caches === 'undefined') return
+  try {
+    const cache = await caches.open(VOICE_CACHE)
+    await Promise.all(
+      USED_VOICES.map(async (voice) => {
+        const url = voiceUrl(voice)
+        const stored = await cache.match(url)
+        if (!stored) return
+        const bytes = await stored.arrayBuffer()
+        if (bytes.byteLength !== VOICE_BYTES) await cache.delete(url)
+      }),
+    )
+  } catch {
+    /* A cache that will not open holds nothing we can be misled by. */
   }
 }
 
@@ -223,11 +288,20 @@ async function warmVoices(): Promise<void> {
     const cache = await caches.open(VOICE_CACHE)
     await Promise.all(
       USED_VOICES.map(async (voice) => {
-        const url = `${MODEL_BASE}/voices/${voice}.bin`
+        const url = voiceUrl(voice)
         if (await cache.match(url)) return
         const response = await fetch(url)
         if (!response.ok) return
-        await cache.put(url, response)
+        /*
+         * Read the bytes and check them before storing, rather than handing
+         * the `Response` straight to the cache. A pack that arrived short is
+         * exactly the thing this cache must never be allowed to hold — see
+         * `VOICE_BYTES` — and once it is in there under its own URL it is
+         * indistinguishable from a good one for ever.
+         */
+        const bytes = await response.arrayBuffer()
+        if (bytes.byteLength !== VOICE_BYTES) return
+        await cache.put(url, new Response(bytes, { headers: response.headers }))
       }),
     )
   } catch {
@@ -418,6 +492,10 @@ async function bringUp(
 
     const progress = new Progress()
 
+    // Before anything is loaded, and it only ever reads the cache: a voice
+    // pack of the wrong length would make the warm-up below meaningless.
+    await pruneVoices()
+
     let KokoroTTS: KokoroModule['KokoroTTS']
     try {
       const module = (await import('kokoro-js')) as KokoroModule
@@ -469,21 +547,45 @@ async function bringUp(
       })
 
       /*
-       * Say one word before claiming to be ready.
+       * Say one line before claiming to be ready — and then listen to it.
        *
        * Building the session succeeds on hardware that then throws on the
        * first real inference — an unsupported operator, a shader that will not
        * compile, a GPU adapter that has already been lost. Finding that out
-       * here costs a second and lets the CPU attempt happen quietly; finding
+       * here costs a second and lets the next attempt happen quietly; finding
        * it out later means somebody taps Play and hears nothing.
        *
-       * It is also the slowest silent thing this worker does: a first
+       * Checking that it did not *throw* was not enough, and the gap between
+       * those two things is the entire reason people who installed this heard
+       * their own words come back as gibberish. A backend can run this graph
+       * to completion and return corrupted samples, reporting nothing at all;
+       * the install then succeeds, and the failure stays invisible until
+       * somebody writes a sentence of their own, because everything else the
+       * app speaks is a pre-generated file. So the warm-up is inspected. See
+       * `engines/audioCheck.ts`.
+       *
+       * This is also the slowest silent thing this worker does: a first
        * inference on a single WebAssembly thread loads espeak-ng, compiles the
        * graph's kernels and runs the whole vocoder. The page is told, so that
        * the wait is described rather than mistaken for a stall.
        */
       stage('warming')
-      await instance.generate('Ready.', { voice: 'af_heart', speed: 1 })
+      const proof = await instance.generate(WARM_UP_LINE, {
+        voice: 'af_heart',
+        speed: 1,
+      })
+      const check = inspectSpeech(
+        new Float32Array(proof.audio),
+        proof.sampling_rate ?? SAMPLE_RATE,
+      )
+      if (!check.ok) {
+        post({
+          type: 'failed',
+          reason: 'garbled',
+          message: `${device}: the voice came back as ${check.reason} (${describeCheck(check)}).`,
+        })
+        return
+      }
 
       tts = instance
       activeBackend = device

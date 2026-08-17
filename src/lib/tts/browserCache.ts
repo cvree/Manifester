@@ -166,6 +166,67 @@ export class BrowserCache {
     }
   }
 
+  /**
+   * Drop every clip stored in one encoding, and keep the rest.
+   *
+   * Which sounds like housekeeping and is really a repair. This cache is the
+   * reason a line is instant the second time somebody hears it, and that is
+   * exactly what makes it dangerous when the thing it captured was wrong: a
+   * device that synthesised a sentence with a broken backend keeps handing that
+   * recording back for ever, so *fixing the engine changes nothing anybody can
+   * hear*. There is no version to bump either — the key is a hash of the words,
+   * the voice and the model, and none of those changed.
+   *
+   * The encoding is the tell. Everything this device made itself is WAV, from
+   * `wav.ts`; everything that shipped with the app is Opus or MP3. So clearing
+   * one format clears precisely the clips a local model produced, and leaves
+   * every pre-generated affirmation somebody has already downloaded alone.
+   *
+   * Returns how many went, so the caller can be quiet when there was nothing
+   * to do — which is the overwhelmingly common case.
+   */
+  async dropFormat(format: AudioFormat): Promise<number> {
+    const db = await this.open()
+    if (!db) return 0
+    try {
+      const all = await request<CachedClip[]>(db, STORE, 'readonly', (store) =>
+        store.getAll(),
+      )
+      const doomed = all.filter((clip) => clip.format === format).map((clip) => clip.id)
+      if (doomed.length === 0) return 0
+
+      await new Promise<void>((resolve) => {
+        const tx = db.transaction(STORE, 'readwrite')
+        const store = tx.objectStore(STORE)
+        doomed.forEach((id) => store.delete(id))
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => resolve()
+        tx.onabort = () => resolve()
+      })
+      return doomed.length
+    } catch {
+      return 0
+    }
+  }
+
+  /**
+   * Let go of the database, so something else can delete it.
+   *
+   * The same reason `closeDatabase` exists in `lib/storage.ts`: a delete with a
+   * connection still open blocks rather than failing, which reads as a button
+   * that does nothing. This cache is the *second* database this app owns, and
+   * it is the one most likely to be forgotten, because nothing in the interface
+   * ever mentions it.
+   */
+  close(): void {
+    const opening = this.dbPromise
+    this.dbPromise = null
+    opening?.then(
+      (db) => db?.close(),
+      () => undefined,
+    )
+  }
+
   /* ── internals ── */
 
   private open(): Promise<IDBDatabase | null> {
