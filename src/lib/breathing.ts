@@ -259,6 +259,22 @@ export function breathsPerMinute(pattern: BreathPattern): number {
   return total > 0 ? 60 / total : 0
 }
 
+/**
+ * The same number, as a person would say it.
+ *
+ * One decimal place, and only when there is one worth showing: a pattern that
+ * comes to six breaths a minute should say six, not 6.0, and one that comes to
+ * 3.75 should not claim a precision the third decimal would ruin. `3.8` is the
+ * right amount of honesty for a number nobody is going to count against a
+ * stopwatch.
+ */
+export function formatBreathRate(pattern: BreathPattern): string | null {
+  const rate = breathsPerMinute(pattern)
+  if (!(rate > 0)) return null
+  const rounded = Math.round(rate * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+}
+
 /** A pattern with no time in it would divide by zero everywhere downstream. */
 export function isPatternValid(pattern: BreathPattern): boolean {
   return pattern.inhale > 0 && pattern.exhale > 0

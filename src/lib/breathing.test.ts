@@ -4,6 +4,7 @@ import {
   cycleSeconds,
   easeInOutSlope,
   expansionAt,
+  formatBreathRate,
   type BreathPattern,
 } from './breathing'
 
@@ -99,5 +100,33 @@ describe('expansionAt', () => {
 
   it('returns zero for a pattern with no time in it', () => {
     expect(expansionAt({ inhale: 0, holdIn: 0, exhale: 0, holdOut: 0 }, 3)).toBe(0)
+  })
+})
+
+/*
+ * The number the player shows inside the orb. It is the one fact about a
+ * pattern people ask for out loud — "how slow am I breathing?" — and it has to
+ * read like an answer rather than like a measurement.
+ */
+describe('formatBreathRate', () => {
+  it('says a whole number without a decimal point', () => {
+    // 6 in, 4 out: ten seconds a breath, six breaths a minute.
+    expect(formatBreathRate({ inhale: 6, holdIn: 0, exhale: 4, holdOut: 0 })).toBe('6')
+  })
+
+  it('keeps one decimal place where there is one worth keeping', () => {
+    // The default: 4 in, 6 out — sixteen seconds, 3.75 breaths a minute.
+    expect(formatBreathRate({ inhale: 6, holdIn: 0, exhale: 10, holdOut: 0 })).toBe('3.8')
+  })
+
+  it('counts the holds, which are part of the breath', () => {
+    // Box breathing is four fours — sixteen seconds a breath, not eight.
+    // Counting only the moving phases would claim 7.5 breaths a minute, which
+    // is nearly double what the person following it is actually doing.
+    expect(formatBreathRate({ inhale: 4, holdIn: 4, exhale: 4, holdOut: 4 })).toBe('3.8')
+  })
+
+  it('has nothing to say about a pattern with no time in it', () => {
+    expect(formatBreathRate({ inhale: 0, holdIn: 0, exhale: 0, holdOut: 0 })).toBeNull()
   })
 })

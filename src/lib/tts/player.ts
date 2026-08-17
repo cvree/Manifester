@@ -23,6 +23,7 @@
  * reliably happy with.
  */
 
+import { clampPlaybackRate } from './shape'
 import type { SpeakOutcome } from './types'
 
 /** Enough to be scheduled cleanly, short enough that nobody waits for it. */
@@ -31,10 +32,24 @@ const FADE_IN_SECONDS = 0.01
 const FADE_OUT_SECONDS = 0.03
 /** Short enough to feel like the slider, long enough not to step. */
 const LEVEL_RAMP_SECONDS = 0.08
+/**
+ * How long a live speed or pitch change takes to arrive.
+ *
+ * Longer than the level ramp, because this one is a glide in the voice rather
+ * than in its loudness, and a step in playback rate is an audible lurch. A
+ * tenth of a second reads as the voice settling into the new setting.
+ */
+const RATE_RAMP_SECONDS = 0.12
 
 export interface PlayOptions {
   /** 0–1. The app's own gain, not the engine's. */
   volume?: number
+  /**
+   * How fast the buffer runs, which is also its pitch. Comes from `voiceShape`
+   * — the clip was rendered at a compensating speed so that the two multiply
+   * back to the tempo that was asked for. See `shape.ts`.
+   */
+  playbackRate?: number
   /** Fired when the first sample is due at the speakers. */
   onStart?: () => void
 }
@@ -54,6 +69,12 @@ interface Active {
   settle: (outcome: SpeakOutcome) => void
   /** Context time the clip is due to finish, for the stall watchdog. */
   endsAt: number
+  /** Context time the first sample is due, so progress can be measured. */
+  startAt: number
+  /** Seconds of buffer, whatever rate it is being played at. */
+  duration: number
+  /** The rate in force now — changed live by `setPlaybackRate`. */
+  rate: number
   startTimer: number | null
   watchdog: number | null
 }
@@ -126,6 +147,51 @@ export class AudioPlayer {
     }
   }
 
+  /**
+   * Change the speed — and so the pitch — of the line speaking *now*.
+   *
+   * The sibling of `setVolume`, and it exists for the same reason: somebody
+   * moving the Speed slider is listening to the thing they are moving it for.
+   * A clip cannot be re-rendered mid-word, but it can be resampled, and that
+   * is instant where a re-synthesis is seconds.
+   *
+   * `endsAt` is recomputed rather than left alone, because it is what the
+   * stall watchdog compares against: slowing a clip down without moving its
+   * due time would have the watchdog declare it finished while it was still
+   * speaking. The remaining buffer is measured at the old rate and re-timed at
+   * the new one, which is exact enough — the ramp below is a tenth of a second
+   * against a watchdog with four tenths of grace.
+   */
+  setPlaybackRate(value: number, rampSeconds = RATE_RAMP_SECONDS): void {
+    const active = this.active
+    const ctx = this.getContext()
+    if (!active || !ctx || ctx.state === 'closed') return
+
+    const target = clampPlaybackRate(value)
+    if (Math.abs(target - active.rate) < 0.001) return
+
+    const now = ctx.currentTime
+    try {
+      active.source.playbackRate.cancelScheduledValues(now)
+      active.source.playbackRate.setValueAtTime(
+        active.source.playbackRate.value,
+        now,
+      )
+      active.source.playbackRate.linearRampToValueAtTime(target, now + rampSeconds)
+    } catch {
+      /* A node released between the check and the ramp. */
+      return
+    }
+
+    const playedSeconds = Math.max(0, now - active.startAt) * active.rate
+    const remaining = Math.max(0, active.duration - playedSeconds)
+    active.rate = target
+    active.endsAt = now + remaining / target
+    // The watchdog already re-arms itself whenever the clip is not due yet, so
+    // a later due time is picked up on its own; an earlier one is beaten by
+    // `onended`. Nothing needs re-arming here.
+  }
+
   play(buffer: AudioBuffer, options: PlayOptions = {}): PlayHandle {
     // Whatever was speaking is over the moment something else is asked for.
     const interrupted = this.active != null
@@ -137,11 +203,13 @@ export class AudioPlayer {
     }
 
     const volume = clamp01(options.volume ?? 1)
+    const rate = clampPlaybackRate(options.playbackRate ?? 1)
     const gain = ctx.createGain()
     gain.connect(ctx.destination)
 
     const source = ctx.createBufferSource()
     source.buffer = buffer
+    source.playbackRate.value = rate
     source.connect(gain)
 
     /*
@@ -157,7 +225,7 @@ export class AudioPlayer {
      */
     const lead = interrupted ? START_LEAD_SECONDS + FADE_OUT_SECONDS : START_LEAD_SECONDS
     const startAt = ctx.currentTime + lead
-    const fadeIn = Math.min(FADE_IN_SECONDS, buffer.duration / 4)
+    const fadeIn = Math.min(FADE_IN_SECONDS, buffer.duration / (4 * rate))
     gain.gain.setValueAtTime(0.0001, startAt)
     gain.gain.linearRampToValueAtTime(volume, startAt + fadeIn)
 
@@ -175,7 +243,10 @@ export class AudioPlayer {
       source,
       gain,
       settle,
-      endsAt: startAt + buffer.duration,
+      endsAt: startAt + buffer.duration / rate,
+      startAt,
+      duration: buffer.duration,
+      rate,
       startTimer: null,
       watchdog: null,
     }

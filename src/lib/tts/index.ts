@@ -34,6 +34,7 @@ import {
   createNormalizer,
 } from './pronunciation/normalizer'
 import type { PronunciationEntry } from './pronunciation/types'
+import { bridgeRate, voiceShape } from './shape'
 import type {
   ClipSource,
   LogicalVoice,
@@ -65,6 +66,19 @@ export interface TTSStatus {
    * read by Ivy or Fen too.
    */
   unlimited: boolean
+  /**
+   * True when something here can make a clip that does not already exist.
+   *
+   * Weaker than `unlimited` — a reachable backend counts, and that is not a
+   * model on this device — and it is the question that decides whether the
+   * *shape* controls are real. A build with neither a service nor a model
+   * still speaks in the studio voice, out of the shelf of clips that shipped
+   * with it; what it cannot do is produce that voice at a speed nobody
+   * pre-generated. Asking it to would quietly hand the line to the device's
+   * own voice, so the control that would ask is not offered. See
+   * `VoiceSettings`.
+   */
+  synthesises: boolean
 }
 
 export interface SpeakSettings extends SpeakOptions {
@@ -78,7 +92,14 @@ export interface SpeakSettings extends SpeakOptions {
   prefer?: 'studio' | 'device'
   /** An exact device voice, for the fallback path only. */
   deviceVoiceURI?: string | null
-  /** Fallback only — no neural engine exposes a pitch control. */
+  /**
+   * How high the voice reads, on both paths.
+   *
+   * The device voice takes it straight through to the platform. The studio
+   * voice gets it by being rendered at a compensating speed and played back
+   * faster or slower — which moves the pitch and leaves the tempo alone. See
+   * `shape.ts`; it is why this is no longer a fallback-only control.
+   */
   pitch?: number
 }
 
@@ -90,6 +111,30 @@ export interface SpeakSettings extends SpeakOptions {
  * again within a few lines.
  */
 const ENGINE_RETRY_MS = 5000
+
+/**
+ * How long a line will wait for the backend to say which model it is running.
+ *
+ * ── Why there is a deadline at all ──
+ *
+ * `warmUp` exists so that the page and the server agree on the model version
+ * that goes into every cache key, and waiting for it costs one round trip on
+ * the first line of a session. That is a fair trade against a health check
+ * that answers. It is not a fair trade against one that does not: a backend
+ * behind a captive portal, a phone on a dead cell, a container still starting
+ * up — all of them hold the request open for the full four-second lookup
+ * timeout, and the whole time the first line of somebody's ritual is not being
+ * spoken, and not being fetched either, because `preload` waits on the same
+ * promise. That is the "massive delay when the audio loads" that this number
+ * removes.
+ *
+ * So the wait is bounded and the fallback is the value the build ships with —
+ * which is the same value the backend reports in every case except the one
+ * where somebody has upgraded the container without rebuilding the front end.
+ * A wrong guess costs a cache miss on one line; the probe lands a moment later
+ * and every line after it is keyed correctly.
+ */
+const WARM_UP_BUDGET_MS = 600
 
 /**
  * Which repairs of the on-device cache this installation has already had.
@@ -138,6 +183,7 @@ class TTS {
     lastSource: null,
     degraded: false,
     unlimited: false,
+    synthesises: false,
   }
   /** Resolves once the engine has said which model version it is running. */
   private ready: Promise<void> | null = null
@@ -152,6 +198,13 @@ class TTS {
    * own voice; after it, one line pays to find out whether the voice is back.
    */
   private engineFailedAt = 0
+  /**
+   * The speed the clip in the speakers was rendered at.
+   *
+   * Zero when nothing studio-made is playing. It is the reference a live speed
+   * change is measured against — see `setLiveRate`.
+   */
+  private liveSynthesisSpeed = 0
 
   constructor() {
     this.normalizer = createNormalizer({
@@ -170,6 +223,7 @@ class TTS {
       language: this.config.language,
     })
     this.status.engine = this.remote ? 'studio' : 'device'
+    this.status.synthesises = this.engines().length > 0
   }
 
   /**
@@ -189,7 +243,9 @@ class TTS {
 
   /** Re-read which engines exist, without disturbing anything already cached. */
   private refreshEngines(): void {
-    this.client.setEngines(this.engines())
+    const engines = this.engines()
+    this.client.setEngines(engines)
+    this.publish({ synthesises: engines.length > 0 })
   }
 
   /* ── Wiring ───────────────────────────────────────────────── */
@@ -219,7 +275,10 @@ class TTS {
       staticBase: this.config.staticBase,
       language: this.config.language,
     })
-    this.publish({ engine: this.remote ? 'studio' : 'device' })
+    this.publish({
+      engine: this.remote ? 'studio' : 'device',
+      synthesises: this.engines().length > 0,
+    })
   }
 
   /* ── The on-device model ──────────────────────────────────────── */
@@ -386,9 +445,34 @@ class TTS {
     this.player.setVolume(value)
   }
 
+  /**
+   * Change the speed of the line that is speaking *now*, and report whether
+   * that worked.
+   *
+   * The studio voice can do this because a clip is a buffer this app owns, and
+   * resampling a buffer is free. The device voice cannot: an utterance's rate
+   * is fixed the moment the platform is handed it. The boolean is the whole
+   * point of the method — the loop uses it to decide between "the fader was
+   * enough" and "this line has to be said again", and the second of those is
+   * the expensive one, so it is worth knowing which is which.
+   *
+   * What the listener hears is the new *tempo*, exactly, from the next tenth
+   * of a second. The pitch rides along with it for the remainder of that one
+   * line, because a clip cannot be re-rendered mid-word; the next line is
+   * rendered at the new speed properly and both are right from then on. That
+   * trade replaces what this used to do, which was stop speaking and hold the
+   * silence until a re-synthesis arrived.
+   */
+  setLiveRate(rate: number): boolean {
+    if (!this.player.isSpeaking || this.liveSynthesisSpeed <= 0) return false
+    this.player.setPlaybackRate(bridgeRate(rate, this.liveSynthesisSpeed))
+    return true
+  }
+
   /** Stop speaking now. Does not cancel work that is nearly finished. */
   stop(): void {
     this.generation += 1
+    this.liveSynthesisSpeed = 0
     this.player.stop('interrupted')
     this.fallbackVoice.stop()
     this.publish({ loading: false })
@@ -495,14 +579,30 @@ class TTS {
     return this.ready
   }
 
+  /**
+   * Wait for the warm-up, but never for longer than a line can afford.
+   *
+   * The promise itself is not cancelled — it settles in its own time and the
+   * status it publishes still lands. This only stops a caller queueing behind
+   * it. See `WARM_UP_BUDGET_MS`.
+   */
   private whenReady(): Promise<void> {
-    return this.warmUp()
+    const ready = this.warmUp()
+    return Promise.race([ready, sleep(WARM_UP_BUDGET_MS)])
   }
 
+  /**
+   * What the studio path should ask the caches and the engine for.
+   *
+   * The speed here is not the speed somebody chose: it is the speed the clip
+   * has to be *rendered* at for the requested pitch to come out of a resampled
+   * playback at the requested tempo. At pitch 1 the two are the same number.
+   * See `shape.ts`.
+   */
   private resolveOptions(settings: SpeakSettings & typeof DEFAULT_SPEAK): ResolveOptions {
     return {
       voice: settings.voice as LogicalVoice,
-      speed: settings.speed,
+      speed: voiceShape(settings.speed, settings.pitch).synthesisSpeed,
       language: settings.language ?? this.config.language,
       cache: settings.cache,
       signal: settings.signal,
@@ -560,6 +660,8 @@ class TTS {
   ): Promise<SpeakOutcome> {
     if (!this.context()) return 'failed'
 
+    const shape = voiceShape(settings.speed, settings.pitch)
+
     this.publish({ loading: true })
     try {
       await this.whenReady()
@@ -569,8 +671,13 @@ class TTS {
         return 'interrupted'
       }
 
+      // Remembered so that a slider moved halfway through this line can be
+      // answered by resampling it rather than by re-rendering it. See
+      // `setLiveRate`.
+      this.liveSynthesisSpeed = shape.synthesisSpeed
       const handle = this.player.play(clip.buffer, {
         volume: settings.volume,
+        playbackRate: shape.playbackRate,
         onStart: settings.onStart,
       })
 
@@ -611,6 +718,9 @@ class TTS {
       settings.onEnd?.('failed')
       return 'failed'
     }
+
+    // Nothing of this app's own is playing, so there is nothing to resample.
+    this.liveSynthesisSpeed = 0
 
     // The device voice cannot take phonemes, so it gets the respellings —
     // which is exactly why the dictionary carries both.
@@ -655,13 +765,18 @@ class TTS {
       next.loading === this.status.loading &&
       next.lastSource === this.status.lastSource &&
       next.degraded === this.status.degraded &&
-      next.unlimited === this.status.unlimited
+      next.unlimited === this.status.unlimited &&
+      next.synthesises === this.status.synthesises
     ) {
       return
     }
     this.status = next
     this.listeners.forEach((listener) => listener(next))
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 /**
@@ -674,6 +789,7 @@ class TTS {
 export const tts = new TTS()
 
 export type { LogicalVoice, SpeakOutcome } from './types'
+export { STUDIO_PITCH, clampStudioPitch, voiceShape } from './shape'
 export { VOICE_PROFILES, voiceProfile, voiceForStyle } from './voices'
 export {
   browserKokoro,

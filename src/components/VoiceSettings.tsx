@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { cx } from '../lib/cx'
 import { MAX_VOICE_VOLUME } from '../lib/speech'
-import { VOICE_PROFILES, voiceForStyle } from '../lib/tts'
+import { STUDIO_PITCH, VOICE_PROFILES, clampStudioPitch, voiceForStyle } from '../lib/tts'
 import { useStudioAvailable, useTTSStatus } from '../lib/tts/useTTSStatus'
 import type { LoopSettings } from '../lib/types'
 import { contentLanguage, voiceSpeaks } from '../lib/voiceLanguage'
@@ -47,6 +47,9 @@ export function VoiceSettings({
   const studioAvailable = useStudioAvailable()
   // Chosen *and* available. See `useStudioAvailable`.
   const usingStudio = settings.voiceSource === 'studio' && studioAvailable
+  // A device voice may have been left anywhere in its wider range; a studio
+  // one has a narrower one, so the control shows where the value will land.
+  const pitch = usingStudio ? clampStudioPitch(settings.pitch) : settings.pitch
 
   /**
    * What each style card will actually sound like.
@@ -289,23 +292,48 @@ export function VoiceSettings({
       />
 
       {/*
-        Pitch belongs to device voices alone.
+        Pitch, on the studio voices too.
 
-        A studio clip is recorded audio, and the only way to raise its pitch
-        after the fact is to play it faster — which is the Speed control, under
-        a different name and with a worse result. A slider that silently does
-        nothing is worse than one that is not there, so it is not there.
+        It used to belong to device voices alone, and the reason given was
+        sound: a studio clip is rendered audio, and the only thing a browser
+        will do to audio is play it at a different rate — which raises the
+        pitch and hurries the words at the same time, making a Pitch slider a
+        worse Speed slider.
+
+        What that reasoning missed is that there are two levers, not one. The
+        engine's own speed stretches time and leaves the voice where it is, so
+        rendering a line at `rate / pitch` and playing it back at `pitch` puts
+        the tempo back exactly where it was and leaves the pitch shift behind.
+        Which means the control is real on both paths now, and Fen can be lifted
+        out of the bottom of his range without being rushed through it. See
+        `tts/shape.ts`.
+
+        The range is narrower for a studio voice on purpose: a neural voice
+        pushed a long way from where it was trained stops sounding like a
+        person.
+
+        And it is offered only where something can actually render a line —
+        `status.synthesises`. A build with no service and no on-device model
+        still speaks in Ivy and Fen, out of the shelf of clips that shipped
+        with it, but every one of those was generated at one pitch. Asking for
+        another would find nothing anywhere and quietly hand the line to the
+        device's own voice, which is a worse outcome than not offering the
+        slider and never explaining why the voice changed.
       */}
-      {!usingStudio && (
+      {(!usingStudio || status.synthesises) && (
         <Slider
           label="Pitch"
-          min={0.5}
-          max={1.5}
+          min={usingStudio ? STUDIO_PITCH.min : 0.5}
+          max={usingStudio ? STUDIO_PITCH.max : 1.5}
           step={0.05}
-          value={settings.pitch}
-          display={settings.pitch.toFixed(2)}
-          hint="Some voices ignore pitch. If nothing changes, that is why."
-          onChange={(pitch) => onChange({ pitch })}
+          value={pitch}
+          display={pitch.toFixed(2)}
+          hint={
+            usingStudio
+              ? 'Moves the voice up or down without changing how fast it reads.'
+              : 'Some voices ignore pitch. If nothing changes, that is why.'
+          }
+          onChange={(next) => onChange({ pitch: next })}
         />
       )}
 

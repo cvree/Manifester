@@ -5,7 +5,6 @@ import { describeMix, mixerLayers } from '../lib/soundMixer'
 import {
   brainwaveSummary,
   breathingSummary,
-  feelSummary,
   soundSummary,
 } from '../lib/summaries'
 import { useLibrary } from '../state/LibraryProvider'
@@ -18,7 +17,6 @@ import {
   MixerIcon,
   MuteIcon,
   PulseIcon,
-  TuneIcon,
   WaveIcon,
 } from './Icons'
 import { SettingRow } from './SettingRow'
@@ -205,12 +203,13 @@ export function PlayerAdjust({
             onClick={() => go('breathing')}
             accent={preferences.breathingEnabled || preferences.backgroundVisualizer}
           />
-          <SettingRow
-            icon={<TuneIcon />}
-            title="Feedback"
-            summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
-            onClick={() => go('feel')}
-          />
+          {/*
+            Taps and haptics are not something anybody adjusts *while
+            listening* — they are a preference you set once and forget, and a
+            row for them here was a row that made this list longer without ever
+            being the reason somebody opened it. It lives under Options, beside
+            the rest of the once-and-forget settings. See `CustomizePanel`.
+          */}
         </div>
 
         <div className="flex justify-center">

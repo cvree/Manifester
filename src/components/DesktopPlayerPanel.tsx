@@ -5,7 +5,6 @@ import { describeMix, mixerLayers } from '../lib/soundMixer'
 import {
   brainwaveSummary,
   breathingSummary,
-  feelSummary,
   soundSummary,
 } from '../lib/summaries'
 import { useLibrary } from '../state/LibraryProvider'
@@ -18,7 +17,6 @@ import {
   MixerIcon,
   MuteIcon,
   PulseIcon,
-  TuneIcon,
   WaveIcon,
 } from './Icons'
 import { SettingRow } from './SettingRow'
@@ -138,12 +136,12 @@ export function DesktopPlayerPanel({
           onClick={() => open('breathing')}
           accent={preferences.breathingEnabled || preferences.backgroundVisualizer}
         />
-        <SettingRow
-          icon={<TuneIcon />}
-          title="Feedback"
-          summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
-          onClick={() => open('feel')}
-        />
+        {/*
+          No Feedback row. Taps and haptics are set once and then never thought
+          about again, which makes them a poor fit for a panel whose whole
+          premise is "things you change while listening". They are under
+          Options with the rest of the once-and-forget settings.
+        */}
       </div>
 
       <div className="border-t border-[var(--quiet-border)] px-5 py-4">

@@ -442,3 +442,170 @@ describe('changing the voice while it is speaking', () => {
     expect(speaker.spoken.length).toBe(before)
   })
 })
+
+/*
+ * ── Not waiting in silence ──
+ *
+ * The bug behind this whole group is the one people described as "it just
+ * stops for ages when I change the speed". Every case of it was the same
+ * shape: the loop stopped the line it was speaking and *then* asked for the
+ * replacement, so the wait for a synthesis — seconds, on a phone running the
+ * model itself — was spent in silence, with the interface showing a line
+ * nobody was reading.
+ *
+ * There are two answers here and the tests below pin both. Speed does not have
+ * to wait at all, because a clip can be resampled; everything else waits with
+ * the old line still playing rather than with nothing playing.
+ */
+describe('changing settings without a silence', () => {
+  /** A speaker that can resample the line it is playing, as the real one can. */
+  class LiveSpeaker extends FakeSpeaker {
+    rates: number[] = []
+    setLiveRate(value: number): boolean {
+      this.rates.push(value)
+      return true
+    }
+  }
+
+  it('changes the speed of the line already speaking, without restarting it', async () => {
+    vi.useFakeTimers()
+    const live = new LiveSpeaker()
+    const running = new VoiceLooper(live)
+    try {
+      running.start(options)
+      await vi.advanceTimersByTimeAsync(0)
+      const before = live.spoken.length
+
+      running.updateOptions({ rate: 1.3 })
+      await vi.advanceTimersByTimeAsync(300)
+
+      // The whole point: the new tempo is on the words in the speakers, and
+      // nothing was stopped, re-fetched or waited for to get it there.
+      expect(live.rates).toEqual([1.3])
+      expect(live.spoken.length).toBe(before)
+    } finally {
+      running.stop()
+    }
+  })
+
+  it('still says the line again when the speed cannot be bent live', async () => {
+    vi.useFakeTimers()
+    loop.start(options)
+    await vi.advanceTimersByTimeAsync(0)
+    const before = loop.isRunning ? speaker.spoken.length : 0
+
+    // The device voice's rate is fixed the moment the platform is handed the
+    // utterance, so there the only honest way to be instant is a restart.
+    loop.updateOptions({ rate: 1.3 })
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(speaker.spoken.length).toBe(before + 1)
+    expect(speaker.requests[speaker.requests.length - 1].speed).toBeCloseTo(1.3)
+  })
+
+  it('keeps the old line speaking until the new one has arrived', async () => {
+    vi.useFakeTimers()
+
+    const pending: { release: (() => void) | null } = { release: null }
+    const slow = new FakeSpeaker()
+    slow.preload = (text: string) => {
+      slow.preloaded.push(text)
+      // A line nobody has ever synthesised, on a phone doing the synthesising.
+      return new Promise<void>((resolve) => {
+        pending.release = resolve
+      })
+    }
+
+    const running = new VoiceLooper(slow)
+    try {
+      running.start(options)
+      await vi.advanceTimersByTimeAsync(0)
+      const before = slow.spoken.length
+      const playing = slow.pending
+
+      running.updateOptions({ voice: 'male_1' })
+      await vi.advanceTimersByTimeAsync(2000)
+
+      // Two seconds after the change, with the replacement still being made:
+      // the old reading is still going. This is the assertion the old code
+      // failed — it had stopped, and was showing a line it was not speaking.
+      expect(slow.spoken.length).toBe(before)
+      expect(slow.pending).toBe(playing)
+
+      pending.release?.()
+      await vi.advanceTimersByTimeAsync(0)
+
+      // And the moment there is something to say it with, it is said.
+      expect(slow.spoken.length).toBe(before + 1)
+      expect(slow.requests[slow.requests.length - 1].voice).toBe('male_1')
+    } finally {
+      running.stop()
+    }
+  })
+
+  it('abandons a swap whose line finished while it was being prepared', async () => {
+    vi.useFakeTimers()
+
+    const pending: { release: (() => void) | null } = { release: null }
+    const slow = new FakeSpeaker()
+    slow.preload = (text: string) => {
+      slow.preloaded.push(text)
+      return new Promise<void>((resolve) => {
+        pending.release = resolve
+      })
+    }
+
+    const running = new VoiceLooper(slow)
+    try {
+      running.start(options)
+      await vi.advanceTimersByTimeAsync(0)
+
+      running.updateOptions({ voice: 'male_1' })
+      await vi.advanceTimersByTimeAsync(200)
+
+      // The line ends on its own before the replacement is ready, so the loop
+      // has moved on under the new voice and there is nothing left to swap.
+      slow.pending?.settle('finished')
+      await vi.advanceTimersByTimeAsync(0)
+      const after = slow.spoken.length
+      expect(slow.spoken[after - 1]).toBe('Second line.')
+
+      pending.release?.()
+      await vi.advanceTimersByTimeAsync(50)
+
+      // No second line spoken twice, and no jump back to the first.
+      expect(slow.spoken.length).toBe(after)
+    } finally {
+      running.stop()
+    }
+  })
+
+  it('fetches the line it is speaking before the ones it is not', async () => {
+    loop.start(options)
+    await flush()
+
+    // An on-device model synthesises one line at a time, so whatever is asked
+    // for first is what everything behind it waits on. Asking for the
+    // lookahead first put the line somebody is waiting to hear at the back of
+    // the queue behind one they would want four seconds later.
+    expect(speaker.spoken[0]).toBe('First line.')
+    expect(speaker.preloaded.indexOf('First line.')).toBeLessThan(
+      speaker.preloaded.lastIndexOf('Second line.'),
+    )
+  })
+
+  it('keeps more than one line ready, so a change does not empty the queue', async () => {
+    const long = {
+      ...options,
+      text: 'One.\nTwo.\nThree.\nFour.',
+      initialDelayMs: 0,
+    }
+    loop.start(long)
+    await flush()
+
+    // Two ahead rather than one: enough that the loop is still a line in front
+    // after everything prepared under the old settings has been thrown away.
+    expect(speaker.preloaded).toContain('Two.')
+    expect(speaker.preloaded).toContain('Three.')
+  })
+})

@@ -48,6 +48,14 @@ export interface Speaker {
    * voice genuinely cannot — see `TTS.setLiveVolume`.
    */
   setLiveVolume?(value: number): void
+  /**
+   * Change the speed of the line already speaking, and say whether it took.
+   *
+   * `false` means the line has to be spoken again to be heard at the new
+   * speed, which is the device voice's answer and the answer whenever nothing
+   * of this app's own is in the speakers. See `TTS.setLiveRate`.
+   */
+  setLiveRate?(value: number): boolean
   readonly isSpeaking: boolean
 }
 
@@ -61,7 +69,11 @@ export interface VoiceLoopOptions {
   deviceVoiceURI?: string | null
   /** 0.5–2.0 */
   rate: number
-  /** Fallback voices only; no neural engine has a pitch control. */
+  /**
+   * How high the voice reads. Applies to both paths now — the studio voice
+   * gets it from `shape.ts` rather than from the engine, which has no pitch
+   * control of its own.
+   */
   pitch: number
   volume: number
   /** Silence between repetitions. */
@@ -101,6 +113,26 @@ const FAILURES_BEFORE_NOTICE = 3
  */
 const RESTART_SETTLE_MS = 140
 
+/**
+ * How many lines beyond the one speaking are fetched in advance.
+ *
+ * One was the old answer and it was one short of enough. It is exactly right
+ * while nothing changes — each line's successor is fetched during it, and by
+ * the time it is wanted it is decoded and in memory. What it does not survive
+ * is a *change*: the moment somebody moves the speed, every clip prepared
+ * under the old setting is worthless, and a window of one means the loop
+ * re-enters the "fetch, then speak" pattern it spends the rest of its life
+ * avoiding — a synthesis-shaped hole before every line for the rest of the
+ * pass, which is the delay people report after touching a slider.
+ *
+ * Two is the smallest window that outlives a change: the line being prepared
+ * to replace the current one, and the one after it, so the loop is a line
+ * ahead again by the time the change has landed. Larger is not better — an
+ * on-device model synthesises one line at a time, so a deep queue is only a
+ * way of putting work the loop needs *now* behind work it needs later.
+ */
+const PRELOAD_AHEAD = 2
+
 export class VoiceLooper {
   private voice: Speaker
   private generation = 0
@@ -124,6 +156,10 @@ export class VoiceLooper {
   private pausedGapVisible = true
   /** Settles a burst of live voice changes into one restart. See `updateOptions`. */
   private restartTimer: number | null = null
+  /** Settles a burst of live changes into one round of preloading. */
+  private primeTimer: number | null = null
+  /** Invalidates a swap that was being prepared when a newer one arrived. */
+  private swapToken = 0
 
   /** The singleton in the app; a fake in a test. */
   constructor(voice: Speaker = tts) {
@@ -169,16 +205,28 @@ export class VoiceLooper {
    * cycle count, and everything else about the session — this restarts a line,
    * never a ritual.
    *
-   * Two changes are handled differently and both for good reasons:
+   * Three changes are handled differently, and all of them for the same
+   * reason: a restart that has to wait for a synthesis is a *silence*, and a
+   * silence is the one thing worse than a setting arriving late.
    *
    *  - **Volume** does not restart anything. The studio voice's level is a
-   *    gain node this app owns, so it can simply be turned down mid-word,
-   *    which is better than a restart in every way.
+   *    gain node this app owns, so it can simply be turned down mid-word.
+   *  - **Speed** does not restart anything either, where the studio voice is
+   *    speaking. A clip is a buffer, and a buffer can be resampled — so the
+   *    new tempo arrives within a tenth of a second, with no gap at all, and
+   *    the following lines are rendered at the new speed properly. This is
+   *    what used to cost seconds of silence per drag. See `TTS.setLiveRate`.
    *  - **Everything else** (`repeatPauseMs`, `loop`) does not change the sound
    *    of the line being spoken, so interrupting it would be damage with no
    *    benefit.
    *
-   * The restart is debounced. A slider being dragged produces a change per
+   * What is left — a different voice, a different pitch, the device instead of
+   * the studio — genuinely cannot be bent mid-word, so those do restart the
+   * line. But they restart it *after* the replacement is ready rather than
+   * before, so the old line plays until the new one can take over. See
+   * `swapCurrentLine`.
+   *
+   * All of it is debounced. A slider being dragged produces a change per
    * pixel, and re-synthesising a line per pixel is how you turn a fader into a
    * stutter; a short settle means the fastest drag costs exactly one restart,
    * on the value the finger came to rest at.
@@ -187,22 +235,38 @@ export class VoiceLooper {
     if (!this.options) return
 
     const before = this.options
-    this.options = { ...before, ...patch }
+    const after = { ...before, ...patch }
+    this.options = after
 
     if (patch.volume != null && patch.volume !== before.volume) {
       this.voice.setLiveVolume?.(patch.volume)
     }
 
-    if (this.reshapesCurrentLine(before, this.options)) {
-      this.restartCurrentLine()
+    /*
+     * Speed, on a line this app is playing itself: no restart, no silence, no
+     * wait. Only when the voice says it could not take it — the device voice,
+     * or nothing currently speaking — does this fall through to saying the
+     * line again.
+     */
+    if (
+      onlySpeedChanged(before, after) &&
+      this.speaking &&
+      this.voice.setLiveRate?.(after.rate) === true
+    ) {
+      this.schedulePrime()
       return
     }
 
-    // The next line is already being fetched under the old settings, so a
-    // change of voice or speed makes that preload worthless. Fetching the new
-    // one now means the change is heard on the next line rather than the one
-    // after it.
-    this.preloadNext()
+    if (this.reshapesCurrentLine(before, after)) {
+      this.restartCurrentLine(voiceIdentityChanged(before, after))
+      return
+    }
+
+    // The next lines are already being fetched under the old settings, so a
+    // change of voice or speed makes those preloads worthless. Fetching the
+    // new ones now means the change is heard on the next line rather than the
+    // one after it.
+    this.schedulePrime()
   }
 
   /**
@@ -228,35 +292,88 @@ export class VoiceLooper {
   }
 
   /**
-   * Say the current line again, now, under the settings that are in force.
+   * Say the current line again under the settings that are in force — as soon
+   * as there is something to say it with.
    *
    * Nothing about the session moves: `index` and `cycles` are untouched, the
    * timer keeps running, the ambience keeps playing, and the gap between
    * passes — if the change arrived during one — is left alone, because
    * restarting a line during a deliberate silence would mean speaking in it.
+   *
+   * `eager` is true for the changes that arrive as a single deliberate choice
+   * — picking a voice from a list — where fetching the replacement on the same
+   * tick is exactly right. It is false for the ones that arrive as a drag,
+   * where fetching on every event would queue a synthesis per pixel; those
+   * settle first. Either way the restart itself waits for the audio.
    */
-  private restartCurrentLine(): void {
+  private restartCurrentLine(eager: boolean): void {
     if (!this.running || this.paused || !this.options) return
+
+    if (eager) this.primePreload()
+    else this.schedulePrime()
+
     // Mid-gap: the change is already applied to the options and the line the
     // gap ends on will be spoken under them. Nothing to interrupt.
-    if (this.gapCancel != null || this.pausedGapMs != null) {
-      this.preload(this.index)
-      return
-    }
+    if (this.gapCancel != null || this.pausedGapMs != null) return
 
-    this.preload(this.index)
-
-    if (this.restartTimer != null) clearTimeout(this.restartTimer)
+    const index = this.index
+    const cycles = this.cycles
+    this.clearRestart()
     this.restartTimer = setTimeout(() => {
       this.restartTimer = null
-      if (!this.running || this.paused) return
-      // Invalidate the line in flight, then say it again from the top. The
-      // outgoing clip is stopped by `speak`'s own interrupt, which fades it
-      // rather than cutting it.
-      this.generation += 1
-      this.speaking = false
-      void this.speakCurrent(this.generation)
+      void this.swapCurrentLine(index, cycles)
     }, RESTART_SETTLE_MS) as unknown as number
+  }
+
+  /**
+   * Wait for the replacement, then put it in — the whole point of which is
+   * that there is no gap in between.
+   *
+   * ── Why the wait comes first ──
+   *
+   * This used to stop the line and then ask for the new one, which reads as
+   * the obvious order and is the wrong one. A studio line under new settings
+   * is a *new clip*: nothing has it, so it has to be synthesised, and on a
+   * phone running the model itself that is a second or three. All of it was
+   * spent in silence, with the interface showing a line nobody was reading —
+   * the exact "massive delay after changing the speed" this is here to remove.
+   *
+   * Turned round, the cost disappears. The outgoing line keeps speaking while
+   * its replacement is prepared, and the swap happens at the moment the audio
+   * is in memory, which is a crossfade rather than a hole. Preparing it is
+   * never wasted either: if it takes longer than the line has left, the loop
+   * has simply moved on under the new settings by then, and the clip that was
+   * being prepared is the one the next pass wants.
+   *
+   * Three guards decide whether the swap still makes sense when the audio
+   * lands, and between them they cover everything that can happen while
+   * waiting: a newer change (`swapToken`), the line ending on its own
+   * (`index`/`cycles`), and the session stopping, pausing or entering its rest
+   * between passes.
+   */
+  private async swapCurrentLine(index: number, cycles: number): Promise<void> {
+    if (!this.running || this.paused || !this.options) return
+    if (this.index !== index || this.cycles !== cycles) return
+
+    const text = this.chunks[index]
+    if (!text) return
+
+    const token = (this.swapToken += 1)
+    await this.voice
+      .preload(text, this.speakSettings(this.options))
+      .catch(() => undefined)
+
+    if (token !== this.swapToken) return
+    if (!this.running || this.paused || !this.options) return
+    if (this.index !== index || this.cycles !== cycles) return
+    if (this.gapCancel != null || this.pausedGapMs != null) return
+
+    // Invalidate the line in flight, then say it again from the top. The
+    // outgoing clip is stopped by `speak`'s own interrupt, which fades it
+    // rather than cutting it.
+    this.generation += 1
+    this.speaking = false
+    void this.speakCurrent(this.generation)
   }
 
   start(options: VoiceLoopOptions, handlers: VoiceLoopHandlers = {}): boolean {
@@ -278,9 +395,9 @@ export class VoiceLooper {
     this.failures = 0
     this.noticed = false
 
-    // The first line is wanted in a moment; the second is wanted after it.
-    this.preload(0)
-    this.preload(1)
+    // The first line is wanted in a moment; the ones behind it are wanted
+    // after it, and the settling silence below is time to fetch them in.
+    this.preloadAhead(0)
 
     const initialDelay = Math.max(0, options.initialDelayMs ?? 0)
     if (initialDelay > 0) this.startGap(this.generation, initialDelay, false)
@@ -304,6 +421,7 @@ export class VoiceLooper {
     this.speaking = false
     this.clearGap()
     this.clearRestart()
+    this.clearPrime()
     this.voice.stop()
   }
 
@@ -336,6 +454,7 @@ export class VoiceLooper {
     this.pausedGapVisible = true
     this.clearGap()
     this.clearRestart()
+    this.clearPrime()
     this.voice.stop()
   }
 
@@ -370,23 +489,32 @@ export class VoiceLooper {
     if (!text) return
 
     this.speaking = true
-    // Fetch the next line while this one is speaking. This is the whole
-    // preload: by the time the gap ends, it is decoded and in memory.
-    this.preload(index + 1)
 
-    const outcome = await this.voice.speak(text, {
-      voice: options.voice,
-      speed: options.rate,
-      pitch: options.pitch,
-      volume: options.volume,
-      priority: 'interrupt',
-      prefer: options.preferDevice ? 'device' : 'studio',
-      deviceVoiceURI: options.deviceVoiceURI ?? null,
+    /*
+     * Ask for this line *before* asking for the ones after it.
+     *
+     * The order matters more than it looks, and only on the path that hurts.
+     * An on-device model synthesises one line at a time, so whatever reaches
+     * it first is what everything behind it waits for — and preloading first
+     * meant the line somebody is waiting to hear was queued behind the line
+     * they would want in four seconds' time. On a cold pass that doubled the
+     * wait before the first word, every time.
+     *
+     * The call is started rather than awaited so the lookahead below is still
+     * issued during this line rather than after it.
+     */
+    const speaking = this.voice.speak(text, this.speakSettings(options, {
       onStart: () => {
         if (generation !== this.generation) return
         this.handlers.onChunk?.(index, this.chunks.length, text)
       },
-    })
+    }))
+
+    // Fetch what comes next while this one is speaking. This is the whole
+    // preload: by the time the gap ends, it is decoded and in memory.
+    this.preloadAhead(index + 1)
+
+    const outcome = await speaking
 
     if (generation !== this.generation) return
     this.speaking = false
@@ -435,9 +563,9 @@ export class VoiceLooper {
     }
 
     this.index = 0
-    // The first line of the next pass is wanted after the gap; ask for it now
-    // so the gap is doing double duty.
-    this.preload(0)
+    // The opening of the next pass is wanted after the gap; ask for it now so
+    // the gap is doing double duty.
+    this.preloadAhead(0)
     this.startGap(generation, Math.max(0, this.options.repeatPauseMs))
   }
 
@@ -471,25 +599,120 @@ export class VoiceLooper {
       clearTimeout(this.restartTimer)
       this.restartTimer = null
     }
+    // A swap that has not been made yet belongs to the restart that scheduled
+    // it, so cancelling one cancels the other.
+    this.swapToken += 1
+  }
+
+  private clearPrime(): void {
+    if (this.primeTimer != null) {
+      clearTimeout(this.primeTimer)
+      this.primeTimer = null
+    }
+  }
+
+  /**
+   * Everything the voice needs to say a line the way it is currently set.
+   *
+   * One place, because `speak`, the preload that runs ahead of it and the
+   * preload a swap waits on all have to describe the *same* audio — they are
+   * addressed by a hash of exactly these values, so a field present in one and
+   * missing from another is a cache that silently never hits, and a cache that
+   * never hits is a synthesis before every line.
+   */
+  private speakSettings(
+    options: VoiceLoopOptions,
+    extra: Pick<SpeakSettings, 'onStart'> = {},
+  ): SpeakSettings {
+    return {
+      voice: options.voice,
+      speed: options.rate,
+      pitch: options.pitch,
+      volume: options.volume,
+      priority: 'interrupt',
+      prefer: options.preferDevice ? 'device' : 'studio',
+      deviceVoiceURI: options.deviceVoiceURI ?? null,
+      ...extra,
+    }
   }
 
   /** Warm the cache for a line, wrapping around at the end of a pass. */
   private preload(index: number): void {
     const options = this.options
-    if (!options || !options.loop && index >= this.chunks.length) return
+    if (!options || (!options.loop && index >= this.chunks.length)) return
     const wrapped = this.chunks.length > 0 ? index % this.chunks.length : 0
     const text = this.chunks[wrapped]
     if (!text) return
-    void this.voice.preload(text, {
-      voice: options.voice,
-      speed: options.rate,
-      prefer: options.preferDevice ? 'device' : 'studio',
-    })
+    void this.voice.preload(text, this.speakSettings(options))
   }
 
-  private preloadNext(): void {
-    this.preload(this.index + 1)
+  /** The line at `from`, and the ones behind it, in the order they are wanted. */
+  private preloadAhead(from: number): void {
+    for (let step = 0; step < PRELOAD_AHEAD; step += 1) {
+      this.preload(from + step)
+    }
   }
+
+  /** The line being spoken and the window after it, under the current settings. */
+  private primePreload(): void {
+    this.clearPrime()
+    this.preloadAhead(this.index)
+  }
+
+  /**
+   * The same, once the settings have stopped moving.
+   *
+   * A drag reports a value per frame, and each distinct speed or pitch is a
+   * different clip — so priming on every event would queue sixty syntheses to
+   * throw away fifty-nine of them, which on a phone is the model doing nothing
+   * but wasted work at the exact moment the loop needs it.
+   */
+  private schedulePrime(): void {
+    this.clearPrime()
+    this.primeTimer = setTimeout(() => {
+      this.primeTimer = null
+      if (!this.running || this.paused) return
+      this.preloadAhead(this.index)
+    }, RESTART_SETTLE_MS) as unknown as number
+  }
+}
+
+/**
+ * True when the only thing that moved is the speed.
+ *
+ * Speed has a live answer that nothing else has — resampling the buffer — so
+ * it is worth telling apart from a change that happens to include it.
+ */
+function onlySpeedChanged(
+  before: VoiceLoopOptions,
+  after: VoiceLoopOptions,
+): boolean {
+  return (
+    before.rate !== after.rate &&
+    before.voice === after.voice &&
+    before.pitch === after.pitch &&
+    before.preferDevice === after.preferDevice &&
+    (before.deviceVoiceURI ?? null) === (after.deviceVoiceURI ?? null)
+  )
+}
+
+/**
+ * True when *who* is reading changed, as opposed to how they are reading.
+ *
+ * The distinction is about the shape of the gesture rather than the sound: a
+ * voice is picked once from a list, so its replacement is worth fetching on
+ * the same tick; a speed or a pitch is dragged, so it is worth waiting for the
+ * finger to stop.
+ */
+function voiceIdentityChanged(
+  before: VoiceLoopOptions,
+  after: VoiceLoopOptions,
+): boolean {
+  return (
+    before.voice !== after.voice ||
+    before.preferDevice !== after.preferDevice ||
+    (before.deviceVoiceURI ?? null) !== (after.deviceVoiceURI ?? null)
+  )
 }
 
 function delay(ms: number): Promise<void> {

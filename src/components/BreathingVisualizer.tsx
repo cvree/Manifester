@@ -64,6 +64,17 @@ interface BreathingVisualizerProps {
   showPhase?: boolean
   /** Blooms once when it becomes true — used as a session begins. */
   awaken?: boolean
+  /**
+   * How many breaths a minute the pattern comes to, ready-formatted.
+   *
+   * Shown under the countdown, quieter than either line above it, and only
+   * while the guide is actually running. It answers the question people ask
+   * once and then stop asking — "how slow am I breathing?" — which is exactly
+   * the kind of fact that belongs where the eye already is and at a weight
+   * that lets it be ignored. The caller formats it, because a component that
+   * draws a breath should not also own how a number reads.
+   */
+  rateLabel?: string | null
   className?: string
 }
 
@@ -73,6 +84,7 @@ export function BreathingVisualizer({
   size = 'md',
   showPhase = false,
   awaken = false,
+  rateLabel = null,
   className,
 }: BreathingVisualizerProps) {
   const [blooming, setBlooming] = useState(false)
@@ -97,7 +109,9 @@ export function BreathingVisualizer({
       role="img"
       aria-label={
         runtime.active
-          ? `Breathing guide: ${runtime.label}, ${runtime.remaining} seconds left.`
+          ? `Breathing guide: ${runtime.label}, ${runtime.remaining} seconds left.${
+              rateLabel ? ` ${rateLabel} breaths a minute.` : ''
+            }`
           : 'Breathing guide, resting.'
       }
     >
@@ -128,6 +142,11 @@ export function BreathingVisualizer({
           {runtime.active && (
             <span className="type-numeral text-[0.95rem] text-ink-muted">
               {runtime.remaining}
+            </span>
+          )}
+          {runtime.active && rateLabel && (
+            <span className="mt-0.5 text-[0.68rem] tracking-[0.09em] text-ink-faint uppercase opacity-70">
+              {rateLabel} breaths a minute
             </span>
           )}
         </div>

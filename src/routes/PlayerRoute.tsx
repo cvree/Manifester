@@ -33,6 +33,9 @@ import {
 } from '../components/Icons'
 import { cx } from '../lib/cx'
 import { primeBreathAudio } from '../lib/breathAudio'
+import { formatBreathRate } from '../lib/breathing'
+import { voiceForStyle } from '../lib/tts'
+import { useWarmVoice } from '../lib/tts/useWarmVoice'
 import { cue } from '../lib/feedback'
 import { countWords, formatClock } from '../lib/format'
 import { listeningSentence } from '../lib/listening'
@@ -96,6 +99,25 @@ export function PlayerRoute() {
     active: preferences.breathingEnabled && playing,
     mirrors: [stageRef, fieldRef],
   })
+
+  /*
+   * The opening lines, fetched while somebody is still deciding to press play.
+   * It is the one line of a session that has nothing in front of it to hide a
+   * synthesis behind — see `useWarmVoice`.
+   */
+  useWarmVoice({
+    text: draft.text,
+    voice: voiceForStyle(draft.settings.voiceStyle),
+    rate: draft.settings.rate,
+    pitch: draft.settings.pitch,
+    preferDevice: draft.settings.voiceSource === 'device',
+    enabled: idle && hasText,
+  })
+
+  /** How slow the breath is, said once, quietly, inside the orb. */
+  const breathRate = preferences.breathingEnabled
+    ? formatBreathRate(preferences.breathPattern)
+    : null
 
   const backgroundOn = preferences.backgroundVisualizer
   const fieldAmplitude =
@@ -361,6 +383,7 @@ export function PlayerRoute() {
                       style={preferences.breathStyle}
                       size="stage"
                       showPhase={preferences.breathingEnabled && playing}
+                      rateLabel={breathRate}
                       awaken={awaken}
                     />
                   </div>

@@ -909,10 +909,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         ...(voiceSource ? { voiceSource } : {}),
       })
       /*
-       * Changing who is reading takes effect on the next line rather than in
-       * the middle of this one. The loop re-preloads under the new voice as
-       * soon as it is told — see `updateOptions` — so the change is heard one
-       * line later even when that line has to be synthesised from scratch.
+       * Changing who is reading takes the current line back to its first word
+       * and reads it again in the new voice — but not until that reading has
+       * been fetched, so the outgoing voice covers the wait rather than a
+       * silence. See `VoiceLooper.swapCurrentLine`.
        */
       speechRef.current?.updateOptions({
         voice: voiceForStyle(style),
