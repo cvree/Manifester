@@ -128,7 +128,7 @@ export function StudioVoicePanel({
           <div className="min-w-0 grow">
             <p className="text-[1rem] font-medium text-ink">Studio Voice</p>
             <ul className="mt-1.5 space-y-1 text-[0.88rem] leading-relaxed text-ink-muted">
-              <li>✓ Installed{studio.backend === 'webgpu' && ' — hardware accelerated'}</li>
+              <li>✓ Installed</li>
               <li>✓ Private — your words never leave this device</li>
               <li>✓ Works offline</li>
             </ul>
@@ -383,9 +383,6 @@ export function StudioVoicePanel({
           {variant === 'card' && !failed && (
             <p className="type-meta mt-2.5">
               Nothing downloads until you press Install.
-              {studio.accelerated
-                ? ' This device supports hardware acceleration.'
-                : ''}
             </p>
           )}
         </div>
@@ -546,6 +543,15 @@ export function explainFailure(failure: string | null): string {
       return 'The copy that was downloaded turned out to be damaged, so it has been thrown away. Trying again fetches a clean one — this is not the same as the attempt that just failed.'
     case 'timeout':
       return 'Nothing happened for long enough that waiting further would not have been honest. Trying again is worth it: whatever finished downloading is still here.'
+    case 'garbled':
+      /*
+       * Said out loud rather than folded into `unsupported`, because it is the
+       * one failure people were previously never told about at all: the engine
+       * ran, the install said it had worked, and the first thing anybody heard
+       * was their own words coming back as noise. Being stopped here — before
+       * the voice is switched on — is the app catching that itself.
+       */
+      return 'The voice started but what it produced was not speech, so it has not been switched on. Trying again is worth it: a second engine often works where the first one quietly did not.'
     case 'unsupported':
       return 'This device could not start the voice engine. It is usually memory: closing other tabs and trying once more often works.'
     default:

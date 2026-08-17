@@ -203,6 +203,28 @@ export function removeLocal(key: string): void {
   }
 }
 
+/**
+ * Let go of the database, so something else can delete it.
+ *
+ * `indexedDB.deleteDatabase` does not fail when a connection is still open — it
+ * *blocks*, indefinitely and silently, which from the outside is a Delete
+ * button that does nothing at all. This module holds exactly one connection and
+ * holds it for the life of the tab, so nothing can remove Manifester's storage
+ * without asking here first. See `lib/reset.ts`.
+ *
+ * The promise is cleared as well as closed: the next call to anything above
+ * opens a fresh connection, which is what makes this safe to call even if the
+ * deletion that prompted it never happens.
+ */
+export function closeDatabase(): void {
+  const opening = dbPromise
+  dbPromise = null
+  opening?.then(
+    (db) => db.close(),
+    () => undefined,
+  )
+}
+
 export async function estimateUsage(): Promise<{
   usageBytes: number
   quotaBytes: number

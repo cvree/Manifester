@@ -20,6 +20,7 @@ const AstrologySettings = lazy(() =>
 import { Button } from '../components/Button'
 import { AppearanceSettings } from '../components/AppearanceSettings'
 import { Card } from '../components/Card'
+import { DeleteAllDataPanel } from '../components/DeleteAllDataPanel'
 import {
   ArrowUpIcon,
   BreathIcon,
@@ -104,6 +105,7 @@ const SECTIONS: Array<{ id: string; label: string }> = [
   { id: 'voices', label: 'Better voices' },
   { id: 'welcome', label: 'The introduction' },
   { id: 'help', label: 'Troubleshooting' },
+  { id: 'delete', label: 'Delete everything' },
 ]
 
 /**
@@ -264,6 +266,23 @@ const TROUBLE: Array<{ question: string; answer: ReactNode }> = [
         words, entirely on your device. The Voice panel says which is happening,
         and <SectionLink id="voices">Getting the best voice</SectionLink> below
         has the free fix for each platform if you are staying on a device voice.
+      </>
+    ),
+  },
+  {
+    question: 'My own words come out as noise or nonsense.',
+    answer: (
+      <>
+        This was a real fault, in a version of Manifester that ran the on-device
+        model on the graphics card — which on many devices returns something
+        that is not speech, without reporting any error at all. Pre-made
+        affirmations were unaffected, so it only ever showed up on words you
+        wrote yourself. It is fixed: the voice is now checked before it is
+        switched on, and anything it made while it was broken has been thrown
+        away. If you still hear it, use{' '}
+        <em className="not-italic text-ink">Still failing? Start the download
+        over</em>{' '}
+        in the Voice panel, which fetches a clean copy of the model.
       </>
     ),
   },
@@ -436,8 +455,13 @@ export function AboutRoute() {
               </Bullet>
               <Bullet>There is no analytics, no tracking and no advertising.</Bullet>
               <Bullet>
-                Clearing your browser data for this site removes everything, so keep a
-                copy of anything you would hate to lose.
+                Nothing is kept anywhere but here, so removing it is entirely up
+                to you:{' '}
+                <em className="not-italic text-ink">Delete everything on this
+                device</em>{' '}
+                at the foot of this page clears all of it in one press — the
+                library, the settings, the cached speech and Studio Voice. Keep
+                a backup first if there is anything you would hate to lose.
               </Bullet>
             </ul>
           </Card>
@@ -671,7 +695,7 @@ export function AboutRoute() {
             id="help"
             className="scroll-mt-6"
             title="If something is not working"
-            description="The six things that actually go wrong, and what to do about each."
+            description="The seven things that actually go wrong, and what to do about each."
           >
             <dl>
               {TROUBLE.map(({ question, answer }) => (
@@ -684,6 +708,22 @@ export function AboutRoute() {
                 </div>
               ))}
             </dl>
+          </Card>
+
+          {/*
+            Last on the page, and deliberately. Everything above it is a way to
+            change how Manifester behaves; this is the way to make it stop
+            having behaved at all, and it should be something somebody scrolls
+            to rather than something they meet.
+          */}
+          <Card
+            data-rise
+            id="delete"
+            className="scroll-mt-6"
+            title="Delete everything on this device"
+            description="One press puts Manifester back to how it was before you first opened it."
+          >
+            <DeleteAllDataPanel />
           </Card>
 
           <div data-rise className="flex flex-col items-center gap-4 px-1 pb-2">

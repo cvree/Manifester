@@ -132,8 +132,26 @@ export interface EngineDescriptor {
 
 /** A synthesis request, after normalisation and after the key is known. */
 export interface EngineRequest {
-  /** The text to speak, with pronunciation rules already applied. */
+  /**
+   * The line as somebody wrote it.
+   *
+   * What the *backend* is sent, because the backend has the dictionary too and
+   * renders it with phonemes switched on, which is the form its engine
+   * understands. See `spoken` for the other half of that.
+   */
   text: string
+  /**
+   * The same line, as the dictionary says it should be read aloud.
+   *
+   * For an engine that speaks the words directly — the model running on this
+   * device — this is the one to use. The pre-generation script produces every
+   * shipped clip from exactly this form, so an engine that speaks `text`
+   * instead is giving a *different reading* of the same sentence from the one
+   * the app ships, under the same cache key. Which is what the on-device model
+   * was doing: the dictionary silently stopped applying to the only lines it
+   * exists for, the ones somebody typed themselves.
+   */
+  spoken: string
   voice: LogicalVoice
   speed: number
   language: string

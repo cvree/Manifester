@@ -28,18 +28,17 @@
  *
  * ── Several attempts, each in its own thread ────────────────────────────────
  *
- * Bringing the model up is tried against the GPU and then the CPU, against the
- * bundled engine and then — only if nothing else worked — a CDN copy. Every
- * one of those attempts gets a **new worker**, and that is not tidiness: ONNX
- * Runtime initialises its WebAssembly exactly once per thread and refuses ever
- * after, so a fallback attempted in a worker where the first one failed throws
- * an error about the first one. Sharing a worker meant the CPU fallback was
- * guaranteed to fail precisely when it was needed, which is how a GPU that
- * could not run this graph turned into "this device could not start the voice
- * engine" with no way out. `runtime.ts` has the order and the reasoning.
+ * Bringing the model up is tried against the bundled engine and then — only if
+ * that will not start — a CDN copy. Every one of those attempts gets a **new
+ * worker**, and that is not tidiness: ONNX Runtime initialises its WebAssembly
+ * exactly once per thread and refuses ever after, so a fallback attempted in a
+ * worker where the first one failed throws an error about the first one.
+ * `runtime.ts` has the order and the reasoning — including why the GPU is not
+ * one of the attempts, which is the reason a person's own words used to come
+ * back as noise.
  *
  * Nothing is re-downloaded between attempts. The weights are in the browser's
- * cache after the first one, so the second and third cost seconds.
+ * cache after the first one, so the second costs seconds.
  */
 
 import { readLocal, removeLocal, writeLocal } from '../../storage'
@@ -148,15 +147,6 @@ export interface StudioSnapshot {
   stage: StudioStage
   failure: StudioFailure | null
   message: string | null
-  /**
-   * True when this device will actually run the model on its GPU.
-   *
-   * Starts as what the browser *advertises* and is replaced, as soon as the
-   * driver has been asked, by what it will really hand over — which is often
-   * not the same thing. The install card says this out loud, so it is worth
-   * the correction. See `webGpuUsable`.
-   */
-  accelerated: boolean
   /** Which copy of the engine the current or last attempt used. */
   runtime: StudioRuntime | null
   /**
@@ -201,14 +191,6 @@ export function studioVoiceSupported(): boolean {
   )
 }
 
-/** True when WebGPU is advertised. Not a promise that it works — see below. */
-export function webGpuAvailable(): boolean {
-  return typeof navigator !== 'undefined' && 'gpu' in navigator
-}
-
-/** Just enough of `navigator.gpu` to ask it the one question that matters. */
-type GpuHost = Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }
-
 /**
  * Just enough of `Worker` for this class to talk to one.
  *
@@ -241,7 +223,6 @@ export class BrowserKokoroEngine implements TTSEngine {
     stage: 'starting',
     failure: null,
     message: null,
-    accelerated: webGpuAvailable(),
     runtime: null,
     retrying: false,
     trail: [],
@@ -273,9 +254,6 @@ export class BrowserKokoroEngine implements TTSEngine {
 
   /** Resolves the `reset` in flight, when the worker says the caches are gone. */
   private purged: (() => void) | null = null
-
-  /** What the GPU driver said when it was asked. See `webGpuUsable`. */
-  private adapter: Promise<boolean> | null = null
 
   constructor(createWorker: () => StudioWorker = defaultWorker) {
     this.createWorker = createWorker
@@ -314,48 +292,6 @@ export class BrowserKokoroEngine implements TTSEngine {
     return () => {
       this.listeners.delete(listener)
     }
-  }
-
-  /**
-   * Whether this browser will actually hand over a GPU.
-   *
-   * `'gpu' in navigator` says the *API* exists, which is a far weaker claim
-   * than anybody reading it assumes, and the gap between the two was expensive.
-   * Chrome on a machine with no usable adapter — a virtual machine, a Linux box
-   * whose driver is not on the allow list, a browser started without the flag —
-   * still defines `navigator.gpu`, and tells the truth only when
-   * `requestAdapter()` resolves to `null`. Studio Voice used to find that out
-   * the long way round: it planned a WebGPU attempt, downloaded ninety
-   * megabytes, built the graph, and got as far as speaking its first word
-   * before ONNX Runtime said
-   *
-   *     no available backend found … Failed to get GPU adapter.
-   *
-   * and the entire attempt was discarded over something one call knows in
-   * milliseconds.
-   *
-   * So it is asked before anything is planned, and asked once — an engine
-   * outlives every install it runs, and the answer cannot change under it. A
-   * `null` adapter is not a failure anybody hears about; it is a device that
-   * installs on the CPU quietly, and is never told about a road it was never
-   * on.
-   *
-   * Asked *there* and not on the way in, though. `requestAdapter()` wakes a GPU
-   * process, and the whole promise of this feature is that a visitor who never
-   * turns it on is never charged for it — which includes not touching their
-   * graphics card to find out something only an install needs to know.
-   */
-  private webGpuUsable(): Promise<boolean> {
-    this.adapter ??= (async () => {
-      if (!webGpuAvailable()) return false
-      try {
-        return Boolean(await (navigator as GpuHost).gpu?.requestAdapter())
-      } catch {
-        // A browser that throws rather than answering has answered.
-        return false
-      }
-    })()
-    return this.adapter
   }
 
   /** True when this device has installed the model before. */
@@ -504,20 +440,17 @@ export class BrowserKokoroEngine implements TTSEngine {
    * remembered answer is the bundled runtime, which is also the one this app
    * would rather use.
    */
-  private async plan(): Promise<Attempt[]> {
-    /*
-     * The first question a bring-up has to answer, and the only place it is
-     * asked: whether the GPU this browser advertises is one it will really
-     * hand over. The snapshot is corrected with the answer, because the card
-     * says it out loud.
-     */
-    const accelerated = await this.webGpuUsable()
-    if (accelerated !== this.snapshot.accelerated) this.publish({ accelerated })
-
-    const all = attemptsFor(accelerated)
+  private plan(): Attempt[] {
+    const all = attemptsFor()
     const remembered = readLocal(RUNTIME_KEY)
     if (!remembered) return all
 
+    /*
+     * A remembered attempt that is no longer on the list is simply ignored,
+     * which is what carries devices off the GPU without anybody having to
+     * migrate anything: a build that recorded `bundled/webgpu` finds no match
+     * here, and gets the current plan in the current order.
+     */
     const [runtime, device] = remembered.split('/')
     const first = all.findIndex(
       (attempt) => attempt.runtime === runtime && attempt.device === device,
@@ -538,7 +471,7 @@ export class BrowserKokoroEngine implements TTSEngine {
     this.superseded = false
 
     this.running = (async () => {
-      const plan = await this.plan()
+      const plan = this.plan()
       this.publish({ trail: [] })
 
       for (let index = 0; index < plan.length; index += 1) {
@@ -721,7 +654,13 @@ export class BrowserKokoroEngine implements TTSEngine {
         this.post({
           type: 'synthesize',
           id,
-          text: request.text,
+          /*
+           * The dictionary's reading of the line, not the raw one. `spoken` is
+           * what the client worked out with the same normaliser the build
+           * script uses; falling back to the written form only matters for a
+           * caller that has no dictionary at all.
+           */
+          text: request.spoken || request.text,
           voice: engineVoiceFor(request.voice),
           speed: request.speed,
         })
@@ -919,13 +858,6 @@ export class BrowserKokoroEngine implements TTSEngine {
       next.message === this.snapshot.message &&
       next.runtime === this.snapshot.runtime &&
       next.retrying === this.snapshot.retrying &&
-      /*
-       * `accelerated` is the other field that can be the only thing that
-       * changed: it starts as what the browser advertises and is replaced, on
-       * its own, by what the driver actually said. Leaving it out here would
-       * have thrown that correction away exactly as the trail was thrown away.
-       */
-      next.accelerated === this.snapshot.accelerated &&
       /*
        * The trail has to be in this comparison, not just in the object.
        *

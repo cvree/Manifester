@@ -122,6 +122,19 @@ export type StudioFailure =
   /** The graph would not build, or the first inference threw. */
   | 'unsupported'
   /**
+   * The model ran, and what came back was not speech.
+   *
+   * The failure that has no exception attached to it, and therefore the one
+   * that used to reach people instead of being caught: a backend that executes
+   * this graph happily and returns corrupted samples. Nothing throws, the
+   * install reports success, and the only symptom is that a person's own words
+   * come back as noise — while the pre-generated affirmations carry on sounding
+   * perfect, because they are static files that never touched the model. It is
+   * its own reason because the answer to it is a different engine rather than
+   * more memory, a better connection or another try at the same thing.
+   */
+  | 'garbled'
+  /**
    * The stored copy of the model is damaged, and has been thrown away.
    *
    * Its own reason because it is the only failure that *fixes itself by

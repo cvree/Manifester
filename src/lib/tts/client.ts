@@ -237,11 +237,35 @@ export class TTSClient {
     this.engines = engines
   }
 
+  /**
+   * Throw away every clip this device synthesised for itself.
+   *
+   * Shipped clips are untouched — see `BrowserCache.dropFormat` for how the two
+   * are told apart. Used once, on the upgrade that fixed the on-device model,
+   * because a cache is only a kindness while what it remembers is right.
+   */
+  async dropLocalSyntheses(): Promise<number> {
+    this.memory.clear()
+    return this.browser.dropFormat('wav')
+  }
+
   /** Stop every fetch and synthesis in flight. */
   cancelAll(): void {
     this.controller.abort(new Error('cancelled'))
     this.controller = new AbortController()
     this.inflight.clear()
+  }
+
+  /**
+   * Drop every cache and let go of the database behind them.
+   *
+   * For the one caller that is about to delete the storage itself — an open
+   * connection makes `deleteDatabase` block rather than fail. See `lib/reset.ts`.
+   */
+  releaseStorage(): void {
+    this.cancelAll()
+    this.memory.clear()
+    this.browser.close()
   }
 
   /* ── internals ── */
@@ -332,8 +356,14 @@ export class TTSClient {
     const language = (options.language ?? this.language).toLowerCase()
     const order = lookupOrder(format)
 
-    // A phrase with a recording of its own never goes near an engine.
-    const override = this.normalizer.normalize(text).audio
+    /*
+     * One pass of the dictionary, used for both of the things it decides: the
+     * phrase-level recording that skips every engine, and — for an engine that
+     * speaks the words itself rather than running its own front end — how the
+     * line should actually be read.
+     */
+    const normalized = this.normalizer.normalize(text)
+    const override = normalized.audio
     if (override) {
       const bytes = await this.fetchBytes(`${this.staticBase}${override}`, signal)
       if (bytes) return { key, format, bytes, source: 'static' }
@@ -372,6 +402,7 @@ export class TTSClient {
      */
     const request = {
       text,
+      spoken: normalized.text || text,
       voice: options.voice,
       speed,
       language,

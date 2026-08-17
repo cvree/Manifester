@@ -44,18 +44,14 @@ function fakeWorker() {
 /**
  * Let the ticks between a press and the worker run.
  *
- * Pressing Install no longer reaches the worker in the same turn: the engine
- * asks the GPU driver whether it will actually hand over an adapter before it
- * decides what to try, and that is a promise however quickly it answers. A
- * handful of microtasks covers the probe, the plan and the first post; nothing
- * here waits on a timer, so it is safe under `vi.useFakeTimers`.
+ * The sequence is an async function, so the first post reaches the worker a
+ * microtask or two after the press rather than in the same turn. A handful of
+ * ticks covers the plan and the first post; nothing here waits on a timer, so
+ * it is safe under `vi.useFakeTimers`.
  */
 async function settle(): Promise<void> {
   for (let tick = 0; tick < 6; tick += 1) await Promise.resolve()
 }
-
-/** A browser that advertises WebGPU *and* hands over an adapter. */
-const workingGpu = { gpu: { requestAdapter: async () => ({}) } }
 
 function build() {
   const fake = fakeWorker()
@@ -123,9 +119,9 @@ describe('installing Studio Voice', () => {
     fake.reply({ type: 'progress', loaded: 45_000_000, total: 90_000_000, file: 'model' })
     expect(engine.getSnapshot().loaded).toBe(45_000_000)
 
-    fake.reply({ type: 'ready', backend: 'webgpu' })
+    fake.reply({ type: 'ready', backend: 'wasm' })
     expect(await installing).toBe(true)
-    expect(engine.getSnapshot()).toMatchObject({ state: 'ready', backend: 'webgpu' })
+    expect(engine.getSnapshot()).toMatchObject({ state: 'ready', backend: 'wasm' })
     expect(engine.everInstalled).toBe(true)
     expect(await engine.probe()).toBe(true)
     expect(seen).toContain('installing')
@@ -225,91 +221,105 @@ describe('installing Studio Voice', () => {
   })
 
   /**
-   * The bug this whole attempt matrix exists for.
+   * The gibberish.
    *
-   * The GPU and CPU attempts used to happen inside one worker. ONNX Runtime
-   * initialises its WebAssembly once per thread and refuses afterwards, so the
-   * CPU fallback threw an error about the GPU failure that sent it there —
-   * which meant every device whose GPU could not run this graph was told its
-   * device could not start the voice engine, with nothing behind the message.
+   * The GPU used to be the first thing tried on any device that advertised
+   * one, and onnxruntime-web will run this graph on a GPU adapter without a
+   * single error while producing corrupted samples. Nothing threw, so the
+   * install succeeded — and because every affirmation that ships with the app
+   * is a pre-generated file, the only thing that sounded wrong was the one
+   * thing Studio Voice exists for: words somebody wrote themselves.
+   *
+   * No device is asked for one now, whatever the browser advertises.
    */
-  it('falls back from the GPU to the CPU in a brand new worker', async () => {
-    vi.stubGlobal('navigator', workingGpu)
+  it('never asks any device for the GPU, however loudly it is advertised', async () => {
+    vi.stubGlobal('navigator', { gpu: { requestAdapter: async () => ({}) } })
     const built = build()
     const installing = built.engine.install()
     await settle()
 
-    expect(built.fake.sent[0]).toMatchObject({ type: 'install', backend: 'webgpu' })
-    expect(built.created).toBe(1)
-
-    built.fake.reply({
-      type: 'failed',
-      reason: 'unsupported',
-      message: 'webgpu: Could not find an implementation for ConvTranspose',
-    })
-    await Promise.resolve()
-
-    // A *second* worker, not the one that just failed.
-    expect(built.created).toBe(2)
-    expect(built.fake.sent.at(-1)).toMatchObject({
+    expect(built.fake.sent[0]).toMatchObject({
       type: 'install',
       backend: 'wasm',
       runtime: 'bundled',
     })
-    expect(built.engine.getSnapshot()).toMatchObject({ state: 'installing' })
-
-    built.fake.reply({ type: 'ready', backend: 'wasm' })
-    expect(await installing).toBe(true)
-    expect(built.engine.getSnapshot().backend).toBe('wasm')
-  })
-
-  /**
-   * The wasted install.
-   *
-   * Chrome defines `navigator.gpu` on machines that have no adapter to give —
-   * a virtual machine, a driver that is not on the allow list, a browser
-   * started without the flag — and only says so when `requestAdapter()`
-   * resolves to `null`. The engine used to take the property as the answer,
-   * plan a WebGPU attempt, download ninety megabytes, build the graph, and
-   * discover the truth at the first word:
-   *
-   *     webgpu: no available backend found … Failed to get GPU adapter.
-   *
-   * Asking first costs a millisecond and skips the road entirely.
-   */
-  it('never tries the GPU a browser will not actually hand over', async () => {
-    vi.stubGlobal('navigator', { gpu: { requestAdapter: async () => null } })
-    const built = build()
-    const installing = built.engine.install()
-    await settle()
-
-    expect(built.fake.sent[0]).toMatchObject({ type: 'install', backend: 'wasm' })
-    // And the card stops claiming an acceleration this device does not have.
-    expect(built.engine.getSnapshot().accelerated).toBe(false)
 
     built.fake.reply({ type: 'ready', backend: 'wasm' })
     expect(await installing).toBe(true)
     // One attempt, one worker: nothing was spent finding out.
     expect(built.created).toBe(1)
+    expect(built.engine.getSnapshot().backend).toBe('wasm')
   })
 
-  it('keeps a readable trail of what every attempt said', async () => {
-    vi.stubGlobal('navigator', workingGpu)
+  /**
+   * A remembered choice from a build that still used the GPU.
+   *
+   * `plan` promotes whatever worked here last time, and on an upgraded device
+   * that value can name an attempt this app no longer makes. It has to be
+   * ignored rather than honoured, or the fix would never reach the people who
+   * had already installed the broken thing.
+   */
+  it('ignores a remembered runtime that is no longer offered', async () => {
+    store.set('manifester:tts.studioRuntime', 'bundled/webgpu')
+    const built = build()
+    void built.engine.install()
+    await settle()
+
+    expect(built.fake.sent[0]).toMatchObject({ backend: 'wasm', runtime: 'bundled' })
+  })
+
+  /**
+   * The engine ran and what came back was not speech.
+   *
+   * The failure with no exception behind it. The worker measures its own
+   * warm-up now (see `audioCheck.ts`) and says so, and the page treats it like
+   * any other reason worth carrying to the other runtime — because it is: the
+   * weights are already on the device, so the second attempt costs seconds,
+   * and the alternative is switching a broken voice on.
+   */
+  it('tries the other engine when the first one produced noise', async () => {
     const built = build()
     const { engine, fake } = built
     const installing = engine.install()
     await settle()
 
-    fake.reply({ type: 'failed', reason: 'unsupported', message: 'webgpu: no kernel' })
+    fake.reply({
+      type: 'failed',
+      reason: 'garbled',
+      message: 'wasm: the voice came back as noise rather than a voice.',
+    })
+    await Promise.resolve()
+
+    expect(built.created).toBe(2)
+    expect(fake.sent.at(-1)).toMatchObject({ type: 'install', runtime: 'cdn' })
+
+    fake.reply({
+      type: 'failed',
+      reason: 'garbled',
+      message: 'wasm: the voice came back as silence.',
+    })
+    expect(await installing).toBe(false)
+    // And it is a failure a person can read, not a voice that was switched on.
+    expect(engine.getSnapshot()).toMatchObject({ state: 'failed', failure: 'garbled' })
+    expect(engine.everInstalled).toBe(false)
+  })
+
+  it('keeps a readable trail of what every attempt said', async () => {
+    const built = build()
+    const { engine, fake } = built
+    const installing = engine.install()
+    await settle()
+
+    fake.reply({ type: 'failed', reason: 'unsupported', message: 'wasm: no kernel' })
     await Promise.resolve()
     fake.reply({ type: 'ready', backend: 'wasm' })
     await installing
 
     const trail = engine.getSnapshot().trail
     expect(trail).toHaveLength(2)
-    expect(trail[0]).toContain('bundled/webgpu')
+    expect(trail[0]).toContain('bundled/wasm')
     expect(trail[0]).toContain('no kernel')
-    expect(trail[1]).toBe('bundled/wasm: ready')
+    expect(trail[1]).toBe('cdn/wasm: ready')
   })
 
   it('tries the other engine once before giving up, and remembers what worked', async () => {
@@ -503,6 +513,7 @@ describe('installing Studio Voice', () => {
 describe('speaking', () => {
   const request = {
     text: 'I am steady.',
+    spoken: 'I am steady.',
     voice: 'female_1' as const,
     speed: 0.9,
     language: 'en-us',

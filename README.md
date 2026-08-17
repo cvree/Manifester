@@ -895,10 +895,9 @@ because something else was unavailable.
   build time and shipped as static audio. A brand-new visitor, on a cold cache,
   with no model and no backend anywhere, hears Ivy on their first tap.
 - **Installed on the device.** For *your* words, the same Kokoro checkpoint can
-  be downloaded once — ~90 MB — and run in a Web Worker, WebGPU where it exists
-  and WebAssembly where it does not. It is free, it works with no connection,
-  and the text never leaves the device. Nothing downloads until somebody presses
-  **Install Studio Voice**.
+  be downloaded once — ~90 MB — and run in a Web Worker on WebAssembly. It is
+  free, it works with no connection, and the text never leaves the device.
+  Nothing downloads until somebody presses **Install Studio Voice**.
 
 A deployment may also have a **speech service** behind it (`docker compose up`,
 below), which is the fastest option where it exists and is not required
@@ -1167,8 +1166,40 @@ cover"**:
 - The loop preloads its next line while the current one is speaking, so the
   synthesis happens during audio that is already playing rather than during
   silence somebody is listening to.
-- WebGPU, where it exists, is roughly an order of magnitude faster than the
-  WebAssembly path and makes the difference academic.
+
+#### Why the GPU is not used
+
+It was, and it is the reason people who installed Studio Voice heard their own
+words come back as gibberish.
+
+WebGPU does not fail loudly here. ONNX Runtime Web will build this graph on a
+GPU adapter, run it without a single error, and hand back corrupted samples on a
+large share of devices — Android Chrome in particular, and not only with the
+quantised weights this app ships
+([huggingface/transformers#1320](https://github.com/huggingface/transformers.js/issues/1320)).
+There is no exception to classify and no message to put on screen. The install
+succeeds, the card says *Installed*, and the failure only becomes visible when
+somebody types a sentence of their own — because everything *else* the app
+speaks is a pre-generated file that never went near the model.
+
+So the plan is WebAssembly with `q8`, which is the pairing upstream `kokoro-js`
+documents, and the only configuration this app can honestly promise. Lines take
+a second or two on a laptop and a few on a phone instead of a fraction of one;
+they are also correct, cached for ever, and preloaded before they are wanted.
+
+Two things now stand behind that decision, because "the model produced garbage"
+is a failure with no exception attached to it and must be caught by *looking*:
+
+- **The warm-up is measured.** Before a device is told it has a voice, the
+  worker generates a known line and checks it — for samples that are not
+  numbers, silence, end-to-end clipping and the sign-flip rate of noise. A
+  backend that fails is reported as `garbled` and the next runtime is tried.
+  See [`src/lib/tts/engines/audioCheck.ts`](src/lib/tts/engines/audioCheck.ts).
+- **Voice packs are length-checked.** A Kokoro voice is a 510 × 256 `float32`
+  style tensor read *by offset* with no bounds check anywhere in the stack. A
+  short one produces voice-shaped noise, silently and for ever, because the
+  truncated bytes sit in a `Cache` under their own URL. Anything that is not
+  exactly `510 · 256 · 4` bytes is deleted rather than trusted.
 
 The rest is failure handling. Most of it is device facts rather than bugs —
 though not all of it was: for a while every install on every device died at the
@@ -1177,8 +1208,8 @@ last step, in a way that read exactly like a device fact. See
 
 | Situation | What happens |
 | --- | --- |
-| WebGPU advertised but no adapter behind it | Asked before anything is planned — `navigator.gpu` exists on plenty of machines that will not hand over a GPU — so the attempt is never made and nothing is spent finding out |
-| WebGPU advertised but the pipeline will not build | The worker warms up with one real inference before reporting ready; if it throws, the session is re-opened on WebAssembly with the **same cached weights** — no second download |
+| The model runs and produces noise | Caught by the warm-up check above, reported as `garbled`, and the other copy of the runtime is tried with the **same cached weights** — no second download |
+| A cached voice pack is the wrong length | Deleted before the model is brought up, and re-fetched; a short one is never written to the cache in the first place |
 | espeak-ng cannot find its own pronunciation data | Reported as an engine failure rather than as a device that cannot run the model, because that is what it is. The build ships espeak exactly as compiled, unbundled, so it cannot happen again |
 | Download interrupted, tab closed, tunnel | Partial files stay in the browser cache; **Install** resumes rather than restarting |
 | No room (private-mode Safari, a full phone) | Reported as a storage failure with a sentence about what to free; everything else keeps working |
@@ -1186,8 +1217,9 @@ last step, in a way that read exactly like a device fact. See
 | Model up but out of memory mid-session | The resolver falls through to the next engine, then to the device voice |
 | Never installed | Exactly the app as it was: pre-generated studio audio, device voice for the rest |
 
-`dtype` is `q8` on both backends. `fp32` is the better-sounding choice for
-WebGPU and is 326 MB, and this app promised somebody ninety.
+`dtype` is `q8`, which is inseparable from running on WebAssembly: upstream
+pairs the two, and it is also the only weight set that keeps the promise on the
+install card. `fp32` is 326 MB, and this app promised somebody ninety.
 
 ### Getting a good device voice
 
@@ -1326,7 +1358,7 @@ voices installed: the case where every quality signal points the wrong way.
 | PWA | `vite-plugin-pwa` (Workbox `generateSW`) |
 | Animation | GSAP + `@gsap/react` (`useGSAP`) |
 | Smooth scrolling | Lenis (`lenis/react`), on Create and About only |
-| Speech | Kokoro-82M — pre-generated at build time, in the browser via `kokoro-js` + ONNX Runtime Web (WebGPU/WASM, in a worker), or behind our own Node API; Web Speech API as the fallback |
+| Speech | Kokoro-82M — pre-generated at build time, in the browser via `kokoro-js` + ONNX Runtime Web (WebAssembly, in a worker), or behind our own Node API; Web Speech API as the fallback |
 | Speech cache | Content-addressed (SHA-256), in memory, IndexedDB, static assets and on the API's disk |
 | Sound | Web Audio API + `HTMLAudioElement` |
 | Storage | IndexedDB (hand-rolled wrapper, no dependency) + a little `localStorage` |
@@ -2226,6 +2258,8 @@ src/
     onboarding.ts   whether somebody has been here before, how far they got,
                     and which generation of the introduction they finished
     launch.ts       which of the three first screens they get
+    reset.ts        the five stores this app owns, and the one button that
+                    empties all of them without leaving the app
     tts/
       index.ts          the four verbs, and the only place engine order is decided
       client.ts         the resolution walk: memory → IndexedDB → shipped →
@@ -2233,6 +2267,8 @@ src/
       engines/
         browserKokoro.ts  Studio Voice on the device: lifecycle, progress,
                           failure classification, and a plain `TTSEngine`
+        audioCheck.ts     is what came back actually speech? the one failure
+                          the engine never raises for itself
         phonemizer.ts     espeak-ng, loaded as an asset rather than bundled,
                           because a bundler quietly miscompiles it
         kokoro.ts         the HTTP client for a deployment that has a service
@@ -2245,8 +2281,8 @@ src/
       useCredentials.ts  one nullable value, shared by two screens
   workers/
     encode.worker.ts  mixes the timeline and encodes MP3/WAV
-    kokoro.worker.ts  Kokoro-82M beside the page: WebGPU with a warmed-up
-                      fallback to WebAssembly, and nothing downloaded unasked
+    kokoro.worker.ts  Kokoro-82M beside the page: WebAssembly, a warm-up that
+                      is measured rather than assumed, nothing downloaded unasked
   styles/
     theme.css     Cosmic Garden — surfaces, type scale, states, the visualiser
 ```

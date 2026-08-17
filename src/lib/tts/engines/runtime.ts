@@ -80,22 +80,41 @@ export interface Attempt {
  * browser's cache after the first attempt, so a second or third costs a few
  * seconds rather than another eighty-six megabytes.
  *
- * ── Why WebGPU is tried at all ──────────────────────────────────────────────
+ * ── Why WebGPU is not in this list ──────────────────────────────────────────
  *
- * When it works it is several times faster, and on a phone that is the
- * difference between a line arriving before somebody gives up on it and after.
- * When it does not work it fails at the first inference rather than silently,
- * because the worker speaks one word before reporting ready — and the CPU
- * attempt behind it is now a real fallback rather than a broken one.
+ * It used to be first, and it is the reason people who installed Studio Voice
+ * heard their own words come back as gibberish.
+ *
+ * WebGPU does not fail loudly here. onnxruntime-web will build this graph on a
+ * GPU adapter, run it without a single error, and hand back a buffer full of
+ * corrupted samples on a large share of devices — Android Chrome in
+ * particular, and not only with the quantised weights this app ships
+ * (huggingface/transformers#1320). There is no exception to classify and no
+ * message to put on screen. The install succeeds, the card says *Installed*,
+ * and the failure only becomes visible when somebody types a sentence of their
+ * own, because everything else the app speaks is a pre-generated file that
+ * never went near the model.
+ *
+ * Upstream `kokoro-js` pairs its devices and its weights deliberately —
+ * `wasm` with `q8`, and nothing else — and that pairing is the only
+ * configuration this app can honestly promise. So it is the only one it uses.
+ * The cost is speed: a line takes a second or two on a laptop and a few on a
+ * phone, rather than a fraction of one. That is a real cost, and it is worth
+ * paying, because the app preloads the line it is about to say, caches every
+ * line it has ever said, and a slow correct voice is a voice. A fast wrong one
+ * is not.
+ *
+ * The `'webgpu'` device stays in the type, and the worker still honours it if
+ * it is asked, so a remembered choice from an older build is understood rather
+ * than crashed on. Nothing plans one.
  */
-export function attemptsFor(webGpu: boolean): Attempt[] {
-  const attempts: Attempt[] = []
-  if (webGpu) attempts.push({ runtime: 'bundled', device: 'webgpu' })
-  attempts.push({ runtime: 'bundled', device: 'wasm' })
-  // And only then somebody else's server, for a device the bundled runtime
-  // could not satisfy at all.
-  attempts.push({ runtime: 'cdn', device: 'wasm' })
-  return attempts
+export function attemptsFor(): Attempt[] {
+  return [
+    { runtime: 'bundled', device: 'wasm' },
+    // And only then somebody else's server, for a device the bundled runtime
+    // could not satisfy at all.
+    { runtime: 'cdn', device: 'wasm' },
+  ]
 }
 
 /**
@@ -126,12 +145,19 @@ export const CDN_WASM_PATH = `https://cdn.jsdelivr.net/npm/@huggingface/transfor
  * *next* runtime, and treating it as final meant a device that was merely slow
  * on WebGPU never reached the CPU attempt that would have worked. Nothing is
  * re-downloaded to find out — the weights are on disk by then.
+ *
+ * `garbled` is too. A runtime that built the graph and then produced noise has
+ * said nothing about the *other* copy of the runtime, and the second attempt
+ * costs seconds because the weights are already on the device. It is also the
+ * one failure where carrying on matters most: the alternative to a retry is
+ * shipping the broken voice.
  */
 export function worthRetryingElsewhere(reason: string | null): boolean {
   return (
     reason === 'unsupported' ||
     reason === 'download' ||
     reason === 'runtime' ||
-    reason === 'timeout'
+    reason === 'timeout' ||
+    reason === 'garbled'
   )
 }

@@ -20,6 +20,7 @@
 
 import type { AudioBus } from '../audioBus'
 import { langForText } from '../deviceVoice'
+import { readLocal, writeLocal } from '../storage'
 import type { RankedVoice } from '../voiceRanking'
 import { TTSClient, NoEngineError, type ResolveOptions } from './client'
 import { DEFAULT_CONFIG, type TTSConfig } from './config'
@@ -89,6 +90,20 @@ export interface SpeakSettings extends SpeakOptions {
  * again within a few lines.
  */
 const ENGINE_RETRY_MS = 5000
+
+/**
+ * Which repairs of the on-device cache this installation has already had.
+ *
+ * A number rather than a flag, so the next one that is ever needed is `2`
+ * rather than a second key. `1` is the repair that went with fixing Studio
+ * Voice: every line the model synthesised before it worked properly is still
+ * on the device, addressed by a hash of the words rather than of the backend
+ * that made them — so without this, fixing the engine changed nothing anybody
+ * could hear, because the wrong recording was returned before any engine was
+ * consulted. See `TTSClient.dropLocalSyntheses`.
+ */
+const CACHE_REPAIR_KEY = 'tts.cacheRepair'
+const CACHE_REPAIR = '1'
 
 const DEFAULT_SPEAK: Required<
   Pick<SpeakSettings, 'voice' | 'speed' | 'volume' | 'priority' | 'allowFallback' | 'pitch'>
@@ -218,6 +233,7 @@ class TTS {
    * imported by anything that does not want a model.
    */
   watchStudioVoice(): () => void {
+    void this.repairCache()
     const unsubscribe = browserKokoro.subscribe((snapshot) => {
       this.refreshEngines()
       const ready = snapshot.state === 'ready'
@@ -238,6 +254,28 @@ class TTS {
   /** Download and start the on-device model. From a deliberate press only. */
   installStudioVoice(): Promise<boolean> {
     return browserKokoro.install()
+  }
+
+  /**
+   * Throw away speech this device made under an engine that was not working.
+   *
+   * Once per installation, and silent either way. It is a cache of bytes that
+   * can always be made again, so the worst case is that one line is
+   * re-synthesised the next time it is played; the case it exists for is
+   * somebody who installed Studio Voice while it was producing noise, for whom
+   * every fix to the engine would otherwise be invisible behind a recording of
+   * the bug. See `CACHE_REPAIR`.
+   */
+  private async repairCache(): Promise<void> {
+    if (readLocal(CACHE_REPAIR_KEY) === CACHE_REPAIR) return
+    // Written first: a repair that fails is not worth running on every load,
+    // and the clips it would have dropped are re-made on demand anyway.
+    writeLocal(CACHE_REPAIR_KEY, CACHE_REPAIR)
+    try {
+      await this.client.dropLocalSyntheses()
+    } catch {
+      /* A cache that will not open has nothing stale in it to worry about. */
+    }
   }
 
   get studio(): StudioSnapshot {
@@ -373,6 +411,20 @@ class TTS {
     this.cancelAll()
     this.player.dispose()
     this.listeners.clear()
+  }
+
+  /**
+   * Stop speaking, drop every cache, and let go of the model and the database.
+   *
+   * Only for the Delete everything button. The worker is torn down as well as
+   * the caches, because it holds the model's own storage open — and because a
+   * thread that carries on synthesising into a database somebody has just asked
+   * to have removed is the kind of thing that leaves half of it behind.
+   */
+  releaseStorage(): void {
+    this.stop()
+    this.client.releaseStorage()
+    browserKokoro.forget()
   }
 
   get isSpeaking(): boolean {
@@ -626,7 +678,6 @@ export { VOICE_PROFILES, voiceProfile, voiceForStyle } from './voices'
 export {
   browserKokoro,
   studioVoiceSupported,
-  webGpuAvailable,
   STUDIO_DOWNLOAD_MB,
   type StudioSnapshot,
   type StudioState,
