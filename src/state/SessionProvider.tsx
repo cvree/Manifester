@@ -47,6 +47,7 @@ import {
   withoutLayer,
 } from '../lib/soundMixer'
 import {
+  chunkText as splitIntoLines,
   clampVoiceVolume,
   isSpeechSupported,
   loadVoices,
@@ -101,6 +102,18 @@ interface SessionSnapshot {
    * ignored the button.
    */
   voicePreparing: boolean
+  /**
+   * True for a session with nothing to say.
+   *
+   * Manifester with no words in it is a breathwork app, and this is what says
+   * so: the breath, the room, the ambience, the rhythm, the timer and the
+   * clock all run exactly as they always do, and the voice loop is simply
+   * never started. It is a fact about the *session* rather than about the
+   * draft, because the player has to keep telling the truth after somebody
+   * types their first word mid-practice — the session they are in is still the
+   * one they started, and it still has no voice in it.
+   */
+  breathOnly: boolean
 }
 
 interface SessionContextValue {
@@ -197,6 +210,7 @@ const EMPTY_SESSION: SessionSnapshot = {
   notice: null,
   delayRemaining: null,
   voicePreparing: false,
+  breathOnly: false,
 }
 
 function newDraft(): Draft {
@@ -685,10 +699,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         : draft.settings
       const text = source ? source.text : draft.text
       /*
+       * Nothing to say.
+       *
+       * The same question the voice loop asks itself — it is `chunkText` that
+       * decides what counts as a line, so asking anything else here would let
+       * the two disagree about a draft made entirely of whitespace and
+       * punctuation. Everything below is then written so that a wordless
+       * session is a real one: the breath, the room, the ambience, the rhythm,
+       * the timer, the wake lock and the listening clock all run, and only the
+       * voice is left out. That is Manifester as a breathwork practice, and it
+       * is one branch rather than a second player.
+       */
+      const breathOnly = splitIntoLines(text).length === 0
+      /*
        * The same name the library will file it under, rather than "Untitled
        * loop" on the player and something better on the card.
        */
-      const title = (source ? source.title : draft.title).trim() || autoTitle(text)
+      const title =
+        (source ? source.title : draft.title).trim() ||
+        (breathOnly ? 'Breathwork' : autoTitle(text))
 
       // Reach for audio permission while we are still inside the tap.
       bus.ensure()
@@ -696,30 +725,40 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       music.unlock()
       tts.unlock()
 
-      const started = speech.start(
-        {
-          text,
-          voice: voiceForStyle(settings.voiceStyle),
-          preferDevice: settings.voiceSource === 'device',
-          deviceVoiceURI:
-            resolveVoiceChoice(voices, settings.voiceURI, settings.voiceStyle)
-              ?.voiceURI ?? null,
-          rate: settings.rate,
-          pitch: settings.pitch,
-          volume: settings.voiceVolume,
-          repeatPauseMs: settings.repeatPauseSeconds * 1000,
-          initialDelayMs: 420,
-          loop: true,
-        },
-        {
-          onChunk: (chunkIndex, chunkTotal, chunkText) =>
-            setSession((current) => ({ ...current, chunkIndex, chunkTotal, chunkText })),
-          onCycle: (cycles) => setSession((current) => ({ ...current, cycles })),
-          onError: (message) =>
-            setSession((current) => ({ ...current, notice: message })),
-          onFinish: () => finish('idle', null),
-        },
-      )
+      // A breath-only session has no voice to start and nothing for it to say;
+      // `speech.start` would decline it and post "Add some words first", which
+      // is exactly the wrong thing to tell somebody who came here to breathe.
+      const started =
+        breathOnly ||
+        speech.start(
+          {
+            text,
+            voice: voiceForStyle(settings.voiceStyle),
+            preferDevice: settings.voiceSource === 'device',
+            deviceVoiceURI:
+              resolveVoiceChoice(voices, settings.voiceURI, settings.voiceStyle)
+                ?.voiceURI ?? null,
+            rate: settings.rate,
+            pitch: settings.pitch,
+            volume: settings.voiceVolume,
+            repeatPauseMs: settings.repeatPauseSeconds * 1000,
+            initialDelayMs: 420,
+            loop: true,
+          },
+          {
+            onChunk: (chunkIndex, chunkTotal, chunkText) =>
+              setSession((current) => ({
+                ...current,
+                chunkIndex,
+                chunkTotal,
+                chunkText,
+              })),
+            onCycle: (cycles) => setSession((current) => ({ ...current, cycles })),
+            onError: (message) =>
+              setSession((current) => ({ ...current, notice: message })),
+            onFinish: () => finish('idle', null),
+          },
+        )
 
       if (!started) return
 
@@ -739,39 +778,50 @@ export function SessionProvider({ children }: { children: ReactNode }) {
        * to keep. The draft adopts the record it landed in, so tweaking and
        * playing again refreshes that one entry instead of laying down another,
        * and pressing Save later promotes it rather than copying it.
+       *
+       * A breath-only session is the one thing that is never captured. There
+       * is nothing to file: a card in Your library with no words on it could
+       * not be told from the one beside it, could not be given a name, and
+       * would push the loops somebody actually wrote down the page. The
+       * listening time is still counted — that happened.
        */
-      void recordPlay({
-        id: source?.id ?? draft.id,
-        title: source ? source.title : draft.title,
-        text,
-        settings,
-      }).then((loop) => {
-        if (!loop) return
-        draftTouchedRef.current = true
-        setDraft((current) => {
-          if (current.text !== text || current.id === loop.id) return current
-          /*
-           * The id, and only the id. A capture names itself from its own
-           * opening words, but writing that name into the Title box would
-           * leave it there — still attached when the words underneath it have
-           * been replaced by something else entirely.
-           */
-          if (current.id == null) return { ...current, id: loop.id }
-          /*
-           * The draft has been rewritten past the capture it came from, so it
-           * follows the capture its words are actually in. A loop somebody
-           * kept is never re-pointed: editing it and pressing Save has to keep
-           * meaning "update the loop I saved".
-           */
-          const bound = loops.find((item) => item.id === current.id)
-          return bound?.origin === 'played' ? { ...current, id: loop.id } : current
+      if (!breathOnly) {
+        void recordPlay({
+          id: source?.id ?? draft.id,
+          title: source ? source.title : draft.title,
+          text,
+          settings,
+        }).then((loop) => {
+          if (!loop) return
+          draftTouchedRef.current = true
+          setDraft((current) => {
+            if (current.text !== text || current.id === loop.id) return current
+            /*
+             * The id, and only the id. A capture names itself from its own
+             * opening words, but writing that name into the Title box would
+             * leave it there — still attached when the words underneath it
+             * have been replaced by something else entirely.
+             */
+            if (current.id == null) return { ...current, id: loop.id }
+            /*
+             * The draft has been rewritten past the capture it came from, so
+             * it follows the capture its words are actually in. A loop
+             * somebody kept is never re-pointed: editing it and pressing Save
+             * has to keep meaning "update the loop I saved".
+             */
+            const bound = loops.find((item) => item.id === current.id)
+            return bound?.origin === 'played'
+              ? { ...current, id: loop.id }
+              : current
+          })
         })
-      })
+      }
       setSession({
         ...EMPTY_SESSION,
         status: 'playing',
         title,
-        chunkTotal: speech.chunkCount,
+        breathOnly,
+        chunkTotal: breathOnly ? 0 : speech.chunkCount,
         remainingSeconds:
           settings.timerMinutes != null ? settings.timerMinutes * 60 : null,
       })

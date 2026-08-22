@@ -9,6 +9,7 @@ import {
 import { useNavigate } from 'react-router'
 import { BreathingVisualizer } from '../components/BreathingVisualizer'
 import { Button } from '../components/Button'
+import { CinematicBreathType } from '../components/CinematicBreathType'
 import { FirstLoopNudge } from '../components/FirstLoopNudge'
 import { Card } from '../components/Card'
 import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
@@ -33,7 +34,7 @@ import {
 } from '../components/Icons'
 import { cx } from '../lib/cx'
 import { primeBreathAudio } from '../lib/breathAudio'
-import { formatBreathRate } from '../lib/breathing'
+import { formatBreathRate, isPatternValid } from '../lib/breathing'
 import { voiceForStyle } from '../lib/tts'
 import { useWarmVoice } from '../lib/tts/useWarmVoice'
 import { cue } from '../lib/feedback'
@@ -77,11 +78,34 @@ export function PlayerRoute() {
   const reducedMotion = useReducedMotion()
 
   const hasText = countWords(draft.text) > 0
+  /*
+   * Manifester with nothing written in it is a breathwork app.
+   *
+   * The player used to answer an empty draft with an empty state and a button
+   * back to the editor, which was true of a player for *words* and false of
+   * this one: the breath, the room, the ambience, the rhythm and the timer are
+   * all here and all work with nothing to say. So a wordless session is a real
+   * session — it simply has no voice in it — and the only thing it needs from
+   * this screen is a guide worth following, which is the next line.
+   */
+  const breathReady =
+    preferences.breathingEnabled && isPatternValid(preferences.breathPattern)
+  const canPlay = hasText || breathReady
   const soundOn = draft.settings.sound.mode !== 'off'
   const idle = session.status === 'idle'
   const playing = session.status === 'playing'
   const paused = session.status === 'paused'
   const complete = session.status === 'complete'
+  /*
+   * Whether *this screen* is a breathwork screen.
+   *
+   * Read off the draft while nothing is running, because that is what the play
+   * button is about to start — and off the session once something is, because
+   * somebody can walk to Create mid-practice, type a line and walk back, and
+   * the session they are still in has no voice in it whatever the draft now
+   * says. One of the two is always the honest answer; neither is on its own.
+   */
+  const wordless = idle ? !hasText : session.breathOnly
   const lifetime = listeningSentence(listeningStats)
 
   const { stageRef, slotRef, toggle, instant } = useStageExpansion({
@@ -113,6 +137,16 @@ export function PlayerRoute() {
     preferDevice: draft.settings.voiceSource === 'device',
     enabled: idle && hasText,
   })
+
+  /*
+   * Cinematic typography: the breath said in words, at the size of the screen.
+   *
+   * It replaces the orb's own small caption rather than joining it — two
+   * countdowns and two phase words on one screen is not twice the guidance, it
+   * is a screen that cannot decide what it is. See `CinematicBreathType`.
+   */
+  const cinematic =
+    preferences.cinematicTypography && preferences.breathingEnabled && playing
 
   /** How slow the breath is, said once, quietly, inside the orb. */
   const breathRate = preferences.breathingEnabled
@@ -148,23 +182,76 @@ export function PlayerRoute() {
   }, [playing])
 
   const lines = useMemo(() => affirmationLines(draft.text), [draft.text])
-  const currentLine = session.chunkText || draft.text.trim() || lines[0]
-  useFittedLine(lineRef, currentLine, expanded)
+  /*
+   * `null` in a breath-only session, and the whole paragraph goes with it —
+   * rather than an empty box holding open the height of three lines of type
+   * that nobody wrote. What fills that room instead is the breath itself.
+   */
+  const currentLine = wordless
+    ? null
+    : session.chunkText || draft.text.trim() || lines[0]
+  /*
+   * A breath-only session says what it is, until it starts. Then it says
+   * nothing at all and the breath has the room — but the *box* stays either
+   * way, because it is what holds the orb where it is. Emptying a fixed-height
+   * box is a silence; removing it is the whole composition jumping the moment
+   * somebody presses play.
+   */
+  const invitation = !wordless
+    ? null
+    : playing
+      ? ''
+      : paused
+        ? 'Held. Press play when you are ready.'
+        : 'No words today — just the breath. Press play.'
+  useFittedLine(lineRef, currentLine ?? invitation, expanded)
 
-  if (idle && !hasText) {
+  /*
+   * The one case that is still genuinely empty: no words *and* no breathing
+   * guide, which leaves the play button with nothing to start.
+   */
+  if (idle && !canPlay) {
     return (
-      <Card data-rise level="stage" className="mx-auto mt-6 max-w-xl">
-        <EmptyState
-          icon={<SeedIcon />}
-          title="Nothing to play yet"
-          description="Write or paste the words you would like to hear, then come back here and press play."
-          action={
-            <Button variant="primary" size="lg" onClick={() => navigate('/create')}>
-              Write your words
-            </Button>
-          }
+      <>
+        <Card data-rise level="stage" className="mx-auto mt-6 max-w-xl">
+          <EmptyState
+            icon={<SeedIcon />}
+            title="Nothing to play yet"
+            description="Write the words you would like to hear — or turn the breathing guide back on, and use Manifester as a breathing practice on its own."
+            action={
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={() => navigate('/create')}
+                >
+                  Write your words
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={() => {
+                    cue('tap')
+                    setSheet('breathing')
+                  }}
+                >
+                  Turn on breathing
+                </Button>
+              </div>
+            }
+          />
+        </Card>
+        {/*
+          The sheets have to come with the empty state, not only with the
+          stage. The second button above is the way out of this screen for
+          somebody who has no words and has turned the guide off, and without
+          this it sets a piece of state that nothing is mounted to read.
+        */}
+        <SettingsSheets
+          open={sheet === 'adjust' || sheet === 'mixer' ? null : sheet}
+          onOpenChange={setSheet}
         />
-      </Card>
+      </>
     )
   }
 
@@ -175,7 +262,9 @@ export function PlayerRoute() {
       : formatClock(session.elapsedSeconds)
 
   const timeCaption = complete
-    ? 'listened'
+    ? wordless
+      ? 'breathed'
+      : 'listened'
     : session.remainingSeconds != null
       ? 'remaining'
       : 'elapsed'
@@ -185,11 +274,13 @@ export function PlayerRoute() {
     : paused
       ? 'Paused'
       : playing
-        ? session.delayRemaining != null
-          ? `Resting · ${session.delayRemaining}s`
-          : session.voicePreparing
-            ? 'Preparing the voice…'
-            : 'Now looping'
+        ? wordless
+          ? 'Breathing'
+          : session.delayRemaining != null
+            ? `Resting · ${session.delayRemaining}s`
+            : session.voicePreparing
+              ? 'Preparing the voice…'
+              : 'Now looping'
         : 'Ready when you are'
 
   const passProgress =
@@ -272,16 +363,27 @@ export function PlayerRoute() {
                   >
                     <SparkIcon />
                   </span>
-                  <h1 className="type-title">Your loop is complete.</h1>
+                  <h1 className="type-title">
+                    {wordless ? 'That is the practice.' : 'Your loop is complete.'}
+                  </h1>
                   <p className="type-body mt-3 max-w-[34ch] text-center">
-                    You listened for {formatClock(session.elapsedSeconds)} across{' '}
-                    {session.cycles} {session.cycles === 1 ? 'pass' : 'passes'}.
-                    Take a breath before you move on.
+                    {wordless ? (
+                      <>
+                        You breathed for {formatClock(session.elapsedSeconds)}.
+                        Sit with it a moment before you move on.
+                      </>
+                    ) : (
+                      <>
+                        You listened for {formatClock(session.elapsedSeconds)} across{' '}
+                        {session.cycles} {session.cycles === 1 ? 'pass' : 'passes'}.
+                        Take a breath before you move on.
+                      </>
+                    )}
                   </p>
                   {lifetime && <p className="type-meta mt-3">{lifetime}</p>}
                   <div className="mt-7 flex flex-wrap justify-center gap-3">
                     <Button variant="primary" size="lg" onClick={() => start()}>
-                      Listen again
+                      {wordless ? 'Breathe again' : 'Listen again'}
                     </Button>
                     <Button variant="secondary" size="lg" onClick={() => stop()}>
                       Done for now
@@ -293,10 +395,12 @@ export function PlayerRoute() {
                     sitting still and pleased. See `FirstLoopNudge` — it shows
                     itself only if it has never been shown.
                   */}
-                  <FirstLoopNudge
-                    className="mt-8 w-full max-w-md"
-                    onChangeSound={() => setSheet('sound')}
-                  />
+                  {!wordless && (
+                    <FirstLoopNudge
+                      className="mt-8 w-full max-w-md"
+                      onChangeSound={() => setSheet('sound')}
+                    />
+                  )}
                 </div>
               </Card>
             ) : (
@@ -308,6 +412,8 @@ export function PlayerRoute() {
                   'surface-stage stage relative flex flex-col items-center px-5 py-8 sm:px-8 lg:py-10',
                   expanded && 'stage--immersive',
                   backgroundOn && 'stage--roomy',
+                  cinematic && 'stage--cinema',
+                  wordless && 'stage--wordless',
                   instant && 'stage--instant',
                 )}
               >
@@ -369,11 +475,13 @@ export function PlayerRoute() {
                     {stateLabel}
                   </p>
                   <h1 className="stage__title mt-2 max-w-full truncate text-center font-display text-[1.75rem] leading-tight text-ink sm:text-[2rem]">
-                    {session.title || draft.title.trim() || autoTitle(draft.text)}
+                    {session.title ||
+                      draft.title.trim() ||
+                      (wordless ? 'Breathwork' : autoTitle(draft.text))}
                   </h1>
                 </div>
 
-                <div className="stage__focus flex w-full flex-col items-center">
+                <div className="stage__focus relative flex w-full flex-col items-center">
                   <div
                     ref={orbRef}
                     className="stage__orb relative my-6 flex items-center justify-center"
@@ -382,21 +490,46 @@ export function PlayerRoute() {
                       runtime={breathing}
                       style={preferences.breathStyle}
                       size="stage"
-                      showPhase={preferences.breathingEnabled && playing}
-                      rateLabel={breathRate}
+                      showPhase={
+                        preferences.breathingEnabled && playing && !cinematic
+                      }
+                      rateLabel={cinematic ? null : breathRate}
                       awaken={awaken}
                     />
                   </div>
 
+                  {/*
+                    The title card, over the whole focus region rather than
+                    inside the orb — it is the one layer here that is language,
+                    and language wants the width of the composition. It is
+                    `aria-hidden` and `pointer-events: none`: the orb already
+                    carries the guide's accessible name and the transport below
+                    is still entirely clickable through it.
+                  */}
+                  {cinematic && (
+                    <CinematicBreathType
+                      runtime={breathing}
+                      immersive={expanded}
+                      wordless={wordless}
+                    />
+                  )}
+
                   <p
                     ref={lineRef}
-                    className="stage__line text-center font-display whitespace-pre-line text-ink"
+                    className={cx(
+                      'stage__line text-center font-display whitespace-pre-line',
+                      wordless
+                        ? 'stage__line--invitation text-ink-muted'
+                        : 'text-ink',
+                    )}
                   >
                     <span
-                      key={currentLine ?? ''}
+                      key={currentLine ?? invitation ?? ''}
                       className="stage__line-text animate-line-in"
                     >
-                      {currentLine ?? 'Ready when you are.'}
+                      {wordless
+                        ? invitation
+                        : (currentLine ?? 'Ready when you are.')}
                     </span>
                   </p>
                 </div>
@@ -405,13 +538,19 @@ export function PlayerRoute() {
                   <button
                     type="button"
                     onClick={primaryAction}
-                    disabled={!hasText}
+                    disabled={!canPlay}
                     aria-label={
-                      playing
-                        ? 'Pause the loop'
-                        : paused
-                          ? 'Resume the loop'
-                          : 'Start the loop'
+                      wordless
+                        ? playing
+                          ? 'Pause the breathing session'
+                          : paused
+                            ? 'Resume the breathing session'
+                            : 'Start a breathing session'
+                        : playing
+                          ? 'Pause the loop'
+                          : paused
+                            ? 'Resume the loop'
+                            : 'Start the loop'
                     }
                     className={cx(
                       'stage__play interactive relative flex h-[5.5rem] w-[5.5rem] items-center justify-center rounded-full',
@@ -465,7 +604,7 @@ export function PlayerRoute() {
                   </div>
                 </div>
 
-                {!idle && !expanded && (
+                {!idle && !expanded && !wordless && (
                   <div className="stage__meter mt-8 w-full max-w-sm">
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <span className="type-meta">

@@ -132,6 +132,7 @@ export function DesktopPlayerPanel({
             preferences.breathSound,
             preferences.backgroundVisualizer,
             preferences.backgroundMode,
+            preferences.cinematicTypography,
           )}
           onClick={() => open('breathing')}
           accent={preferences.breathingEnabled || preferences.backgroundVisualizer}
