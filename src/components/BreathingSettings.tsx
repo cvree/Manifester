@@ -123,6 +123,26 @@ export function BreathingSettings({
         }}
       />
 
+      {/*
+        Second in the panel, directly under the guide's own switch, and above
+        everything about the room — because this is the one setting here that
+        changes what the player *is* rather than how it is decorated: with it on
+        the words are the guide and the orb is the light behind them. Putting it
+        below six room tiles would have buried the most consequential switch on
+        the screen under the most decorative one. See `CinematicBreathType`.
+      */}
+      {preferences.breathingEnabled && (
+        <Toggle
+          label="Cinematic typography"
+          description="Breathe in. Breathe out — set across the whole screen, resolving one letter at a time, opening as you fill and drawing back together as you empty. Enough on its own to follow with your eyes barely open."
+          checked={preferences.cinematicTypography}
+          onChange={(cinematicTypography) => {
+            onChange({ cinematicTypography })
+            if (cinematicTypography) cue('start')
+          }}
+        />
+      )}
+
       <Toggle
         label="Background visualiser"
         description={

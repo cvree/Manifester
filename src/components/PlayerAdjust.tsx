@@ -199,6 +199,7 @@ export function PlayerAdjust({
               preferences.breathSound,
               preferences.backgroundVisualizer,
               preferences.backgroundMode,
+              preferences.cinematicTypography,
             )}
             onClick={() => go('breathing')}
             accent={preferences.breathingEnabled || preferences.backgroundVisualizer}

@@ -314,6 +314,7 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
               preferences.breathSound,
               preferences.backgroundVisualizer,
               preferences.backgroundMode,
+              preferences.cinematicTypography,
             )}
             onClick={() => openPanel('breathing')}
             accent={preferences.breathingEnabled || preferences.backgroundVisualizer}

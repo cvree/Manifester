@@ -41,6 +41,21 @@ export interface Preferences {
   breathPattern: BreathPattern
   /** Which of the six forms the guide is drawn as. */
   breathStyle: BreathStyleId
+  /**
+   * Cinematic typography: the breath said in words, across the whole screen.
+   *
+   * A layer over the guide rather than a different guide — the same clock, the
+   * same pattern, the same sound — that sets "Breathe in" and "Breathe out" at
+   * the size of the room and lets them open and close with the breath. It is
+   * on by default, because for most people the words are what makes a
+   * breathing guide followable with their eyes half shut, and it belongs to
+   * the guide rather than to a loop: whether the screen speaks to you is not a
+   * property of the words you happen to be playing over it.
+   *
+   * Switched off, the guide is exactly what it always was: the orb, its small
+   * caption, and the count.
+   */
+  cinematicTypography: boolean
   /** The breath's own voice, or `'off'`. */
   breathSound: BreathSound
   breathSoundVolume: number
@@ -91,6 +106,7 @@ const DEFAULTS: Preferences = {
   breathingEnabled: true,
   breathPattern: DEFAULT_PATTERN,
   breathStyle: DEFAULT_STYLE,
+  cinematicTypography: true,
   // Silent by default; sound remains an explicit choice inside Breathing.
   breathSound: 'off',
   breathSoundVolume: DEFAULT_BREATH_VOLUME,

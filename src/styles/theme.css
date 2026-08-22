@@ -1995,6 +1995,446 @@ html:not(.dark) .breath-aurora__veil {
   }
 }
 
+/* ── Cinematic typography ───────────────────────────────────── */
+
+/*
+ * The breath, set as a title card.
+ *
+ * ── The idea ──
+ *
+ * Everything else in the breathing guide is a shape. This is the one layer
+ * that is *language*, and it is set at the size language gets set at when it is
+ * the only thing on screen: two words across the middle, resolving out of blur
+ * a letter at a time, spreading as you fill and drawing back together as you
+ * empty.
+ *
+ * The reason it works — and the reason it is worth the eighty lines below
+ * rather than a `font-size` bump on the existing caption — is that the type is
+ * *on the breath's clock*, not on a clock of its own. Three inherited custom
+ * properties do all of it:
+ *
+ *   · `--e`  expansion, 0 → 1 → 0 across a breath. The tracking, the scale and
+ *            the light all come from this, so the words physically open as the
+ *            lungs do and close as they empty. Nothing is scripted to match the
+ *            breath; it *is* the breath, arithmetically.
+ *   · `--p`  progress through the phase. The rule under the words is this and
+ *            nothing else.
+ *   · `--m`  how much movement is happening right now — 1 mid-breath, 0 at a
+ *            turn and through a hold. The whisper rides this, so it lifts as
+ *            the breath moves and dissolves as it comes to rest, which is what
+ *            makes the top of an in-breath feel like a held moment rather than
+ *            like a paragraph that stopped changing.
+ *
+ * They are written onto `.stage` every frame by `useBreathing` and inherit
+ * down. This layer therefore costs zero JavaScript per frame and zero React
+ * renders per frame — it re-renders when the *words* change and never for the
+ * animation. See `CinematicBreathType`.
+ *
+ * ── The emphasis ──
+ *
+ * "Breathe in" and "Breathe out" are the two phases that are a movement, and
+ * they are set large and lit. "Hold" and "Rest" are the rests in the bar: two
+ * thirds of the size, wider tracking, dimmer. A hold typeset at the same weight
+ * as a breath is a hold nobody feels.
+ */
+
+.cinema {
+  --cinema-size: clamp(1.45rem, 8.4vw, 3.1rem);
+  --cinema-track: 0.26em;
+  /* How much of that tracking the in-breath adds on top. */
+  --cinema-swell: 0.16em;
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding-inline: 1.25rem;
+  pointer-events: none;
+  /*
+   * The stage scrolls when it is expanded, and `overflow-y: auto` computes
+   * `overflow-x` to `auto` with it — so a glow half a percent too wide is a
+   * horizontal scrollbar on the most carefully composed screen in the app.
+   * `clip` on the inline axis alone contains that without turning this into a
+   * scroll container of its own.
+   */
+  overflow-x: clip;
+  /*
+   * The tracking below is a *layout* property — letter-spacing cannot be
+   * composited, and it is rewritten every frame from `--e`. That is the one
+   * honest cost of this layer, and what bounds it is the box itself: absolutely
+   * positioned with all four insets set, so its size is fixed by its container
+   * and never derived from its content. A tracking change therefore reflows a
+   * dozen inline-blocks inside a box of known size and stops there.
+   *
+   * Deliberately *not* `contain: layout`. It reads as though it would say the
+   * same thing and it does one extra thing besides: it makes the element a
+   * containing block for every fixed-position descendant, which quietly
+   * re-anchors anything inside this layer that meant to be positioned against
+   * the viewport. The bound above is a property of the box, and it does not
+   * need a keyword that carries a second meaning with it.
+   */
+  opacity: 0;
+}
+
+/*
+ * An animation rather than a transition, and it has to be one: this layer is
+ * mounted at the moment the session starts, already live, so there is no
+ * earlier state for a transition to run *from* — it would simply appear at full
+ * strength. The words should arrive the way the room does, over about a second.
+ */
+.cinema[data-live='true'] {
+  animation: cinema-in 1100ms var(--ease-calm) both;
+}
+
+@keyframes cinema-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The holds are the rests in the bar. */
+.cinema[data-moving='false'] {
+  --cinema-size: clamp(1.05rem, 5.6vw, 2.05rem);
+  --cinema-track: 0.4em;
+  --cinema-swell: 0.02em;
+}
+
+/*
+ * The pool of light the words sit in.
+ *
+ * It is not decoration: at this size, type laid straight over a living
+ * background loses its counters to whatever is moving behind it. The glow
+ * gathers with `--e`, so the page is brightest exactly when the words are
+ * widest — the two read as one gesture rather than as a caption and a spotlight.
+ */
+.cinema__glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(46rem, 128%);
+  aspect-ratio: 2.1 / 1;
+  translate: -50% -50%;
+  border-radius: 999px;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--bg-0) 62%, transparent) 0%,
+    color-mix(in oklab, var(--bg-0) 34%, transparent) 46%,
+    transparent 76%
+  );
+  transform: scale(calc(0.88 + var(--e) * 0.14));
+  opacity: calc(0.5 + var(--e) * 0.3);
+  will-change: transform, opacity;
+}
+
+/*
+ * ── The words ──
+ *
+ * Words wrap; letters do not. At this size "Breathe out" does not fit across a
+ * phone, and a phrase broken mid-word would be a typesetting error rather than
+ * a title card — so each word is its own inline block and the line breaks
+ * between them, which on a narrow screen stacks the phrase into two lines and
+ * reads, if anything, more like a film title than the single line does.
+ *
+ * The tracking is where the breath enters the type. `--e` adds up to `--swell`
+ * of extra letter-spacing, so an in-breath physically opens the words out and
+ * an out-breath draws them back in. The trailing negative margin cancels the
+ * space CSS letter-spacing adds after the *last* glyph, which is what keeps a
+ * tracked line optically centred instead of sitting a fraction to the left.
+ */
+.cinema__word {
+  position: relative;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0 0.5em;
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-size: var(--cinema-size);
+  font-weight: 400;
+  line-height: 1.12;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: calc(var(--cinema-track) + var(--e) * var(--cinema-swell));
+  margin-right: calc(-1 * (var(--cinema-track) + var(--e) * var(--cinema-swell)));
+  color: var(--ink);
+  opacity: calc(0.74 + var(--e) * 0.26);
+  transform: scale(calc(0.985 + var(--e) * 0.035));
+  text-shadow: 0 0 calc(0.5rem + var(--e) * 1.4rem)
+    color-mix(in oklab, var(--glow) calc(30% + var(--e) * 45%), transparent);
+  /* Not `letter-spacing`: hinting a layout property buys nothing and costs a
+     promotion. See `contain` on `.cinema`. */
+  will-change: transform, opacity;
+}
+
+.cinema__word-part {
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+/*
+ * ── The resolve ──
+ *
+ * Each letter arrives out of blur, slightly low and slightly loose, and settles.
+ * The delay is a *fraction of a fixed total* rather than a fixed step per
+ * letter, so "Hold" and "Breathe out" finish resolving at the same moment
+ * instead of the short word being over while the long one is still arriving —
+ * and the phrase always lands well inside the shortest phase any preset has.
+ *
+ * The blur is on a handful of single glyphs for half a second at each phase
+ * turn. That is the one shape of filter animation that is not worth worrying
+ * about, and it is the entire reason this reads as cinema rather than as a
+ * label fading in.
+ */
+.cinema__glyph {
+  display: inline-block;
+  animation: cinema-resolve 900ms var(--ease-calm) both;
+  /*
+   * `animation-delay` is set per letter from `CinematicBreathType`, because it
+   * is a fraction of a fixed sweep and `calc(var(--i) / var(--glyphs))` is
+   * rejected outright — a `var()` has no type at parse time and `/` demands a
+   * number on its right. Written that way the delay silently computed to `0s`
+   * and every letter arrived together, which is not a stagger, it is the whole
+   * word blinking at each turn. One inline string per letter per phase turn,
+   * and nothing per frame.
+   */
+}
+
+/*
+ * The opacity is up long before the blur is gone, and that ordering is the
+ * whole character of it: what you watch is a letter *focusing*, the way a
+ * title card resolves, rather than one fading in. Tied together — full
+ * opacity at the end of the travel — every turn would blank the phrase for a
+ * third of a second before it came back, which reads as a flicker however
+ * beautiful the curve is.
+ */
+@keyframes cinema-resolve {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.34em, 0) scale(1.06);
+    filter: blur(0.5rem);
+  }
+  28% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+/*
+ * ── The rule ──
+ *
+ * A hairline that opens from the centre across the phase and is gone at the
+ * turn. It is the only part of this layer that reports time rather than breath,
+ * and it is one `scaleX(var(--p))` — the cheapest honest progress bar there is.
+ * From the centre rather than the left because the words above it are centred,
+ * and a bar that filled left-to-right under a centred title would put the
+ * composition permanently off balance for half of every phase.
+ */
+.cinema__rule {
+  position: relative;
+  display: block;
+  width: min(15rem, 46%);
+  height: 1px;
+  background: color-mix(in oklab, var(--ink) 10%, transparent);
+  opacity: calc(0.35 + var(--m) * 0.4);
+}
+
+.cinema__rule-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in oklab, var(--rose) 78%, transparent) 22%,
+    color-mix(in oklab, var(--gold) 78%, transparent) 50%,
+    color-mix(in oklab, var(--rose) 78%, transparent) 78%,
+    transparent 100%
+  );
+  transform: scaleX(var(--p));
+  transform-origin: center;
+  will-change: transform;
+}
+
+/*
+ * ── The line underneath ──
+ *
+ * One short instruction in the voice a person would use. It rides `--m` — how
+ * much of this phase's own movement is happening right now — so it lifts
+ * through the middle of a breath and dissolves as the breath comes to its turn.
+ * That single link is what makes the top of an in-breath feel like time
+ * suspending rather than like a subtitle that stopped changing.
+ */
+.cinema__whisper {
+  margin: 0;
+  max-width: 26rem;
+  font-family: var(--font-display);
+  font-size: clamp(0.78rem, 3.1vw, 0.98rem);
+  font-style: italic;
+  line-height: 1.4;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--ink-muted);
+  opacity: calc(0.34 + var(--m) * 0.46);
+  /*
+   * Behind the word rather than after it. It used to take 1200ms on a 260ms
+   * delay, which is a third of a six-second out-breath spent arriving — the
+   * line was still fading up when a person had already read the word above it
+   * and started breathing. It comes in under the tail of the sweep now.
+   */
+  animation: cinema-whisper-in 640ms var(--ease-calm) both;
+  animation-delay: 200ms;
+}
+
+@keyframes cinema-whisper-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+  }
+  to {
+    filter: blur(0);
+  }
+}
+
+/*
+ * ── The count ──
+ *
+ * Set as a numeral in the display face, tracked wide and kept quiet: it is
+ * there for the one glance a person takes to find out how much of the
+ * out-breath is left, and it should cost nothing to ignore for the rest of the
+ * session. Keyed by the second it shows, so each new number arrives with its
+ * own small settle rather than snapping.
+ */
+.cinema__count {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(0.85rem, 3.4vw, 1.05rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.34em;
+  margin-right: -0.34em;
+  color: var(--ink-faint);
+  opacity: 0.72;
+  animation: cinema-tick 360ms var(--ease-calm) both;
+}
+
+/*
+ * A settle, not a blink. The numeral is re-keyed every second, so it plays this
+ * once a second for the whole session — and a fade that started from nothing
+ * would leave the count genuinely unreadable for a third of every second it is
+ * on screen. It starts most of the way lit and travels two pixels.
+ */
+@keyframes cinema-tick {
+  from {
+    opacity: 0.3;
+    transform: translate3d(0, 2px, 0);
+  }
+  to {
+    opacity: 0.72;
+    transform: none;
+  }
+}
+
+/*
+ * ── The expanded room ──
+ *
+ * Just the size. There were letterbox scrims here for a while, fixed to the
+ * viewport's top and bottom edges, and they were the wrong instrument twice
+ * over: this layer carries `z-index` and therefore a stacking context, so
+ * anything inside it paints *above* the stage's title and corner controls
+ * however far back it is pushed — the bars simply dimmed the two things at the
+ * top of the screen that are not theirs to dim. The legibility they were for is
+ * already the glow's job, and it does it where it is actually needed, which is
+ * behind the words rather than at the edges of the screen.
+ */
+.cinema--immersive {
+  --cinema-size: clamp(2rem, min(9.5vw, 9vh), 5.2rem);
+  gap: 0.9rem;
+}
+
+.cinema--immersive[data-moving='false'] {
+  --cinema-size: clamp(1.35rem, min(6vw, 5.6vh), 3.2rem);
+}
+
+/*
+ * ── With no words in the player ──
+ *
+ * Manifester without an affirmation is a breathwork app, and on that screen
+ * this layer is not an overlay on a composition — it *is* the composition. So
+ * it takes a little more size and a little more room, and the glow behind it
+ * softens, because there is no spoken line underneath for it to have to
+ * out-shout.
+ */
+.cinema--wordless {
+  --cinema-size: clamp(1.6rem, 9.2vw, 3.5rem);
+  gap: 0.7rem;
+}
+
+.cinema--wordless.cinema--immersive {
+  --cinema-size: clamp(2.2rem, min(10.5vw, 10vh), 6rem);
+}
+
+.cinema--wordless .cinema__glow {
+  opacity: calc(0.34 + var(--e) * 0.26);
+}
+
+/*
+ * ── Less motion ──
+ *
+ * The words stay — they are the guide, and a guide that stops saying what to
+ * do is not a calmer guide, it is a broken one. What goes is everything that
+ * *travels*: the per-letter resolve, the blur, and the tracking that opens and
+ * closes with the breath. `--e` is pinned at a half-open 0.55 for the whole
+ * session under reduced motion (see `useBreathing`), so the type simply settles
+ * at one comfortable width and the phrase swaps at each turn with a plain fade.
+ *
+ * The rule is kept: it reports progress without anything appearing to move
+ * quickly, which is the one piece of motion worth defending here.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .cinema__word {
+    transform: none;
+    will-change: auto;
+  }
+
+  .cinema__glyph {
+    animation: cinema-fade 260ms var(--ease-calm) both;
+    animation-delay: 0ms;
+  }
+
+  .cinema__whisper {
+    animation: cinema-fade 260ms var(--ease-calm) both;
+    animation-delay: 0ms;
+  }
+
+  .cinema__count {
+    animation: none;
+  }
+
+  .cinema__glow {
+    transform: none;
+  }
+
+  @keyframes cinema-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
 /* ── The player's atmosphere ────────────────────────────────── */
 
 /*
@@ -4634,6 +5074,66 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 /*
+ * The line, when there is no line.
+ *
+ * A breath-only session keeps the box — it is what holds the orb where it is —
+ * and puts one quiet sentence in it until the practice starts, then empties it.
+ * Set smaller and in italic, because it is an invitation rather than something
+ * anybody is being asked to read along with, and it should not be mistaken for
+ * an affirmation somebody wrote.
+ */
+.stage__line--invitation {
+  font-size: calc(var(--line-size) * 0.84 * var(--line-fit, 1));
+  font-style: italic;
+  opacity: 0.82;
+}
+
+/*
+ * ── A stage with nothing written on it ──
+ *
+ * The words' box is three lines tall because an affirmation can run to three,
+ * and it is a *fixed* height so that the orb above it cannot be moved by a
+ * change of words. A breath-only session has one sentence of invitation and
+ * then nothing at all, so reserving three would hand two lines of the
+ * composition to text that does not exist — and in the expanded room it would
+ * cost more than that, because the orb's diameter there is the room left over
+ * once this box has taken its share. One line, and the breath gets the rest.
+ */
+.stage--wordless {
+  --line-lines: 1;
+}
+
+/*
+ * ── The stage, once the type has the room ──
+ *
+ * With cinematic typography on, the words in the middle of the screen are the
+ * guide and the orb is the light behind them. Two things follow from that, and
+ * neither is a different layout:
+ *
+ *   · the orb steps back — still the same form on the same clock, just no
+ *     longer competing with type set at four times its caption's size for the
+ *     same few degrees of the eye;
+ *   · and the pool of light it spills into the room comes up, because that
+ *     light is now what the words are legible against.
+ *
+ * Both are a single value each, and both are on the stage's own transition, so
+ * turning the switch on mid-session is a room dimming rather than a re-layout.
+ */
+.stage--cinema .breath-halo,
+.stage--cinema .breath-aurora,
+.stage--cinema .breath-ripple {
+  opacity: calc(0.62 + var(--e) * 0.2);
+}
+
+.stage--cinema .stage__orb {
+  filter: saturate(0.94);
+}
+
+.stage--cinema.stage--immersive .breath::after {
+  opacity: calc(0.3 + var(--e) * 0.34);
+}
+
+/*
  * "End session" is the one control that is genuinely optional while a session
  * is running, so it is the one that steps furthest back when the room goes
  * quiet. It restates the press transitions `.interactive` gave it, because a
@@ -4970,6 +5470,16 @@ html:not(.dark) .breath-aurora__veil {
   .stage--immersive .stage__top {
     grid-area: top;
     padding-inline: 3rem 0;
+  }
+
+  /*
+   * `display: contents` on the focus block promotes its children to grid
+   * items, and an auto-placed one would claim a cell of its own — so the type
+   * is named onto the orb's area, which is both where it belongs and what
+   * gives it a containing block to fill.
+   */
+  .stage--immersive .cinema {
+    grid-area: orb;
   }
 
   .stage--immersive .stage__line {

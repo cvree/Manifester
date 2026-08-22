@@ -107,6 +107,7 @@ export function breathingSummary(
   sound?: BreathSound,
   background?: boolean,
   room?: BackgroundChoice,
+  cinematic?: boolean,
 ): string {
   /*
    * The background visualiser has its own switch inside this panel and does
@@ -123,6 +124,10 @@ export function breathingSummary(
   return [
     preset ? `${preset.name} · ${shape}` : `Custom · ${formatSeconds(cycleSeconds(pattern))}s`,
     style ? findStyle(style).name : null,
+    // Ahead of the form's name would be wrong — this is a layer over the form,
+    // not a replacement for it — but it earns a word, because it is the part
+    // that changes what the player looks like from across the room.
+    cinematic ? 'Cinematic' : null,
     // Worth its own word in the summary: it is the part that works when your
     // eyes are shut, and the part nobody expects a breathing guide to have.
     sound && sound !== 'off' ? findVoice(sound)?.name : null,
