@@ -4,9 +4,7 @@ import {
   useCallback,
   useEffect,
   useState,
-  type ComponentType,
   type ReactNode,
-  type SVGProps,
 } from 'react'
 import { useNavigate } from 'react-router'
 import { AiSetupPanel } from '../components/AiSetupPanel'
@@ -23,18 +21,9 @@ import { Card } from '../components/Card'
 import { DeleteAllDataPanel } from '../components/DeleteAllDataPanel'
 import {
   ArrowUpIcon,
-  BreathIcon,
-  ClockIcon,
-  DownloadIcon,
   HeadphonesIcon,
-  MicIcon,
   PaletteIcon,
-  PauseIcon,
-  PulseIcon,
   SparkIcon,
-  TuneIcon,
-  VoiceIcon,
-  WaveIcon,
 } from '../components/Icons'
 import { InstallInstructions } from '../components/InstallPrompt'
 import { setStoredCredentials, useCredentials } from '../lib/ai/useCredentials'
@@ -100,7 +89,6 @@ const SECTIONS: Array<{ id: string; label: string }> = [
   { id: 'install', label: 'Install it' },
   { id: 'privacy', label: 'Privacy' },
   { id: 'ai', label: 'AI writing help' },
-  { id: 'settings', label: 'Every setting' },
   { id: 'rhythms', label: 'Rhythms' },
   { id: 'voices', label: 'Better voices' },
   { id: 'welcome', label: 'The introduction' },
@@ -172,74 +160,6 @@ function useActiveSection(): string {
  * cost of that is people not knowing a thing exists — so here, once, is the
  * whole surface area with directions to each control.
  */
-const SETTINGS: Array<{
-  icon: ComponentType<SVGProps<SVGSVGElement>>
-  name: string
-  where: string
-  what: string
-}> = [
-  {
-    icon: VoiceIcon,
-    name: 'Voice',
-    where: 'Create → Customize, and Player → Levels',
-    what: 'Who reads the words, and how fast. Manifester’s own studio voices — Ivy and Fen — sound the same on every device, and Studio Voice can be installed here so they read your own words too. Your phone’s own voices are there if you prefer one. On the Player it can be changed mid-session, and lands on the next line.',
-  },
-  {
-    icon: WaveIcon,
-    name: 'Background sound',
-    where: 'Create → Customize',
-    what: 'One of five generated ambiences, a sound you imported, or a playlist of them.',
-  },
-  {
-    icon: PulseIcon,
-    name: 'Brainwave rhythm',
-    where: 'Create → Customize',
-    what: 'A generated pulse under everything else. On its own, or beneath an ambience.',
-  },
-  {
-    icon: BreathIcon,
-    name: 'Breathing',
-    where: 'Create → Customize',
-    what: 'The pattern you follow, the shape it is drawn as, and the sound it breathes with.',
-  },
-  {
-    icon: ClockIcon,
-    name: 'Session length',
-    where: 'Create, its own card',
-    what: 'From five minutes to eight hours, or until you stop it yourself.',
-  },
-  {
-    icon: PauseIcon,
-    name: 'Delay between loops',
-    where: 'Create → Customize',
-    what: 'The silence before your words begin again — up to a minute of it.',
-  },
-  {
-    icon: MicIcon,
-    name: 'Record your own voice',
-    where: 'Create → Customize',
-    what: 'Optional. It is what makes a downloadable file possible.',
-  },
-  {
-    icon: DownloadIcon,
-    name: 'Download audio',
-    where: 'Create → Customize',
-    what: 'Renders your recording and background sound to a file, here on your device.',
-  },
-  {
-    icon: TuneIcon,
-    name: 'Haptics and interface sounds',
-    where: 'Create or Player → Customize',
-    what: 'How the app answers a tap. Both can be switched off entirely.',
-  },
-  {
-    icon: SparkIcon,
-    name: 'AI writing help',
-    where: 'Customize, or the card above',
-    what: 'Off unless you turn it on, and it is the only thing that ever leaves this device.',
-  },
-]
-
 /** The things that actually go wrong, and the shortest true answer to each. */
 const TROUBLE: Array<{ question: string; answer: ReactNode }> = [
   {
@@ -504,37 +424,6 @@ export function AboutRoute() {
             >
               <AstrologySettings />
             </Suspense>
-          </Card>
-
-          <Card
-            data-rise
-            id="settings"
-            className="scroll-mt-6"
-            title="Every setting, and where it lives"
-            description="Customize sits collapsed so the Create screen stays quiet. This is what is inside it."
-          >
-            <ul className="mt-1">
-              {SETTINGS.map(({ icon: Icon, name, where, what }) => (
-                <li
-                  key={name}
-                  className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-4 gap-y-1 border-t border-[var(--quiet-border)] py-4 first:border-t-0 first:pt-0"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-[0.85rem] bg-[var(--sage-soft)] text-[1.05rem] text-[var(--sage)]"
-                  >
-                    <Icon />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                      <h3 className="type-subheading">{name}</h3>
-                      <span className="type-meta text-ink-faint">{where}</span>
-                    </div>
-                    <p className="type-meta mt-1">{what}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
           </Card>
 
           <Card

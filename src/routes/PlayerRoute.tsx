@@ -15,11 +15,11 @@ import { Card } from '../components/Card'
 import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
 import { DesktopPlayerPanel } from '../components/DesktopPlayerPanel'
 import { EmptyState } from '../components/EmptyState'
+import { Notice } from '../components/Notice'
 import { AmbienceMixer } from '../components/AmbienceMixer'
 import { PlayerAdjust } from '../components/PlayerAdjust'
 import { PlayerAtmosphere } from '../components/PlayerAtmosphere'
 import {
-  CloseIcon,
   CollapseIcon,
   ExpandIcon,
   MixerIcon,
@@ -329,27 +329,16 @@ export function PlayerRoute() {
       >
         <div className="min-w-0">
           {session.notice && (
-            <div
-              role="alert"
-              data-rise
-              inert={expanded}
-              className={cx(
-                'mb-6 flex items-start gap-3 rounded-[1.25rem] border border-[var(--gold)] bg-[var(--gold-soft)] px-4 py-3.5',
-                'transition-opacity duration-[620ms] ease-[var(--ease-breath)]',
-                expanded && 'pointer-events-none opacity-0',
-              )}
-            >
-              <p className="grow text-[0.92rem] leading-relaxed text-ink">
-                {session.notice}
-              </p>
-              <button
-                type="button"
-                onClick={dismissNotice}
-                aria-label="Dismiss this message"
-                className="interactive -mt-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-ink"
+            <div data-rise inert={expanded}>
+              <Notice
+                onDismiss={dismissNotice}
+                className={cx(
+                  'mb-6 transition-opacity duration-[620ms] ease-[var(--ease-breath)]',
+                  expanded && 'pointer-events-none opacity-0',
+                )}
               >
-                <CloseIcon />
-              </button>
+                {session.notice}
+              </Notice>
             </div>
           )}
 
@@ -606,22 +595,30 @@ export function PlayerRoute() {
 
                 {!idle && !expanded && !wordless && (
                   <div className="stage__meter mt-8 w-full max-w-sm">
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <span className="type-meta">
-                        {session.delayRemaining != null
-                          ? `Next pass in ${session.delayRemaining}s`
-                          : session.voicePreparing && session.chunkTotal === 0
-                            ? 'Preparing the voice…'
-                            : session.chunkTotal > 0
+                    {/*
+                      Only the thing the bar underneath is measuring. Resting
+                      and preparing are already said, larger and higher up, by
+                      the state label at the top of the stage — printing them
+                      again eighteen inches lower does not make them twice as
+                      true. When there is nothing to count, the row goes with
+                      it rather than holding open a line of empty type.
+                    */}
+                    {(session.chunkTotal > 0 || session.trackName) && (
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="type-meta">
+                          {session.chunkTotal > 0
                             ? `${session.chunkTotal === lines.length ? 'Line' : 'Part'} ${
                                 session.chunkIndex + 1
                               } of ${session.chunkTotal}`
-                            : 'Speaking'}
-                      </span>
-                      {session.trackName && (
-                        <span className="type-meta truncate">{session.trackName}</span>
-                      )}
-                    </div>
+                            : ''}
+                        </span>
+                        {session.trackName && (
+                          <span className="type-meta truncate">
+                            {session.trackName}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div
                       className="h-1.5 w-full overflow-hidden rounded-pill bg-[var(--control-sunken)]"
                       role="progressbar"

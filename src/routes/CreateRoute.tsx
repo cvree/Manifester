@@ -1,33 +1,25 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '../components/Button'
 import { Card, FieldLabel } from '../components/Card'
 import { CustomizePanel, type PanelKey } from '../components/CustomizePanel'
 import {
   CheckIcon,
-  CloseIcon,
   PlayIcon,
   PlusIcon,
   SeedIcon,
   SparkIcon,
 } from '../components/Icons'
+import { Notice } from '../components/Notice'
 import { RitualPreview, type RitualSetting } from '../components/RitualPreview'
 import { TextArea, TextField } from '../components/TextArea'
-import { TimerSettings } from '../components/TimerSettings'
 import { primeBreathAudio } from '../lib/breathAudio'
 import { recordEngagement } from '../lib/engagement'
 import { cue } from '../lib/feedback'
 import { countWords } from '../lib/format'
 import { draftToLoop } from '../lib/loops'
 import { useReducedMotion } from '../lib/motion'
-import { SmoothScroll, scrollToCentre } from '../lib/smoothScroll'
+import { SmoothScroll } from '../lib/smoothScroll'
 import { STARTER_LINES } from '../lib/tts/knownPhrases'
 import { useStudioAvailable } from '../lib/tts/useTTSStatus'
 import {
@@ -104,7 +96,6 @@ export function CreateRoute() {
   const {
     draft,
     updateDraft,
-    updateSettings,
     resolvedDeviceVoice,
     previewVoice,
     stopPreview,
@@ -128,7 +119,6 @@ export function CreateRoute() {
   const [helper, setHelper] = useState<HelperState | null>(null)
   const [busy, setBusy] = useState<'add' | 'improve' | null>(null)
   const [panel, setPanel] = useState<PanelKey | null>(null)
-  const timerRef = useRef<HTMLDivElement>(null)
   const storedCredentials = useCredentials()
 
   /*
@@ -155,7 +145,7 @@ export function CreateRoute() {
    * than merely hiding the entrance.
    */
   const credentials = preferences.aiEnabled ? storedCredentials : null
-  const actionsRef = useRef<HTMLDivElement>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
 
   const words = countWords(draft.text)
   const canStart = words > 0
@@ -168,12 +158,13 @@ export function CreateRoute() {
   })
 
   /*
-   * The quick-start bar only appears once the real Start button has scrolled
-   * away. That is what keeps a fixed control from ever covering content: at
-   * rest there is nothing floating over the page at all.
+   * The quick-start bar only appears once the ritual preview — and with it the
+   * one Start button on this screen — has scrolled away. That is what keeps a
+   * fixed control from ever covering content: at rest there is nothing
+   * floating over the page at all.
    */
   useEffect(() => {
-    const node = actionsRef.current
+    const node = previewRef.current
     if (!node || typeof IntersectionObserver === 'undefined') return
     const observer = new IntersectionObserver(
       ([entry]) => setShowQuickStart(!entry.isIntersecting),
@@ -184,19 +175,13 @@ export function CreateRoute() {
   }, [])
 
   /*
-   * What a summary tile in the ritual preview does when tapped. Four of the
-   * five open the sheet that owns the setting; session length has no sheet —
-   * it is a card on this page — so that one scrolls to it instead. Either
-   * way the tile keeps its promise: it takes you to the control.
+   * What a summary tile in the ritual preview does when tapped: it opens the
+   * sheet that owns the setting. All five behave the same way now — session
+   * length used to be the exception, a card further down the page that the
+   * tile scrolled to, which made one tile in five feel broken and gave the
+   * screen a second home for a setting that already had one.
    */
   const openSetting = useCallback((setting: RitualSetting) => {
-    if (setting === 'timer') {
-      // Through the helper rather than `scrollIntoView`: while Lenis is
-      // driving the page, a native scroll under it leaves the two disagreeing
-      // about where the page is, and the next wheel event snaps it back.
-      scrollToCentre(timerRef.current)
-      return
-    }
     setPanel(setting === 'rhythm' ? 'brainwave' : setting)
   }, [])
 
@@ -350,37 +335,6 @@ export function CreateRoute() {
     updateDraft({ text: helper.before })
     setHelper(null)
   }, [helper, updateDraft])
-
-  const actions = (
-    <div className="flex gap-3">
-      <Button
-        variant="primary"
-        size="xl"
-        className="grow"
-        disabled={!canStart}
-        loading={starting}
-        onClick={handleStart}
-        leading={!starting && <PlayIcon className="text-[0.9rem]" />}
-      >
-        {starting ? 'Beginning…' : 'Start loop'}
-      </Button>
-      <Button
-        variant="secondary"
-        size="xl"
-        disabled={!canStart}
-        onClick={() => void handleSave()}
-        leading={
-          saved ? (
-            <CheckIcon className="text-[0.95rem]" />
-          ) : (
-            <SeedIcon className="text-[0.95rem]" />
-          )
-        }
-      >
-        {saved ? 'Saved' : 'Save'}
-      </Button>
-    </div>
-  )
 
   return (
     /*
@@ -605,6 +559,7 @@ export function CreateRoute() {
           column, where they belong.
         */}
         <div
+          ref={previewRef}
           data-rise
           className="lg:sticky lg:top-6 lg:col-start-2 lg:self-start lg:[grid-row:1/span_8]"
         >
@@ -631,90 +586,70 @@ export function CreateRoute() {
             onStart={handleStart}
             canStart={canStart}
             starting={starting}
+            onSave={() => void handleSave()}
+            saved={saved}
             onOpenSetting={openSetting}
           />
-        </div>
-
-        {/* Wrapped so the Length tile in the preview has something to scroll to. */}
-        <div ref={timerRef} data-rise className="lg:col-start-1">
-          <Card
-            level="panel"
-            title="Session length"
-            description="How long the loop keeps going before it fades out."
-          >
-            <TimerSettings
-              minutes={draft.settings.timerMinutes}
-              onChange={(timerMinutes) => updateSettings({ timerMinutes })}
-            />
-          </Card>
-        </div>
-
-        <div ref={actionsRef} data-rise className="lg:col-start-1">
-          {actions}
-          {!canStart && (
-            <p className="type-meta mt-3 text-center lg:text-left">
-              Write at least one line to begin.
-            </p>
-          )}
         </div>
 
         <div data-rise className="lg:col-start-1">
           <CustomizePanel open={panel} onOpenChange={setPanel} />
         </div>
 
+        {/*
+          One sentence. The full account of what is stored and what is sent is
+          on About, and repeating it here in four lines under every screen only
+          taught people to stop reading it.
+        */}
         <p className="type-meta px-1 text-center lg:col-start-1 lg:text-left">
-          Your saved loops stay on this device. Manifester does not require an
-          account and has no server of its own.
           {credentials
-            ? ` The two helper buttons above send that loop to ${findProvider(credentials.provider).name}; nothing else leaves this device.`
-            : ' Nothing you write leaves this device.'}
+            ? `Everything stays on this device — except the two helper buttons above, which send this loop to ${findProvider(credentials.provider).name}.`
+            : 'Everything stays on this device. No account, no server.'}
         </p>
       </div>
 
       {/*
-        The quick-start bar. Phone only, and only while the real buttons are
-        off screen — so at rest nothing floats over the page at all. It is
-        mounted and unmounted rather than faded, so the duplicate Start button
-        never sits invisibly in the tab order. It also stays away while a
-        session is running, where the mini-player already owns that space.
+        The quick-start bar: the one Start button following you down the page
+        once the preview it belongs to has scrolled off. Phone only — on a
+        desktop the preview is sticky and never leaves. It is mounted and
+        unmounted rather than faded, so a Start button never sits invisibly in
+        the tab order, and it stays away while a session is running, where the
+        mini-player already owns that space.
       */}
       {showQuickStart && canStart && session.status === 'idle' && (
         <div
           className="animate-sheet-in pointer-events-none fixed inset-x-0 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 px-4 lg:hidden"
           style={{ paddingBottom: 'max(0.25rem, env(safe-area-inset-bottom))' }}
         >
-          <div className="surface-sheet pointer-events-auto mx-auto w-full max-w-md rounded-[1.5rem] p-2">
-            {actions}
+          <div className="surface-sheet pointer-events-auto mx-auto flex w-full max-w-md items-center gap-2 rounded-[1.5rem] p-2">
+            <Button
+              variant="primary"
+              size="xl"
+              className="grow"
+              loading={starting}
+              onClick={handleStart}
+              leading={!starting && <PlayIcon className="text-[0.9rem]" />}
+            >
+              {starting ? 'Beginning…' : 'Start loop'}
+            </Button>
+            <Button
+              variant="secondary"
+              size="xl"
+              onClick={() => void handleSave()}
+              aria-label={saved ? 'Saved to your library' : 'Save this loop'}
+              leading={
+                saved ? (
+                  <CheckIcon className="text-[0.95rem]" />
+                ) : (
+                  <SeedIcon className="text-[0.95rem]" />
+                )
+              }
+            >
+              {saved ? 'Saved' : 'Save'}
+            </Button>
           </div>
         </div>
       )}
     </SmoothScroll>
-  )
-}
-
-function Notice({
-  children,
-  onDismiss,
-}: {
-  children: ReactNode
-  onDismiss?: () => void
-}) {
-  return (
-    <div
-      role="alert"
-      className="flex items-start gap-3 rounded-[1.25rem] border border-[var(--gold)] bg-[var(--gold-soft)] px-4 py-3.5"
-    >
-      <p className="grow text-[0.92rem] leading-relaxed text-ink">{children}</p>
-      {onDismiss && (
-        <button
-          type="button"
-          onClick={onDismiss}
-          aria-label="Dismiss this message"
-          className="interactive -mt-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-ink"
-        >
-          <CloseIcon />
-        </button>
-      )}
-    </div>
   )
 }

@@ -109,18 +109,12 @@ export function SavedLoopCard({
     flash('Saved to your loops')
   }
 
+  /*
+   * No Save entry here. A recent play already carries a Save button in the
+   * footer, an inch to the left of the button that opens this menu — the same
+   * action twice, side by side, one of them hidden behind a tap.
+   */
   const actions: MenuAction[] = [
-    ...(onKeep
-      ? [
-          {
-            id: 'keep',
-            label: 'Save to your loops',
-            hint: 'Moves it above Recent plays and keeps it for good',
-            icon: <SeedIcon />,
-            onSelect: keep,
-          },
-        ]
-      : []),
     {
       id: 'share-link',
       label: canShare() ? 'Share loop link' : 'Copy loop link',
@@ -243,11 +237,7 @@ export function SavedLoopCard({
             <Menu
               label={`More for ${loop.title}`}
               title={loop.title}
-              description={
-                onKeep
-                  ? 'Save it for good, share it, set one reminder, download it, or make another copy.'
-                  : 'Share it, set one reminder, download it, or make another copy.'
-              }
+              description="Share it, set one reminder, download it, or make another copy."
               actions={actions}
             />
           </span>

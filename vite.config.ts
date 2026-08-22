@@ -173,7 +173,7 @@ export default defineConfig({
       ],
       manifest: {
         id: base,
-        name: 'Manifester — calm affirmation loops',
+        name: 'Manifester',
         short_name: 'Manifester',
         description:
           'Paste an intention, choose a voice, and let it loop over gentle ambient sound. Everything stays on your device.',

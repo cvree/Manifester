@@ -66,16 +66,17 @@ export function LibraryRoute() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 md:max-w-5xl">
+      {/*
+        No paragraph naming the three things in the library: the tabs directly
+        under this heading already name them, and a sentence that lists the
+        buttons below it is a caption for a picture you can see.
+      */}
       <header data-rise className="pt-2">
         <h1 className="type-display">Your library</h1>
         <p className="type-body mt-3 max-w-[52ch]">
-          The loops you have saved, everything you have played lately, and the
-          sounds they rest on. All of it stays on this device.
+          {total ?? 'Everything here stays on this device.'}
         </p>
-        {total && <p className="type-meta mt-2">{total}</p>}
       </header>
-
-      <LibraryBackupPanel />
 
       <div data-rise>
         <SegmentedControl
@@ -107,6 +108,13 @@ export function LibraryRoute() {
           <SkySection />
         </Suspense>
       )}
+
+      {/*
+        Last, not first. Backing up is a now-and-then errand, and it used to be
+        the largest thing on the screen — a card about a file, above the loops
+        somebody actually opened this page to reach.
+      */}
+      <LibraryBackupPanel />
     </div>
   )
 }

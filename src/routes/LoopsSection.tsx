@@ -119,9 +119,8 @@ export function LoopsSection() {
                 <div>
                   <h2 className="type-label">Recent plays · {played.length}</h2>
                   <p className="type-meta mt-1 max-w-[46ch]">
-                    Everything you listen to is kept here for you, the last{' '}
-                    {MAX_PLAYED_LOOPS} at a time. Save one and it moves up to
-                    stay.
+                    The last {MAX_PLAYED_LOOPS} you listened to. Save one and it
+                    moves up to stay.
                   </p>
                 </div>
                 {clearing ? (

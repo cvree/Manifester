@@ -10,11 +10,13 @@ import type { BreathingRuntime } from '../lib/useBreathing'
 import type { LoopSettings } from '../lib/types'
 import { BreathingVisualizer } from './BreathingVisualizer'
 import {
+  CheckIcon,
   ChevronIcon,
   ClockIcon,
   PauseIcon,
   PlayIcon,
   PulseIcon,
+  SeedIcon,
   VoiceIcon,
   WaveIcon,
 } from './Icons'
@@ -53,6 +55,16 @@ interface RitualPreviewProps {
   onStart: () => void
   canStart: boolean
   starting: boolean
+  /**
+   * Keep this loop.
+   *
+   * Save lives here, beside Start, because the preview is the picture of the
+   * thing being saved. It used to be one of a second pair of buttons further
+   * down the page, which meant the screen had two places that both claimed to
+   * act on the ritual and neither of which was obviously the one.
+   */
+  onSave: () => void
+  saved: boolean
   /**
    * Take me to the control behind this tile. The preview does not know
    * whether that means opening a sheet or scrolling the page — Create owns
@@ -131,6 +143,8 @@ export function RitualPreview({
   onStart,
   canStart,
   starting,
+  onSave,
+  saved,
   onOpenSetting,
   className,
 }: RitualPreviewProps) {
@@ -217,19 +231,23 @@ export function RitualPreview({
         )}
 
         {/*
-          Start the loop, and hear one line of it. The pair sit together
-          because they are the same question at two sizes — and Start is the
-          filled one, because a preview is a step on the way to it rather than
-          an alternative to it.
+          The only place on this screen that acts on the ritual.
+
+          Start, hearing one line of it, and keeping it were three buttons in
+          two places — a pair here and a second pair further down the page, both
+          claiming to be the thing you press when you have finished writing.
+          They are one group now, with a single filled button in it: a preview
+          is a step on the way to starting, and saving is what you do to a loop
+          you have already decided about, so neither competes for the eye.
         */}
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+        <div className="mt-6 flex w-full flex-col items-center gap-2.5">
           <button
             type="button"
             onClick={onStart}
             disabled={!canStart || starting}
             aria-busy={starting || undefined}
             className={cx(
-              'interactive pressable inline-flex min-h-12 items-center gap-2.5 rounded-pill border border-transparent px-6 text-[0.95rem] font-medium',
+              'interactive pressable inline-flex min-h-13 w-full max-w-[19rem] items-center justify-center gap-2.5 rounded-pill border border-transparent px-6 text-[1rem] font-medium',
               'bg-[linear-gradient(175deg,color-mix(in_oklab,var(--rose-deep)_86%,white)_0%,var(--rose-deep)_62%)] text-[var(--bg-0)]',
               'shadow-[0_1px_0_rgb(255_255_255/0.28)_inset,0_8px_24px_-10px_var(--glow)]',
               'hover:brightness-[1.05]',
@@ -247,29 +265,51 @@ export function RitualPreview({
             {starting ? 'Beginning…' : 'Start loop'}
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              cue('tap')
-              if (previewing) onStopPreview()
-              else onPreview()
-            }}
-            disabled={!canPreview}
-            className={cx(
-              'interactive pressable inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
-              previewing
-                ? 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]'
-                : 'border-[var(--control-border)] bg-[var(--control)] text-ink',
-              'disabled:cursor-not-allowed disabled:opacity-45',
-            )}
-          >
-            {previewing ? (
-              <PauseIcon className="text-[0.85rem]" />
-            ) : (
-              <VoiceIcon className="text-[0.95rem]" />
-            )}
-            {previewing ? 'Stop preview' : 'Hear a line'}
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                cue('tap')
+                if (previewing) onStopPreview()
+                else onPreview()
+              }}
+              disabled={!canPreview}
+              className={cx(
+                'interactive pressable inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
+                previewing
+                  ? 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]'
+                  : 'border-[var(--control-border)] bg-[var(--control)] text-ink',
+                'disabled:cursor-not-allowed disabled:opacity-45',
+              )}
+            >
+              {previewing ? (
+                <PauseIcon className="text-[0.85rem]" />
+              ) : (
+                <VoiceIcon className="text-[0.95rem]" />
+              )}
+              {previewing ? 'Stop preview' : 'Hear a line'}
+            </button>
+
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={!canStart}
+              className={cx(
+                'interactive pressable inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
+                saved
+                  ? 'border-[var(--sage)] bg-[var(--sage-soft)] text-[var(--sage)]'
+                  : 'border-[var(--control-border)] bg-[var(--control)] text-ink',
+                'disabled:cursor-not-allowed disabled:opacity-45',
+              )}
+            >
+              {saved ? (
+                <CheckIcon className="text-[0.95rem]" />
+              ) : (
+                <SeedIcon className="text-[0.95rem]" />
+              )}
+              {saved ? 'Saved' : 'Save'}
+            </button>
+          </div>
         </div>
 
         {!canStart && (

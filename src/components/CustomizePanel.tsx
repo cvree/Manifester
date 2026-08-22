@@ -2,9 +2,7 @@ import type { ReactNode } from 'react'
 import { setStoredCredentials, useCredentials } from '../lib/ai/useCredentials'
 import { cue, hapticsSupported, primeFeedback, soundSupported } from '../lib/feedback'
 import {
-  brainwaveSummary,
   breathingSummary,
-  delaySummary,
   exportSummary,
   feelSummary,
   musicSummary,
@@ -26,17 +24,14 @@ import {
   DownloadIcon,
   MicIcon,
   NoteIcon,
-  PauseIcon,
-  PulseIcon,
   SparkIcon,
   TuneIcon,
-  VoiceIcon,
-  WaveIcon,
 } from './Icons'
 import { MusicSettings } from './MusicControl'
 import { SettingRow } from './SettingRow'
 import { Sheet } from './Sheet'
 import { SoundSettings } from './SoundSettings'
+import { TimerSettings } from './TimerSettings'
 import { Toggle } from './Toggle'
 import { VoiceRecorderPanel } from './VoiceRecorderPanel'
 import { VoiceSettings } from './VoiceSettings'
@@ -47,6 +42,7 @@ export type PanelKey =
   | 'music'
   | 'brainwave'
   | 'breathing'
+  | 'timer'
   | 'delay'
   | 'recording'
   | 'export'
@@ -73,6 +69,10 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
   breathing: {
     title: 'Breathing',
     description: 'The guide you follow while you listen — how it moves, and how it sounds.',
+  },
+  timer: {
+    title: 'Session length',
+    description: 'How long the loop keeps going before it fades out.',
   },
   delay: {
     title: 'Delay between loops',
@@ -180,6 +180,19 @@ export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
         />
       </Sheet>
 
+      {/*
+        Session length used to be a card of its own on Create, which made it
+        the one setting with two homes — a tile in the preview that scrolled
+        somewhere, and a panel nothing else on the screen looked like. It is a
+        sheet like the other nine now.
+      */}
+      <Sheet open={open === 'timer'} onClose={close} {...TITLES.timer}>
+        <TimerSettings
+          minutes={settings.timerMinutes}
+          onChange={(timerMinutes) => updateSettings({ timerMinutes })}
+        />
+      </Sheet>
+
       <Sheet open={open === 'delay'} onClose={close} {...TITLES.delay}>
         <DelaySettings
           seconds={settings.repeatPauseSeconds}
@@ -254,15 +267,19 @@ export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
 }
 
 /**
- * Everything that used to be a long vertical settings form.
+ * Everything about the ritual that the preview's tiles do not already carry.
  *
- * Each row states its own value, so the whole of the advanced configuration is
- * legible at a glance; opening one puts it in a sheet — rising from the bottom
- * on a phone, centred on a desktop — instead of pushing the page further down.
+ * The two used to overlap almost entirely: voice, sound, length, delay and
+ * rhythm each had a tile in the preview *and* a row down here, on the same
+ * screen, both opening the same sheet. Two lists of the same settings is not
+ * twice the control — it is a screen you have to read twice to be sure you
+ * have not missed something.
  *
- * The nine rows are grouped into three named runs, because nine identical rows
- * in a column is a list you read from the top every time rather than a place
- * you know your way around.
+ * So the split is by what the setting is about. The five tiles above own the
+ * loop itself — who reads it, what it rests on, how long it runs. These rows
+ * own everything around it: the guide, the soundtrack, and the handful of
+ * things done once and then forgotten. Each row still states its own value, and
+ * opening one puts it in a sheet rather than pushing the page further down.
  */
 interface CustomizePanelProps {
   /**
@@ -274,11 +291,9 @@ interface CustomizePanelProps {
 }
 
 export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
-  const { draft, resolvedDeviceVoice } = useSession()
-  const { allTracks } = useLibrary()
+  const { draft } = useSession()
   const { preferences } = usePreferences()
   const credentials = useCredentials()
-  const studioAvailable = useStudioAvailable()
 
   const { settings } = draft
 
@@ -291,43 +306,13 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
     <>
       <div className="surface-panel overflow-hidden">
         <div className="border-b border-[var(--quiet-border)] px-4 py-4 sm:px-5">
-          <h2 className="type-subheading">Customize your ritual</h2>
+          <h2 className="type-subheading">Everything else</h2>
           <p className="type-meta mt-0.5">
-            Everything here is optional. The defaults already work.
+            Optional. Everything the ritual tiles do not already cover.
           </p>
         </div>
 
-        <Group label="What you hear">
-          <SettingRow
-            icon={<VoiceIcon />}
-            title="Voice"
-            summary={voiceSummary(settings, resolvedDeviceVoice, studioAvailable)}
-            onClick={() => openPanel('voice')}
-            accent
-          />
-          <SettingRow
-            icon={<WaveIcon />}
-            title="Background sound"
-            summary={soundSummary(settings, allTracks)}
-            onClick={() => openPanel('sound')}
-            accent={settings.sound.mode !== 'off'}
-          />
-          <SettingRow
-            icon={<NoteIcon />}
-            title="Music"
-            summary={musicSummary(preferences.music, preferences.musicVolume)}
-            onClick={() => openPanel('music')}
-            accent={preferences.music}
-          />
-          <SettingRow
-            icon={<PauseIcon />}
-            title="Delay between loops"
-            summary={delaySummary(settings.repeatPauseSeconds)}
-            onClick={() => openPanel('delay')}
-          />
-        </Group>
-
-        <Group label="What guides you">
+        <Group label="Around the loop">
           <SettingRow
             icon={<BreathIcon />}
             title="Breathing"
@@ -344,11 +329,11 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
             accent={preferences.breathingEnabled || preferences.backgroundVisualizer}
           />
           <SettingRow
-            icon={<PulseIcon />}
-            title="Brainwave rhythm"
-            summary={brainwaveSummary(settings.brainwave)}
-            onClick={() => openPanel('brainwave')}
-            accent={settings.brainwave.enabled}
+            icon={<NoteIcon />}
+            title="Music"
+            summary={musicSummary(preferences.music, preferences.musicVolume)}
+            onClick={() => openPanel('music')}
+            accent={preferences.music}
           />
         </Group>
 
