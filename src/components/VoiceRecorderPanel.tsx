@@ -6,6 +6,7 @@ import {
   describeRecordingError,
   isRecordingSupported,
 } from '../lib/recorder'
+import { soundtrack } from '../lib/soundtrack'
 import * as storage from '../lib/storage'
 import { Button } from './Button'
 import { IconButton } from './IconButton'
@@ -33,6 +34,27 @@ export function VoiceRecorderPanel({
   const [playing, setPlaying] = useState(false)
 
   if (!recorderRef.current) recorderRef.current = new VoiceRecorder()
+
+  /*
+   * The soundtrack leaves entirely while the microphone is open, and steps
+   * back while a take is being played back.
+   *
+   * Two different answers because they are two different problems. Music
+   * playing into an open microphone ends up *inside* the recording, which no
+   * level adjustment can undo; music under somebody auditioning what they just
+   * recorded is only in the way, so it ducks like any other voice. Both are
+   * cleared on unmount, so closing the sheet mid-take can never leave the
+   * music switched off. See `lib/soundtrack`.
+   */
+  useEffect(() => {
+    soundtrack.setRecording(recording)
+    return () => soundtrack.setRecording(false)
+  }, [recording])
+
+  useEffect(() => {
+    soundtrack.setDucked(playing, 'audition')
+    return () => soundtrack.setDucked(false, 'audition')
+  }, [playing])
 
   // Load whatever recording this loop already has.
   useEffect(() => {

@@ -7,6 +7,7 @@ import {
   delaySummary,
   exportSummary,
   feelSummary,
+  musicSummary,
   recordingSummary,
   soundSummary,
   voiceSummary,
@@ -24,6 +25,7 @@ import {
   BreathIcon,
   DownloadIcon,
   MicIcon,
+  NoteIcon,
   PauseIcon,
   PulseIcon,
   SparkIcon,
@@ -31,6 +33,7 @@ import {
   VoiceIcon,
   WaveIcon,
 } from './Icons'
+import { MusicSettings } from './MusicControl'
 import { SettingRow } from './SettingRow'
 import { Sheet } from './Sheet'
 import { SoundSettings } from './SoundSettings'
@@ -41,6 +44,7 @@ import { VoiceSettings } from './VoiceSettings'
 export type PanelKey =
   | 'voice'
   | 'sound'
+  | 'music'
   | 'brainwave'
   | 'breathing'
   | 'delay'
@@ -57,6 +61,10 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
   sound: {
     title: 'Background sound',
     description: 'The ambience your words rest on.',
+  },
+  music: {
+    title: 'Music',
+    description: 'The soundtrack under the app.',
   },
   brainwave: {
     title: 'Brainwave rhythm',
@@ -150,6 +158,15 @@ export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
           onVolumeChange={setLiveMusicVolume}
           live={session.status === 'playing' || session.status === 'paused'}
         />
+      </Sheet>
+
+      <Sheet open={open === 'music'} onClose={close} {...TITLES.music}>
+        {/*
+          The same panel the header button opens. One set of controls, reachable
+          from the place people look for settings and from the place people
+          reach when they want the sound to stop.
+        */}
+        <MusicSettings />
       </Sheet>
 
       <Sheet open={open === 'brainwave'} onClose={close} {...TITLES.brainwave}>
@@ -294,6 +311,13 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
             summary={soundSummary(settings, allTracks)}
             onClick={() => openPanel('sound')}
             accent={settings.sound.mode !== 'off'}
+          />
+          <SettingRow
+            icon={<NoteIcon />}
+            title="Music"
+            summary={musicSummary(preferences.music, preferences.musicVolume)}
+            onClick={() => openPanel('music')}
+            accent={preferences.music}
           />
           <SettingRow
             icon={<PauseIcon />}

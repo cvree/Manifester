@@ -223,6 +223,39 @@ export default defineConfig({
             },
           },
           /*
+           * The soundtrack.
+           *
+           * Eleven megabytes across five pieces, and deliberately not in the
+           * offline bundle: precaching them would more than double what every
+           * visitor downloads for a layer that is switched off entirely for
+           * anybody on a metered connection, and most visits never reach more
+           * than two of the five. So each piece is cached the first time it is
+           * actually heard, and from then on it costs nothing — which is what
+           * makes a crossfade between two scenes instant on the second visit
+           * and offline afterwards.
+           *
+           * `CacheFirst` with no expiry is right here for the same reason it
+           * is right for the speech clips: these files never change without
+           * changing name. The entry limit is a fence rather than a policy —
+           * there are five of them.
+           */
+          {
+            urlPattern: ({ url, sameOrigin }) =>
+              sameOrigin &&
+              url.pathname.includes('/music/') &&
+              url.pathname.endsWith('.mp3'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'manifester-music',
+              expiration: { maxEntries: 12 },
+              // Range requests: a media fetch can be partial, and a 206 that is
+              // cached as if it were the whole file is a track that plays the
+              // first two seconds forever.
+              cacheableResponse: { statuses: [0, 200] },
+              rangeRequests: true,
+            },
+          },
+          /*
            * The Studio Voice runtime: the worker bundle and the ONNX
            * WebAssembly it loads. Together they are far too large to precache
            * for the majority who never install the model, and far too

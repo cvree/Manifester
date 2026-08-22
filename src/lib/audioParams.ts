@@ -1,8 +1,11 @@
 /**
  * Small Web Audio primitives shared by the generated-sound modules.
  *
- * Both of these exist because a browser's own answer to the same problem is not
- * consistent enough to build on.
+ * Every one of them exists because a browser's own answer to the same problem
+ * is not consistent enough to build on: `cancelAndHoldAtTime` for holding a
+ * ramp, `setValueCurveAtTime` for shaping one, and `DynamicsCompressorNode`
+ * for keeping a mix inside full scale. The replacements here are arithmetic,
+ * and so behave the same on every engine.
  */
 
 /**
@@ -107,4 +110,106 @@ export function createSoftCeiling(
   const shaper = ctx.createWaveShaper()
   shaper.curve = curve
   return shaper
+}
+
+/**
+ * How many linear segments an equal-power fade is traced with.
+ *
+ * A cosine drawn as 24 straight lines is within 0.2% of the curve everywhere,
+ * which is roughly a fiftieth of a decibel — inaudible, and the error is in the
+ * shape rather than in the endpoints, which land exactly.
+ */
+const FADE_SEGMENTS = 24
+
+/**
+ * The equal-power position between two levels.
+ *
+ * A linear crossfade between two *uncorrelated* sources — two different pieces
+ * of music, or two moments of the same one — loses 3 dB in the middle, because
+ * power adds where amplitude does not: at the halfway point both sides are at
+ * 0.5 and the sum carries half the energy either side had alone. Sine and
+ * cosine are the pair whose squares sum to one, so a fade out along the cosine
+ * against a fade in along the sine holds the level flat all the way across.
+ *
+ * Anchored at `from` rather than at 0 or 1 so an interrupted fade continues
+ * from wherever it had reached instead of stepping back to the start of the
+ * curve.
+ */
+function equalPowerAt(from: number, to: number, progress: number): number {
+  const shape =
+    to >= from
+      ? Math.sin((Math.PI / 2) * progress)
+      : 1 - Math.cos((Math.PI / 2) * progress)
+  return from + (to - from) * shape
+}
+
+/**
+ * Fade a param to a new level along an equal-power curve, starting from
+ * whatever value it had actually reached.
+ *
+ * `setValueCurveAtTime` is the API that looks like it is for this, and it is
+ * deliberately not used: it cannot be anchored at the current value, and
+ * starting one over an automation that is still running is a
+ * `NotSupportedError` on some engines and a step on others — which is exactly
+ * the case this function exists to survive, because a crossfade in this app is
+ * interrupted every time somebody navigates twice in three seconds. A chain of
+ * short linear ramps has neither problem: it begins where `holdParamAt` pins
+ * it, and starting another chain simply replaces the rest of this one.
+ *
+ * `when` must be the context's current time, for the reason `holdParamAt`
+ * gives.
+ */
+export function fadeParam(
+  param: AudioParam,
+  target: number,
+  seconds: number,
+  when: number,
+): void {
+  holdParamAt(param, when)
+  if (seconds <= 0) {
+    param.setValueAtTime(target, when)
+    return
+  }
+
+  const from = param.value
+  for (let step = 1; step <= FADE_SEGMENTS; step += 1) {
+    const progress = step / FADE_SEGMENTS
+    param.linearRampToValueAtTime(
+      equalPowerAt(from, target, progress),
+      when + seconds * progress,
+    )
+  }
+}
+
+/**
+ * The same curve, scheduled to happen later on a param nothing else is
+ * automating.
+ *
+ * Used for the two halves of a loop's seam, which are written onto a gain node
+ * created for one repetition and thrown away after it. Because that node's
+ * automation is known in full at the moment it is built, the fade can be laid
+ * down ahead of time — which is what lets a repetition be scheduled four
+ * seconds early and still land sample-accurately, whatever the page is doing
+ * when the moment arrives.
+ */
+export function scheduleFade(
+  param: AudioParam,
+  from: number,
+  to: number,
+  when: number,
+  seconds: number,
+): void {
+  param.setValueAtTime(from, when)
+  if (seconds <= 0) {
+    param.setValueAtTime(to, when)
+    return
+  }
+
+  for (let step = 1; step <= FADE_SEGMENTS; step += 1) {
+    const progress = step / FADE_SEGMENTS
+    param.linearRampToValueAtTime(
+      equalPowerAt(from, to, progress),
+      when + seconds * progress,
+    )
+  }
 }

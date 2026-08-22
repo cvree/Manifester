@@ -37,6 +37,7 @@ import {
 } from '../lib/loops'
 import { ActiveTimeClock } from '../lib/sessionClock'
 import { soundPlaybackChanged } from '../lib/soundChoice'
+import { soundtrack } from '../lib/soundtrack'
 import {
   effectiveLevel,
   layersChanged,
@@ -290,6 +291,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * one alive. Attaching is idempotent.
    */
   tts.attach(busRef.current)
+  // And so does the soundtrack, for the same reason and on the same terms: one
+  // context, one set of interruption workarounds, one thing to keep alive.
+  soundtrack.attach(busRef.current)
   if (!musicRef.current) musicRef.current = new MusicEngine(busRef.current)
   if (!brainwaveRef.current) brainwaveRef.current = new BrainwaveVoice(busRef.current)
   if (!timerRef.current) timerRef.current = new SessionTimer()
@@ -473,6 +477,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             ? current
             : { ...current, voicePreparing: status.loading },
         )
+        /*
+         * And the music steps back under the words.
+         *
+         * Driven by the utterance rather than by the session — unlike the
+         * interface cues two blocks down — because this one is loud enough for
+         * the difference to matter: a bed of music at a steady level under a
+         * spoken affirmation is exactly the thing that makes the affirmation
+         * harder to hear. The soundtrack holds the duck through the gaps
+         * between phrases so it cannot flutter; see `DUCK_HOLD_MS`.
+         */
+        soundtrack.setDucked(status.speaking)
       }),
     [],
   )
@@ -491,6 +506,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setCueDucking(session.status === 'playing')
     return () => setCueDucking(false)
+  }, [session.status])
+
+  /*
+   * A locked phone under a running session is somebody listening with their
+   * eyes shut, and a hidden tab with nothing running is a tab they left. The
+   * soundtrack treats the two completely differently, and this is how it knows
+   * which one it is looking at.
+   */
+  useEffect(() => {
+    soundtrack.setListening(session.status === 'playing')
   }, [session.status])
 
   /* ── Screen wake lock: speech stops when a phone sleeps ── */
@@ -682,6 +707,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // Opens the audio path for the voice and asks the speech service whether
     // it is there, so the first line does not spend a round trip finding out.
     tts.unlock()
+    /*
+     * And this is the press the soundtrack has been waiting for.
+     *
+     * Every route reaches `prime()` from a real gesture — Begin, play, a
+     * previewed line — which is exactly the permission a browser requires and
+     * exactly the moment somebody has asked the app to do something. Until one
+     * of them happens the music does not exist, which is the whole of the "no
+     * audio on page load" promise.
+     */
+    soundtrack.begin()
   }, [])
 
   const start = useCallback(
@@ -1195,6 +1230,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // is going away, so a synthesis that has not landed has nowhere to land.
       tts.cancelAll()
       music?.dispose()
+      soundtrack.dispose()
       brainwave?.dispose()
       timer?.stop()
       bus?.close()

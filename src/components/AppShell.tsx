@@ -5,6 +5,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
 import { useIsCompact, useReducedMotion } from '../lib/motion'
+import { sceneFor, soundtrack } from '../lib/soundtrack'
 import { useSession } from '../state/SessionProvider'
 import { useStage } from '../state/StageProvider'
 import { useTheme } from '../state/ThemeProvider'
@@ -21,6 +22,7 @@ import {
   SunIcon,
 } from './Icons'
 import { InstallPrompt } from './InstallPrompt'
+import { MusicControl } from './MusicControl'
 
 /**
  * Three tabs, in the order the app is used: write it, play it, keep it.
@@ -81,6 +83,23 @@ export function AppShell() {
 
   // Any route change, or ending the session, restores the normal chrome.
   useEffect(() => setNavRevealed(false), [location.pathname])
+
+  /*
+   * Tell the soundtrack where we are.
+   *
+   * From the shell rather than from each route, because the answer depends on
+   * both the route *and* the session — somebody who walks to the library
+   * mid-session has not changed what they are doing — and this is the one
+   * component that is mounted for the whole of both. `sceneFor` decides;
+   * everything here does is report. Nothing is started by this: until a real
+   * press has opened the audio, the soundtrack files the scene away and stays
+   * silent. See `lib/soundtrack`.
+   */
+  useEffect(() => {
+    soundtrack.setScene(
+      sceneFor({ path: location.pathname, status: session.status }),
+    )
+  }, [location.pathname, session.status])
 
   // A gentle stagger as each screen arrives. Skipped when motion is reduced.
   useGSAP(
@@ -184,6 +203,12 @@ export function AppShell() {
             >
               <InfoIcon />
             </button>
+            {/*
+              Kept through onboarding, unlike the About button beside it: the
+              music is the one thing on that screen somebody might need to stop
+              in a hurry, and it is the screen that starts it.
+            */}
+            <MusicControl />
             <button
               type="button"
               onClick={toggleTheme}

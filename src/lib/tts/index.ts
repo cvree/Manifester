@@ -52,6 +52,18 @@ export interface TTSStatus {
   engine: VoiceKind
   /** True while a line is being fetched or synthesised. */
   loading: boolean
+  /**
+   * True while words are actually coming out of the speakers.
+   *
+   * Distinct from `loading`, which is the wait *before* a line, and that
+   * distinction is the whole reason this exists: the soundtrack steps back
+   * under a spoken line and comes back after it, and ducking during a
+   * synthesis that has not started yet would leave a hole in the music where
+   * the voice was going to be. Published from both paths — the studio voice
+   * and the device's own — so the music does not have to know or care which
+   * one is speaking. See `lib/soundtrack`.
+   */
+  speaking: boolean
   /** Where the last clip came from. Diagnostics only. */
   lastSource: ClipSource | 'fallback' | null
   /** True when the studio voice has been asked for and could not be had. */
@@ -180,6 +192,7 @@ class TTS {
   private status: TTSStatus = {
     engine: 'none',
     loading: false,
+    speaking: false,
     lastSource: null,
     degraded: false,
     unlimited: false,
@@ -475,7 +488,7 @@ class TTS {
     this.liveSynthesisSpeed = 0
     this.player.stop('interrupted')
     this.fallbackVoice.stop()
-    this.publish({ loading: false })
+    this.publish({ loading: false, speaking: false })
   }
 
   /**
@@ -687,6 +700,7 @@ class TTS {
       this.engineFailedAt = 0
       this.publish({
         loading: false,
+        speaking: true,
         engine: 'studio',
         lastSource: clip.source,
         degraded: false,
@@ -694,10 +708,17 @@ class TTS {
 
       const outcome = await handle.done
       settings.signal?.removeEventListener('abort', onAbort)
+      /*
+       * `isSpeaking` rather than a flat `false`: a queued line can already have
+       * taken the speakers by the time this one's promise settles, and saying
+       * "nothing is speaking" there would let the music swell up into the next
+       * sentence and duck again a moment later.
+       */
+      this.publish({ speaking: this.isSpeaking })
       settings.onEnd?.(outcome)
       return outcome
     } catch (error) {
-      this.publish({ loading: false })
+      this.publish({ loading: false, speaking: this.isSpeaking })
       if (settings.signal?.aborted) return 'interrupted'
       // A missing engine is not a fault worth marking the session degraded
       // over: it is what a build with no backend looks like, every time.
@@ -750,10 +771,23 @@ class TTS {
 
     const onAbort = () => handle.stop()
     settings.signal?.addEventListener('abort', onAbort, { once: true })
-    this.publish({ loading: false, engine: 'device', lastSource: 'fallback' })
+    /*
+     * Announced when the utterance is handed over rather than when it starts.
+     * `onstart` is the more accurate moment and not every engine fires it, and
+     * being a fraction early costs nothing here: the music's duck takes four
+     * hundred milliseconds to arrive, which is about how long a platform takes
+     * to open its own voice.
+     */
+    this.publish({
+      loading: false,
+      speaking: true,
+      engine: 'device',
+      lastSource: 'fallback',
+    })
 
     const outcome = await handle.done
     settings.signal?.removeEventListener('abort', onAbort)
+    this.publish({ speaking: this.isSpeaking })
     settings.onEnd?.(outcome)
     return outcome
   }
@@ -763,6 +797,7 @@ class TTS {
     if (
       next.engine === this.status.engine &&
       next.loading === this.status.loading &&
+      next.speaking === this.status.speaking &&
       next.lastSource === this.status.lastSource &&
       next.degraded === this.status.degraded &&
       next.unlimited === this.status.unlimited &&

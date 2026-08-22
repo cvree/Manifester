@@ -29,6 +29,7 @@ import {
   writeProgress,
 } from '../lib/onboarding'
 import { chooseSound } from '../lib/soundChoice'
+import { soundtrack } from '../lib/soundtrack'
 import { soundName } from '../lib/summaries'
 import { tts } from '../lib/tts'
 import { useBreathing } from '../lib/useBreathing'
@@ -399,6 +400,14 @@ export function WelcomeRoute() {
             onBegin={() => {
               // The one gesture the whole experience's responsiveness rests on.
               tts.unlock()
+              /*
+               * And the one the soundtrack has been waiting for. This press is
+               * the only place in the app where somebody says "yes, begin"
+               * before anything has happened at all, which makes it exactly the
+               * right moment for the room to arrive — and the reason the first
+               * screen is silent until it happens.
+               */
+              soundtrack.begin()
               go('intent')
             }}
           />

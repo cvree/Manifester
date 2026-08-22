@@ -824,6 +824,145 @@ nothing muted", which is exactly what they sounded like.
 
 ---
 
+## The soundtrack
+
+Five pieces of music sit under the app and change with what you are doing. It is
+not a player: there is no transport, no track list, no now-playing banner, and
+nothing to skip. If it is working you do not think about it, and the only two
+controls — on, and how loud — live behind a single note-shaped button beside the
+day/night toggle ([`src/lib/soundtrack/`](src/lib/soundtrack)).
+
+| Where you are | What plays |
+| --- | --- |
+| Onboarding, and the player before you press play | *Twilight Sanctuary* |
+| Writing or editing your words | *The Velvet Hour* |
+| A session running, wherever you have wandered to | *Between Two Breaths* |
+| A loop that has finished | *The Glass Room* |
+| The library, the About page, a shared loop | *After the Sun Recedes* |
+
+Three of those rows are not routes. **A running session outranks the route**, so
+walking to the library mid-practice does not change the music — you have gone to
+look something up while it plays, not started doing something else. **A live
+microphone means silence**, because music playing into an open recorder ends up
+inside the take, and no level adjustment undoes that afterwards. And **the launch
+route has no piece at all**: it is a redirect that exists for as long as
+IndexedDB takes to answer, and giving it one would put a crossfade into every
+cold start.
+
+**Nothing plays on load, ever.** Browsers refuse audio outside a gesture and are
+right to. The music starts from the same presses that already open the audio
+hardware for the voice — *Begin* on the first screen, or pressing play — and
+until one of them happens there is not so much as a network request. Somebody who
+has deliberately turned the music on before is met halfway on their next visit:
+their first touch anywhere starts it again, because they have already answered
+the question. Somebody who turned it off is never asked again.
+
+### The loops are the hard part
+
+Each piece is a mastered MP3 between one and three minutes long, and looping one
+of those *well* is most of this feature. Three things go wrong with the obvious
+`source.loop = true`:
+
+1. **MP3 padding.** The format is framed, so a decoder hands back a few tens of
+   milliseconds of digital silence before the first sample the composer wrote.
+   Looping the buffer whole puts that silence *inside* the piece, once a minute.
+   That is the gap people mean by "MP3 loops don't work".
+2. **A composed ending.** All five wind down and fade to nothing. Playing that
+   and cutting back to a full-level opening is a restart you can hear from the
+   next room.
+3. **The join itself.** Splicing one waveform onto another mid-cycle is a step,
+   and a step is a click.
+
+So the repeating region runs from the first real sample — measured at runtime,
+because decoders disagree about the padding by a frame or so — to a point chosen
+*before* the ending, and consecutive repetitions overlap by 1.2 seconds:
+
+```text
+rep n      ──────────────────────────╲___
+rep n+1                            ___╱──────────────────────────
+                                     └ 1.2 s ┘
+```
+
+The outgoing side follows a cosine down and the incoming side a sine up, so their
+squares sum to one and the level holds flat across the join — which a linear
+crossfade does not, sagging 3 dB in the middle. The loop point is chosen by
+*loudness* rather than by where the fade nominally starts: the latest moment
+whose final 1.2 seconds match the opening's, within eight seconds of the ending.
+That costs each piece between 3% and 12% of its decrescendo and buys a seam that
+measures flat. `node scripts/music-loop-points.mjs` prints the table
+[`tracks.ts`](src/lib/soundtrack/tracks.ts) carries, so adding a sixth piece is a
+run of that rather than an ear and a guess.
+
+It is tested on the files that ship rather than on a stand-in. One test renders
+each join and compares it against the arithmetic that defines it, window by
+window: the outgoing stretch under a cosine plus the incoming stretch under a
+sine, from the same decoded file. Read the wrong part of the buffer, drop a
+repetition, stack two without fading, splice instead of overlapping, or let a
+frame of padding through, and the rendered envelope stops matching within a
+decibel. A second test loops a synthetic bed seven times and asserts that every
+window is indistinguishable from the window one repetition earlier.
+
+Repetitions are scheduled four seconds ahead on the app's
+[heartbeat](src/lib/heartbeat.ts) rather than on a timer, because a hidden tab clamps
+`setTimeout` to a second and eventually to a minute — and a repetition scheduled
+a minute late is a minute of silence.
+
+### Its own channel
+
+The music is not part of the generated mix. It has its own branch of the bus, its
+own soft ceiling and its own volume, so the Sound slider does not move it and it
+cannot push the binaural path into the ceiling's knee:
+
+```text
+ambience ─┐
+          ├─→ generated (sound volume) ─→ ceiling ─→ master ─┐
+  rhythm ─┘                                                  ├─→ output
+                     soundtrack ─→ its own ceiling ──────────┘
+```
+
+The slider reads 0–100% of `MAX_SOUNDTRACK_GAIN`, which is 0.3 — so at the
+default 40% the music peaks around 0.12, and even at the top it stays well under
+a spoken line.
+
+**Under narration it steps back to 30%** over 400 ms and comes back over 1.8 s,
+with a 1.2-second hold before the recovery starts. The hold is the interesting
+part: without it the music would swell between every phrase of an affirmation and
+duck again a second later, which is far more noticeable than simply staying
+quiet. It is sized to bridge the gaps *inside* a repetition and not the one
+between them — the pause between loops is three seconds by default and is a
+composed part of the ritual, so the music is meant to come back up and fill it.
+Ducking is reference-counted by source, because there is more than one voice in
+the app, and two callers sharing one flag is how music ends up ducked forever.
+
+Scene changes crossfade over 2.5 seconds, and a new scene has to hold for 400 ms
+before anything acts on it. Pressing *Start loop* puts the app on the player a
+beat before the session reports itself as playing, so for one frame the honest
+answer is "the player, idle" — a different piece. Twelve route changes in four
+seconds produce one crossfade and three buffer sources in total. Leaving a scene
+also remembers how far into the piece it had got, so walking to the library and
+back is one continuous piece rather than two visits to its opening.
+
+### What it costs
+
+Eleven megabytes of MP3 decode to about a hundred and seventy megabytes of float
+samples, which is more than a phone will give a page for a background layer. So
+only the current piece and the one you are most likely to reach next are held
+decoded, and the rest are evicted least-recently-used. The prefetch is skipped
+entirely on a metered connection or a device reporting less than 4 GB, where the
+crossfade simply starts a moment later. Nothing is precached into the offline
+bundle — that would more than double what every visitor downloads for a layer
+some of them switch off — and each piece is instead cached by the service worker
+the first time it is actually heard.
+
+A pause is the one place this reaches into the rest of the audio. Pausing a
+session used to suspend the whole `AudioContext`, which stops `currentTime` and
+lets every oscillator resume on the phase it held. The music is not the session
+and nobody asked it to stop, so while it is playing the bus is held open and the
+ritual's own mix is faded out instead; with the music off, pausing suspends the
+context exactly as it always did. Both are asserted in the browser.
+
+---
+
 ## Why the export records your voice instead of the app's
 
 **No web page can capture speech synthesis output.** `SpeechSynthesisUtterance`
@@ -2243,6 +2382,15 @@ src/
     audioParams.ts  click-free ramps and the soft-clip ceiling
     ambient.ts      the five generated ambiences
     brainwaveAudio.ts  preset table, frequency maths and the rhythm engine
+    soundtrack/
+      index.ts      the adaptive soundtrack: what plays, when it starts, how
+                    loud, and how far it steps back under a spoken line
+      scene.ts      route + session → a feeling → a piece. Pure, and the one
+                    place the mapping is decided
+      loop.ts       gapless repetition: trimmed padding, a loop point before
+                    the composed ending, and an equal-power overlap at the seam
+      buffers.ts    fetch, decode, and a working set small enough for a phone
+      tracks.ts     the five pieces and their measured loop lengths
     storage.ts      IndexedDB + localStorage
     timer.ts        wall-clock session countdown
     motion.ts       reduced motion, low-power, breakpoint and platform detection

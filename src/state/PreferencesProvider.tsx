@@ -1,5 +1,6 @@
 /**
- * App-level preferences: the breathing guide, and whether cues are felt or heard.
+ * App-level preferences: the breathing guide, the music, and whether cues are
+ * felt or heard.
  *
  * These belong to the person rather than to a particular loop, so they live in
  * localStorage and apply everywhere. Saved loops deliberately do not carry them
@@ -34,6 +35,11 @@ import {
   type BackgroundChoice,
 } from '../lib/environment'
 import { setHapticsEnabled, setSoundEnabled } from '../lib/feedback'
+import {
+  DEFAULT_SOUNDTRACK_LEVEL,
+  prefersReducedData,
+  soundtrack,
+} from '../lib/soundtrack'
 import { readLocal, writeLocal } from '../lib/storage'
 
 export interface Preferences {
@@ -78,6 +84,26 @@ export interface Preferences {
    * a minute and a half at a time. See `BACKGROUND_MODES`.
    */
   backgroundMode: BackgroundChoice
+  /**
+   * The adaptive soundtrack: whether there is music under the app at all.
+   *
+   * On by default and silent until somebody presses something, which are not
+   * in tension — see `lib/soundtrack`. Off is remembered forever, and nothing
+   * re-enables it: a person who turned the music off has said so, and an app
+   * that quietly turns it back on after an update is an app that lied.
+   */
+  music: boolean
+  /** 0–1 against the music channel's own ceiling. See `MAX_SOUNDTRACK_GAIN`. */
+  musicVolume: number
+  /**
+   * True once somebody has touched the music switch themselves.
+   *
+   * The same distinction `uiSoundsChosen` makes, for a different reason: it is
+   * what lets the music resume on the first touch of a later visit. Starting
+   * audio from a stray tap would be a surprise if nobody had ever asked for
+   * it, and is simply the app remembering if they have.
+   */
+  musicChosen: boolean
   /** Interface taps and confirmations. See `feedback.ts`. */
   uiSounds: boolean
   /**
@@ -113,6 +139,9 @@ const DEFAULTS: Preferences = {
   breathHapticCues: true,
   backgroundVisualizer: true,
   backgroundMode: DEFAULT_BACKGROUND_CHOICE,
+  music: true,
+  musicVolume: DEFAULT_SOUNDTRACK_LEVEL,
+  musicChosen: false,
   uiSounds: true,
   uiSoundsChosen: false,
   uiHaptics: true,
@@ -180,6 +209,16 @@ function load(): Preferences {
       MAX_BREATH_VOLUME,
       Math.max(0, merged.breathSoundVolume),
     )
+    merged.musicVolume = Math.min(1, Math.max(0, merged.musicVolume))
+
+    /*
+     * A phone on a metered connection, or with Data Saver on, does not get
+     * eleven megabytes of atmosphere it never asked for. The switch is still
+     * there and still works — this only changes what the *default* is for
+     * somebody who has never expressed a view.
+     */
+    if (!merged.musicChosen && prefersReducedData()) merged.music = false
+
     return merged
   } catch {
     return DEFAULTS
@@ -195,6 +234,21 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     writeLocal(KEY, JSON.stringify(preferences))
   }, [preferences])
 
+  /*
+   * The music's two settings, pushed to the one thing that owns the audio.
+   *
+   * Here rather than in a component, because the soundtrack has to hear about
+   * a preference restored from storage as well as one somebody has just
+   * changed — and this is the only place both look the same.
+   */
+  useEffect(() => {
+    soundtrack.setEnabled(preferences.music, preferences.musicChosen)
+  }, [preferences.music, preferences.musicChosen])
+
+  useEffect(() => {
+    soundtrack.setLevel(preferences.musicVolume)
+  }, [preferences.musicVolume])
+
   const update = useCallback((patch: Partial<Preferences>) => {
     setPreferences((current) => ({
       ...current,
@@ -204,6 +258,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         : current.breathPattern,
       // Touching the switch at all is the answer, whichever way it was moved.
       uiSoundsChosen: patch.uiSounds != null ? true : current.uiSoundsChosen,
+      musicChosen: patch.music != null ? true : current.musicChosen,
     }))
   }, [])
 

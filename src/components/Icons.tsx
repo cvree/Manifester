@@ -376,6 +376,27 @@ export const SpeakerIcon = (props: IconProps) => (
 )
 
 /** A speaker crossed through — a layer that is muted. */
+/**
+ * The soundtrack. A single note rather than a pair, because two beamed notes
+ * read as "media player" and this is meant to read as "atmosphere".
+ */
+export const NoteIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M9.5 17.2V7.1a1 1 0 0 1 .78-.98l6-1.33A1 1 0 0 1 17.5 5.8v9.1" />
+    <ellipse cx="7.4" cy="17.3" rx="2.1" ry="1.9" />
+    <ellipse cx="15.4" cy="15.1" rx="2.1" ry="1.9" />
+  </Icon>
+)
+
+/** The same note, with the line that says it is not sounding. */
+export const NoteOffIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M9.5 12.4V7.1a1 1 0 0 1 .78-.98l6-1.33A1 1 0 0 1 17.5 5.8v6.3" />
+    <ellipse cx="7.4" cy="17.3" rx="2.1" ry="1.9" />
+    <path d="M4 20 20 4" />
+  </Icon>
+)
+
 export const SpeakerOffIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M5 9.4h3.1L12 6v12l-3.9-3.4H5Z" />

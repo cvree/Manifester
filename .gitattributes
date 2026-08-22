@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Audio and speech assets are binary; never LF-normalise them.
+*.mp3 binary
+*.opus binary

@@ -162,6 +162,19 @@ export function feelSummary(uiSounds: boolean, uiHaptics: boolean): string {
   return parts.length > 0 ? parts.join(' · ') : 'Off'
 }
 
+/**
+ * The music row, in the Customize list.
+ *
+ * Deliberately not the piece that happens to be playing. What belongs on a
+ * settings row is the setting, and naming the track here would put a permanent
+ * "now playing" on a screen the whole design is trying to keep out of the way.
+ * The title is inside the panel, where somebody has already asked.
+ */
+export function musicSummary(enabled: boolean, level: number): string {
+  if (!enabled) return 'Off'
+  return `On \u00b7 ${Math.round(level * 100)}%`
+}
+
 export function exportSummary(
   settings: LoopSettings,
   hasRecording: boolean,
