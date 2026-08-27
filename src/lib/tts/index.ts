@@ -482,6 +482,30 @@ class TTS {
     return true
   }
 
+  /**
+   * Ask the voice to settle any clip whose fate is already decided.
+   *
+   * The app calls this when it comes back to the foreground. Everything it can
+   * do is a no-op on a session that is genuinely still speaking; what it is
+   * for is the session that is not — a clip abandoned by an interruption, or
+   * one whose end arrived while the page was hidden and every timer in it was
+   * being throttled. Resolving that here rather than at the watchdog's pace is
+   * what lets the loop put the line back on the same turn as the screen coming
+   * on, instead of seconds later.
+   *
+   * The device voice gets the same treatment from the other direction: a phone
+   * that took `speechSynthesis` away often hands it back *paused*, and an
+   * engine left paused stays that way for as long as the session does.
+   */
+  verify(): void {
+    // Deliberately not `bus.ensure()`: that also un-parks the ritual's mix,
+    // and this is called from a visibility change, which happens just as often
+    // to a session somebody paused on purpose. The player asks for the context
+    // back on its own where it needs to.
+    this.player.verify()
+    this.fallbackVoice.resumeIfPaused()
+  }
+
   /** Stop speaking now. Does not cancel work that is nearly finished. */
   stop(): void {
     this.generation += 1

@@ -260,6 +260,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const statusRef = useRef<SessionStatus>('idle')
   const draftTouchedRef = useRef(false)
   /**
+   * The draft as it is *now*, for the callers that cannot wait for a render.
+   *
+   * `start()` used to read the `draft` its own closure was built with, which
+   * is correct everywhere the button that starts a session is not also the
+   * button that changes it — and wrong in the one place that matters most.
+   * The introduction commits the chosen line and voice and then starts a
+   * session a few hundred milliseconds later, inside a timeout armed during
+   * the same tap; React has re-rendered by then, but the timeout is still
+   * holding the `start` from *before* the commit, so the first session anybody
+   * ever hears was started from the previous draft — the default voice, and
+   * sometimes no words at all.
+   *
+   * A ref is written during render rather than in an effect, so it is already
+   * correct for anything that reads it after the commit's re-render, whether
+   * or not effects have run.
+   */
+  const draftRef = useRef<Draft>(draft)
+  draftRef.current = draft
+  /**
    * True between `start()` and `finish()`. Generated sound is only ever touched
    * while this holds, which is what guarantees nothing reaches for the audio
    * hardware outside a real tap — including on first load.
@@ -423,6 +442,38 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /* ── Voice preview ── */
 
   /**
+   * True while a preview has borrowed the speakers from a running session.
+   *
+   * Previewing a voice and looping one are the same singleton speaking, so a
+   * preview started from the editor with a session still running *interrupts*
+   * that session's line — it always did, and there was nothing underneath to
+   * notice, so the loop simply went quiet for the rest of the session.
+   *
+   * The loop recovers from unasked-for interruptions now, which fixes the
+   * silence and would otherwise replace it with an argument: the loop putting
+   * its line back on top of the sample somebody is listening to, half a second
+   * after they pressed Preview. So the borrow is made explicit. The loop is
+   * paused for exactly as long as the sample lasts and resumed after it, the
+   * ambience and the timer carry on underneath, and the two are never in the
+   * speakers at the same time.
+   */
+  const previewBorrowRef = useRef(false)
+
+  const borrowVoice = useCallback(() => {
+    if (statusRef.current !== 'playing' || previewBorrowRef.current) return
+    previewBorrowRef.current = true
+    speechRef.current?.pause()
+  }, [])
+
+  const returnVoice = useCallback(() => {
+    if (!previewBorrowRef.current) return
+    previewBorrowRef.current = false
+    // Not if the session was paused or ended in the meantime: giving the voice
+    // back to a session nobody is in would start it talking on its own.
+    if (statusRef.current === 'playing') speechRef.current?.resume()
+  }, [])
+
+  /**
    * Hear the voice, now.
    *
    * The one place in the app where somebody is waiting on a single line rather
@@ -441,6 +492,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       busRef.current?.ensure()
       tts.unlock()
+      borrowVoice()
 
       setPreviewState('loading')
       void tts
@@ -458,14 +510,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         })
         .then(() => setPreviewState('idle'))
         .catch(() => setPreviewState('idle'))
+        .finally(returnVoice)
     },
-    [draft.settings],
+    [borrowVoice, draft.settings, returnVoice],
   )
 
   const stopPreview = useCallback(() => {
     tts.stop()
     setPreviewState('idle')
-  }, [])
+    returnVoice()
+  }, [returnVoice])
 
   /* ── What the voice is doing, for the player's status line ── */
 
@@ -729,10 +783,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       if (liveRef.current) finish('idle', null)
 
+      // Always the live draft, never the one this closure was built with.
+      const current = draftRef.current
       const settings: LoopSettings = source
         ? normaliseSettings(source)
-        : draft.settings
-      const text = source ? source.text : draft.text
+        : current.settings
+      const text = source ? source.text : current.text
       /*
        * Nothing to say.
        *
@@ -751,7 +807,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
        * loop" on the player and something better on the card.
        */
       const title =
-        (source ? source.title : draft.title).trim() ||
+        (source ? source.title : current.title).trim() ||
         (breathOnly ? 'Breathwork' : autoTitle(text))
 
       // Reach for audio permission while we are still inside the tap.
@@ -822,8 +878,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
        */
       if (!breathOnly) {
         void recordPlay({
-          id: source?.id ?? draft.id,
-          title: source ? source.title : draft.title,
+          id: source?.id ?? current.id,
+          title: source ? source.title : current.title,
           text,
           settings,
         }).then((loop) => {
@@ -903,7 +959,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         })
       }
     },
-    [draft, finish, loops, recordPlay, requestWakeLock, startElapsed, voices],
+    [finish, loops, recordPlay, requestWakeLock, startElapsed, voices],
   )
 
   const pause = useCallback(() => {
@@ -1198,22 +1254,53 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (wakeLockRef.current === null && session.status === 'playing') {
         void requestWakeLock()
       }
+      if (session.status === 'playing') {
+        /*
+         * Settle the clip before asking the loop about it, in that order.
+         *
+         * The voice's stall watchdog runs on a `setTimeout`, and a phone that
+         * has been asleep has been throttling those the whole time — so a clip
+         * that was abandoned minutes ago can still be sitting there
+         * unresolved, with the loop quite reasonably believing a line is on
+         * its way. Asking the player to look first turns that into an ended
+         * line, which is exactly what `recover()` knows how to put back.
+         */
+        tts.verify()
+        speechRef.current?.recover()
+      }
       /*
        * And a catch-up on everything that schedules ahead — the breath, the
        * ambience's transients, the gap between repetitions — so anything a
        * throttled timer left undone is done on this turn rather than up to
        * half a second later, which is long enough to hear.
+       *
+       * After the voice rather than before it. The loop's own retry is an
+       * alarm on this same heartbeat, so beating first would fire the retry
+       * and *then* have `recover()` arrive to restart the line it had just
+       * started — one line either way, but a request issued twice for nothing.
+       * Recovering first cancels the alarm, and this finds nothing left to do.
        */
       beat()
-      if (session.status === 'playing') speechRef.current?.recover()
     }
     const persist = () => flushListening()
     document.addEventListener('visibilitychange', recover)
     window.addEventListener('pageshow', recover)
+    /*
+     * And `focus`, which is not redundant.
+     *
+     * An installed PWA on iOS routinely comes back from a call, a Control
+     * Centre pull or a notification without ever firing `visibilitychange` —
+     * the page was never hidden as far as the document is concerned, the
+     * audio was simply taken away and given back. That is the case people
+     * describe as "it stopped when I got a text and never started again", and
+     * `recover` is idempotent, so arming a third way in costs nothing.
+     */
+    window.addEventListener('focus', recover)
     window.addEventListener('pagehide', persist)
     return () => {
       document.removeEventListener('visibilitychange', recover)
       window.removeEventListener('pageshow', recover)
+      window.removeEventListener('focus', recover)
       window.removeEventListener('pagehide', persist)
     }
   }, [flushListening, requestWakeLock, session.status])

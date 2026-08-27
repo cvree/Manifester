@@ -23,6 +23,7 @@
  * reliably happy with.
  */
 
+import { wake } from '../audioSession'
 import { clampPlaybackRate } from './shape'
 import type { SpeakOutcome } from './types'
 
@@ -115,7 +116,11 @@ export class AudioPlayer {
    */
   unlock(): boolean {
     const ctx = this.getContext()
-    return ctx != null && ctx.state !== 'closed'
+    if (!ctx || ctx.state === 'closed') return false
+    // A gesture is the only thing that clears an iOS `interrupted`, and this
+    // is the one place in the voice layer that is guaranteed to be inside one.
+    wake(ctx)
+    return true
   }
 
   /**
@@ -201,6 +206,28 @@ export class AudioPlayer {
     if (!ctx || ctx.state === 'closed') {
       return { done: Promise.resolve<SpeakOutcome>('failed'), stop: () => undefined }
     }
+
+    /*
+     * A context that is not running is not a context that refuses to schedule.
+     *
+     * This is the whole of a class of "it just stopped talking" reports on
+     * phones. A call, an alarm, another app taking the audio route or a screen
+     * lock leaves the context `suspended` — or, on iOS, `interrupted` — and
+     * `currentTime` stops advancing while it is there. Everything below still
+     * succeeds: a source is created, `start(frozenNow + lead)` is accepted,
+     * and then nothing ever happens, because the clock it was scheduled
+     * against is not moving. The watchdog eventually calls it interrupted,
+     * which is honest but late.
+     *
+     * Asking for it back first costs nothing when the context is already
+     * running, and when it is not it is the difference between a line that
+     * arrives a moment after the interruption ends and a line that never
+     * arrives at all. `resume()` is asynchronous, but a frozen clock is
+     * exactly what makes that safe: the schedule below is relative to a
+     * `currentTime` that cannot advance until the context is back, so the clip
+     * is still `lead` seconds away whenever that happens.
+     */
+    if (ctx.state !== 'running') wake(ctx)
 
     const volume = clamp01(options.volume ?? 1)
     const rate = clampPlaybackRate(options.playbackRate ?? 1)
@@ -357,6 +384,57 @@ export class AudioPlayer {
       disconnect(active)
       active.settle('finished')
     }, remainingMs + WATCHDOG_GRACE_MS)
+  }
+
+  /**
+   * Settle the current clip's fate *now*, rather than at the watchdog's pace.
+   *
+   * Called when the app comes back to the foreground, where the question "is
+   * this clip still coming?" has an answer the moment somebody looks. Waiting
+   * for the armed timer instead can cost the whole of a clip's remaining
+   * duration plus the grace, and on a phone that timer was being throttled
+   * while the page was hidden — so the session sits in silence for seconds
+   * after the screen is already back, which is precisely the thing that reads
+   * as the app having quietly given up.
+   *
+   * The check itself is the watchdog's, and it is deliberately conservative:
+   * anything that is genuinely still on its way is left alone.
+   */
+  verify(): void {
+    const active = this.active
+    if (!active) return
+    const ctx = this.getContext()
+
+    if (!ctx || ctx.state === 'closed') {
+      this.active = null
+      if (active.watchdog != null) clearTimeout(active.watchdog)
+      if (active.startTimer != null) clearTimeout(active.startTimer)
+      disconnect(active)
+      active.settle('interrupted')
+      return
+    }
+
+    if (ctx.state !== 'running') {
+      // Ask for it back — and if it does not come back, the clip is not
+      // arriving, which the loop needs to be told rather than left to guess.
+      wake(ctx)
+      return
+    }
+
+    // Running, and the clip's due time has already gone by on the audio clock:
+    // it is not going to start now, whatever `onended` has or has not said.
+    if (ctx.currentTime + 0.01 >= active.endsAt) {
+      this.active = null
+      if (active.watchdog != null) clearTimeout(active.watchdog)
+      if (active.startTimer != null) clearTimeout(active.startTimer)
+      try {
+        active.source.stop()
+      } catch {
+        /* Already finished. */
+      }
+      disconnect(active)
+      active.settle('finished')
+    }
   }
 
   /** Stop whatever is speaking, without a click. */

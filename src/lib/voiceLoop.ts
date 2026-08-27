@@ -21,6 +21,16 @@
  * fetches it while the current one is still speaking; by the time the gap ends
  * the audio is decoded and in memory, and the next line starts in the time it
  * takes to schedule a buffer.
+ *
+ * ── Surviving the phone ─────────────────────────────────────────────────────
+ *
+ * Two mechanisms, and they answer the same failure from opposite ends.
+ * `recover()` is the one the app calls when it comes back to the foreground,
+ * where the answer is immediate and certain. The retry described at
+ * `RETRY_BASE_MS` is the one that runs when nobody is looking — a screen that
+ * is still off, a call that is still going — and it is what makes the loop
+ * *self-healing* rather than merely recoverable. Between them, no interruption
+ * this app did not ask for can end a session; it can only interrupt it.
  */
 
 import { scheduleAt } from './heartbeat'
@@ -133,6 +143,43 @@ const RESTART_SETTLE_MS = 140
  */
 const PRELOAD_AHEAD = 2
 
+/**
+ * How long after an interruption nobody asked for before the line is tried
+ * again, and how far that backs off.
+ *
+ * ── Why a loop needs this at all ──
+ *
+ * A clip can end for a reason that has nothing to do with this app: a call
+ * arrives, an alarm goes off, another app takes the audio route, or a phone
+ * locks and iOS parks the `AudioContext` in a state it never leaves on its
+ * own. All of those arrive here as `interrupted`, which is the same word the
+ * loop uses for *its own* deliberate interruptions — stopping, pausing,
+ * swapping a line for one in a new voice — and those are supposed to end the
+ * line without advancing anything.
+ *
+ * So the loop used to treat them all alike and simply stop: no next line, no
+ * gap, no error, the session still showing "Now looping" with a running timer,
+ * a moving orb and complete silence. Nothing brought it back, either, because
+ * `recover()` reasonably declines to speak when it does not believe a line was
+ * in flight — and after an interruption it does not.
+ *
+ * Telling the two apart turns out to be free: every interruption this app
+ * causes bumps the generation first, so the only ones that reach the end of
+ * `speakCurrent` with a matching generation are the ones that came from
+ * outside. Those get put back.
+ *
+ * The backoff is what keeps that from becoming a spin. If the context is
+ * genuinely gone, each attempt fails immediately, and retrying every 400 ms
+ * for the length of a phone call is a battery complaint. Doubling to a five
+ * second ceiling means a brief glitch is recovered from within half a second,
+ * a long interruption is retried a couple of dozen times an hour, and either
+ * way the first attempt after the phone comes back is the one that works —
+ * because coming back to the foreground calls `recover()`, which does not
+ * wait for the timer at all.
+ */
+const RETRY_BASE_MS = 400
+const RETRY_MAX_MS = 5000
+
 export class VoiceLooper {
   private voice: Speaker
   private generation = 0
@@ -147,6 +194,14 @@ export class VoiceLooper {
   private speaking = false
   private failures = 0
   private noticed = false
+  /**
+   * True when a line ended because something outside this app took the audio,
+   * and the loop is waiting to put it back. See `RETRY_BASE_MS`.
+   */
+  private stalled = false
+  /** Cancels the wait before a stalled line is put back. See `scheduleAt`. */
+  private retryCancel: (() => void) | null = null
+  private retryDelay = RETRY_BASE_MS
 
   /** Cancels the silence between repetitions. See `scheduleAt`. */
   private gapCancel: (() => void) | null = null
@@ -394,6 +449,9 @@ export class VoiceLooper {
     this.paused = false
     this.failures = 0
     this.noticed = false
+    this.clearRetry()
+    this.stalled = false
+    this.retryDelay = RETRY_BASE_MS
 
     // The first line is wanted in a moment; the ones behind it are wanted
     // after it, and the settling silence below is time to fetch them in.
@@ -422,6 +480,11 @@ export class VoiceLooper {
     this.clearGap()
     this.clearRestart()
     this.clearPrime()
+    // Whatever the phone did to the last line, the answer now is the pause
+    // somebody asked for. `resume()` speaks the current line again regardless,
+    // so a pending retry has nothing left to add and a lot to get wrong.
+    this.clearRetry()
+    this.stalled = false
     this.voice.stop()
   }
 
@@ -429,6 +492,7 @@ export class VoiceLooper {
     if (!this.running || !this.paused) return
     this.paused = false
     this.generation += 1
+    this.retryDelay = RETRY_BASE_MS
     const generation = this.generation
 
     if (this.pausedGapMs != null) {
@@ -452,9 +516,12 @@ export class VoiceLooper {
     this.gapVisible = true
     this.pausedGapMs = null
     this.pausedGapVisible = true
+    this.stalled = false
+    this.retryDelay = RETRY_BASE_MS
     this.clearGap()
     this.clearRestart()
     this.clearPrime()
+    this.clearRetry()
     this.voice.stop()
   }
 
@@ -473,7 +540,22 @@ export class VoiceLooper {
     if (!this.running || this.paused) return
     if (this.gapCancel != null || this.pausedGapMs != null) return
     if (this.speaking && this.voice.isSpeaking) return
-    if (!this.speaking) return
+    /*
+     * A stalled loop is the *other* shape of the same problem, and it has to
+     * be handled here rather than left to the retry timer.
+     *
+     * `speaking` is false after an interruption, because the line did end — it
+     * was simply ended by a phone call rather than by this app. Falling
+     * through on that would mean the one moment when recovery is certain to
+     * work, somebody picking their phone back up, is also the one moment the
+     * loop declines to try; the session would then stay silent until a
+     * backed-off timer came round, up to five seconds later, with the screen
+     * already on and showing "Now looping".
+     */
+    if (!this.speaking && !this.stalled) return
+    this.clearRetry()
+    this.stalled = false
+    this.retryDelay = RETRY_BASE_MS
     this.generation += 1
     void this.speakCurrent(this.generation)
   }
@@ -519,7 +601,24 @@ export class VoiceLooper {
     if (generation !== this.generation) return
     this.speaking = false
 
-    if (outcome === 'interrupted') return
+    /*
+     * The generation still matches, so nothing in this app asked for this.
+     *
+     * Every deliberate interruption — `stop`, `pause`, a voice swap, a
+     * restart — bumps the generation before it stops the voice, and so returns
+     * at the guard above. Reaching here means the audio was taken away by
+     * something outside: an interruption, a suspended context, a clip the
+     * watchdog gave up on. The line is still the right line, so it is put back
+     * rather than skipped, and the loop stays alive rather than ending in a
+     * silence that looks exactly like playing.
+     */
+    if (outcome === 'interrupted') {
+      this.armRetry()
+      return
+    }
+
+    this.stalled = false
+    this.retryDelay = RETRY_BASE_MS
 
     if (outcome === 'failed') {
       this.failures += 1
@@ -609,6 +708,52 @@ export class VoiceLooper {
       clearTimeout(this.primeTimer)
       this.primeTimer = null
     }
+  }
+
+  private clearRetry(): void {
+    this.retryCancel?.()
+    this.retryCancel = null
+  }
+
+  /**
+   * Put the current line back, once whatever took the audio has let go.
+   *
+   * Deliberately says the *same* line rather than advancing: an interruption
+   * is not a performance, and a phone call in the middle of a pass should not
+   * cost somebody a repetition. The index and the cycle count are untouched,
+   * which also means a stall during a session behaves exactly like a pause
+   * somebody sat through.
+   *
+   * `scheduleAt` rather than a bare timer, for the reason every other
+   * scheduled thing in this file uses it: the case this exists for is a phone
+   * whose screen is off, where `setTimeout` is throttled to a second or worse
+   * and the audio clock is the only thing still keeping honest time. When the
+   * context is the thing that was interrupted the audio clock is stopped too,
+   * and then the throttled timer is what fires — which is exactly why both are
+   * armed.
+   */
+  private armRetry(): void {
+    if (!this.running || this.paused) return
+    this.stalled = true
+    this.clearRetry()
+
+    const wait = this.retryDelay
+    this.retryDelay = Math.min(RETRY_MAX_MS, this.retryDelay * 2)
+
+    const generation = this.generation
+    this.retryCancel = scheduleAt(Date.now() + wait, () => {
+      this.retryCancel = null
+      if (!this.running || this.paused || !this.stalled) return
+      if (generation !== this.generation) return
+      // Something started speaking again in the meantime — a resume, a swap —
+      // and this retry is about a line that is no longer the problem.
+      if (this.speaking) return
+      // Cleared before the attempt, not after it: this one is being answered,
+      // and if it is interrupted again `armRetry` sets the flag back.
+      this.stalled = false
+      this.generation += 1
+      void this.speakCurrent(this.generation)
+    })
   }
 
   /**

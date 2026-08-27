@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  blendStarters,
-  recommendedFor,
-  type Focus,
-} from '../../lib/affirmations'
+import { blendStarters, type Focus } from '../../lib/affirmations'
 import { cx } from '../../lib/cx'
 import { cue } from '../../lib/feedback'
 import { VOICE_PROFILES, voiceForStyle } from '../../lib/tts'
@@ -21,11 +17,17 @@ import type { Audition } from './useAudition'
  *
  * Everything on this step is arranged around the second between a tap and a
  * voice. Four starters — blended from every intent they chose, best of each
- * first — one of them elevated as the recommendation and pre-selected so the
- * next step is always one press away, and tapping any of them *speaks it*, in
- * the same gesture, with no Preview button in between. All four are warmed the
- * moment the step appears, so the common case is a decode rather than a
+ * first — presented as four equal choices, the first of them pre-selected so
+ * the next step is always one press away, and tapping any of them *speaks it*,
+ * in the same gesture, with no Preview button in between. All four are warmed
+ * the moment the step appears, so the common case is a decode rather than a
  * request.
+ *
+ * None of them is labelled. A "Recommended" caption under a line somebody is
+ * being asked to *listen to* reads as a claim about the audio rather than
+ * about the words, and the only honest answer to "recommended by what?" here
+ * is "it is the first one" — which the order already says. The pre-selection
+ * carries the same suggestion without asking anybody to interpret a badge.
  *
  * ── The voice moment ────────────────────────────────────────────────────────
  *
@@ -84,7 +86,6 @@ export function VoiceMomentStep({
   // Memoised because it is an effect dependency: a fresh array on every render
   // would re-warm four clips every time somebody typed a character.
   const starters = useMemo(() => blendStarters(focuses), [focuses])
-  const recommended = focuses.length > 0 ? recommendedFor(focuses[0]) : starters[0]
   const [note, setNote] = useState<string | null>(null)
   const status = useTTSStatus()
   const { warm, play } = audition
@@ -215,7 +216,6 @@ export function VoiceMomentStep({
           <ul className="mt-5 space-y-1.5 [@media(max-height:720px)]:mt-3">
             {starters.map((line) => {
               const selected = value.trim() === line
-              const isRecommended = line === recommended
               const playing = audition.speaking === line
               const preparing = audition.loading === line
               return (
@@ -229,11 +229,7 @@ export function VoiceMomentStep({
                       'transition-[background-color,border-color,box-shadow] duration-300 ease-[var(--ease-calm)]',
                       selected
                         ? 'border-[var(--rose)] bg-[var(--rose-soft)]'
-                        : isRecommended
-                          ? // Elevated, never forced: a warmer surface and a
-                            // quiet label, and every other line is one tap away.
-                            'border-[var(--border-strong)] bg-[var(--surface-strong)] shadow-[0_8px_24px_-18px_var(--glow)] hover:border-[var(--rose)]'
-                          : 'border-[var(--border)] bg-[var(--surface-sunken)] hover:border-[var(--border-strong)]',
+                        : 'border-[var(--border)] bg-[var(--surface-sunken)] hover:border-[var(--border-strong)]',
                     )}
                   >
                     <span
@@ -251,18 +247,6 @@ export function VoiceMomentStep({
                       <span className="block text-[0.96rem] leading-snug text-ink">
                         {line}
                       </span>
-                      {/*
-                        Shown whether or not it is selected. It arrives
-                        pre-selected, so hiding the label on selection would
-                        mean the recommendation is never actually legible as
-                        one — the elevation would read as "this happens to be
-                        first" rather than "we think this is the one".
-                      */}
-                      {isRecommended && (
-                        <span className="type-label mt-0.5 block text-[0.62rem] text-ink-faint">
-                          Recommended
-                        </span>
-                      )}
                     </span>
                     {preparing && (
                       <span className="type-meta shrink-0" role="status">

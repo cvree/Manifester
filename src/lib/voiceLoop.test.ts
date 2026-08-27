@@ -74,6 +74,17 @@ class FakeSpeaker implements Speaker {
     this.pending?.settle('failed')
     await flush()
   }
+
+  /**
+   * What a phone call, an alarm or a locked screen looks like from in here:
+   * the clip ends as interrupted, and nothing in the app asked it to.
+   *
+   * Synchronous, because every test that needs it is running on fake timers —
+   * where `flush()`, which is itself a timer, would never come back.
+   */
+  interrupt(): void {
+    this.pending?.settle('interrupted')
+  }
 }
 
 /** Let every already-resolved promise run. */
@@ -281,6 +292,78 @@ describe('the looping speaker', () => {
     loop.recover()
     await flush()
     expect(speaker.spoken).toHaveLength(2)
+  })
+
+  it('puts the line back after an interruption nobody asked for', async () => {
+    vi.useFakeTimers()
+    loop.start(options)
+    await vi.advanceTimersByTimeAsync(0)
+
+    // The audio was taken away mid-line. The loop must not treat this as its
+    // own doing, and must not treat it as the line having been heard.
+    speaker.interrupt()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(speaker.spoken).toEqual(['First line.'])
+
+    // Same line, same place in the pass: an interruption costs nothing.
+    await vi.advanceTimersByTimeAsync(500)
+    expect(speaker.spoken).toEqual(['First line.', 'First line.'])
+    expect(loop.isRunning).toBe(true)
+  })
+
+  it('keeps trying while the audio stays gone, and backs off doing it', async () => {
+    vi.useFakeTimers()
+    loop.start(options)
+    await vi.advanceTimersByTimeAsync(0)
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      speaker.interrupt()
+      await vi.advanceTimersByTimeAsync(6000)
+    }
+
+    // Still alive, still on the first line, and not spinning: four
+    // interruptions over twenty-four seconds is a handful of attempts rather
+    // than one per frame.
+    expect(loop.isRunning).toBe(true)
+    expect(speaker.spoken.every((line) => line === 'First line.')).toBe(true)
+    expect(speaker.spoken.length).toBeLessThan(10)
+  })
+
+  it('speaks again the moment the app comes back, without waiting for a retry', async () => {
+    vi.useFakeTimers()
+    loop.start(options)
+    await vi.advanceTimersByTimeAsync(0)
+    speaker.interrupt()
+    await vi.advanceTimersByTimeAsync(0)
+
+    // The screen came on. This is the one moment recovery is certain to work,
+    // so it must not be the moment the loop is asleep waiting for a timer.
+    loop.recover()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(speaker.spoken).toEqual(['First line.', 'First line.'])
+  })
+
+  it('does not put a line back that the person paused', async () => {
+    vi.useFakeTimers()
+    loop.start(options)
+    await vi.advanceTimersByTimeAsync(0)
+    loop.pause()
+    await vi.advanceTimersByTimeAsync(6000)
+
+    // A pause interrupts the line too, and the whole point of a pause is that
+    // nothing comes back until somebody asks.
+    expect(speaker.spoken).toEqual(['First line.'])
+  })
+
+  it('does not put a line back after the session has stopped', async () => {
+    vi.useFakeTimers()
+    loop.start(options)
+    await vi.advanceTimersByTimeAsync(0)
+    loop.stop()
+    await vi.advanceTimersByTimeAsync(6000)
+
+    expect(speaker.spoken).toEqual(['First line.'])
+    expect(loop.isRunning).toBe(false)
   })
 
   it('re-fetches under the new voice, so nothing waits on a stale preload', async () => {

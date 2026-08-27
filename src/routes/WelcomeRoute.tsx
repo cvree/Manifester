@@ -30,8 +30,9 @@ import {
 } from '../lib/onboarding'
 import { chooseSound } from '../lib/soundChoice'
 import { soundtrack } from '../lib/soundtrack'
+import { chunkText } from '../lib/speech'
 import { soundName } from '../lib/summaries'
-import { tts } from '../lib/tts'
+import { tts, voiceForStyle } from '../lib/tts'
 import { useBreathing } from '../lib/useBreathing'
 import { useLibrary } from '../state/LibraryProvider'
 import { usePreferences } from '../state/PreferencesProvider'
@@ -155,7 +156,20 @@ export function WelcomeRoute() {
   const { hue, chroma, setPalette } = useTheme()
   const { allTracks } = useLibrary()
   const reducedMotion = useReducedMotion()
-  const audition = useAudition()
+  /*
+   * Auditioned exactly as the session will play it.
+   *
+   * On a first run these are the shipped defaults and every clip on the next
+   * screen is already made. They are read from the draft rather than assumed
+   * because this screen is reachable a second time, from About — and somebody
+   * who has set a speed should hear the speed they set, not be shown a
+   * preview of a session that will sound different.
+   */
+  const shape = useMemo(
+    () => ({ speed: draft.settings.rate, pitch: draft.settings.pitch }),
+    [draft.settings.rate, draft.settings.pitch],
+  )
+  const audition = useAudition(shape)
 
   /* ── State, restored from a half-finished visit if there is one ── */
 
@@ -271,14 +285,37 @@ export function WelcomeRoute() {
     [audition],
   )
 
-  /** Everything the first session needs, written into the real draft. */
+  /**
+   * Everything the first session needs, written into the real draft.
+   *
+   * The whole contract of this screen is that the session which follows is the
+   * one they just auditioned, so two things travel across:
+   *
+   *  - **The words**, and the title they imply.
+   *  - **Who reads them.** `studio` is the right default because Ivy and Fen
+   *    are what the previous screen was comparing — but it is a *default*, not
+   *    an overwrite. Somebody who answered `OwnWordsGate` by deliberately
+   *    picking a device voice has already chosen, and forcing `studio` back
+   *    over that choice threw it away at the last possible moment.
+   *
+   * Nothing else is written. In particular the speed and the pitch are left
+   * exactly as they were found — the audition was rendered at *those* values
+   * rather than at a fixed one, so what was heard is already what the session
+   * will play, and About promises that watching the introduction again changes
+   * none of somebody's settings.
+   */
   const commit = useCallback(() => {
     const line = text.trim()
     if (line) {
       updateDraft({ text: line, title: loopTitleFor(focuses) })
     }
-    updateSettings({ voiceStyle: style, voiceSource: 'studio' })
-  }, [focuses, style, text, updateDraft, updateSettings])
+    updateSettings({
+      voiceStyle: style,
+      ...(draft.settings.voiceSource === 'device'
+        ? {}
+        : { voiceSource: 'studio' as const }),
+    })
+  }, [draft.settings.voiceSource, focuses, style, text, updateDraft, updateSettings])
 
   /**
    * Leave, at any point, keeping whatever has been decided.
@@ -309,14 +346,39 @@ export function WelcomeRoute() {
     bloom()
 
     /*
-     * One tick for the draft to land before the session reads it.
+     * The first line of the session, fetched now rather than in half a second.
      *
-     * `start()` takes what is in the provider, and `commit()` has only just
-     * queued a state update — starting synchronously would begin a session
-     * with the previous draft. The bloom's duration is the same wait, which is
-     * why the transition reads as continuous rather than as a pause followed
-     * by a screen: by the time the player mounts, the voice is already loading
-     * and the garden behind it never went away.
+     * `commit()` has just decided every input the clip is addressed by — the
+     * words, the voice, the speed — and those are exactly what the loop will
+     * ask for when it starts. Asking for it here is the same request the loop
+     * would make, deduplicated by the client's content hash, issued while the
+     * bloom is still running. In the ordinary case the audition already warmed
+     * this and it is a memory hit; in the case where it did not, the fetch
+     * overlaps the transition instead of following it, which is the difference
+     * between a first word and a first silence.
+     */
+    const opening = chunkText(text)[0]
+    if (opening && draft.settings.voiceSource !== 'device') {
+      void tts.preload(opening, {
+        voice: voiceForStyle(style),
+        speed: shape.speed,
+        pitch: shape.pitch,
+      })
+    }
+
+    /*
+     * The bloom, and then the player.
+     *
+     * The wait is the transition and nothing else: `start()` reads the draft
+     * as it stands rather than as the closure around this timeout saw it, so
+     * the words and the voice `commit()` has just queued are the ones the
+     * session begins with however soon it runs. That used to be untrue, and it
+     * was the reason a first session could open in the wrong voice — see
+     * `draftRef` in `SessionProvider`.
+     *
+     * So the whole of this number is how long the field takes to open. By the
+     * time the player mounts the voice is already loading, and the garden
+     * behind it never went away.
      */
     window.setTimeout(
       () => {
@@ -326,7 +388,19 @@ export function WelcomeRoute() {
       },
       reducedMotion ? 24 : BLOOM_MS - 60,
     )
-  }, [beginning, bloom, commit, navigate, prime, reducedMotion, start])
+  }, [
+    beginning,
+    bloom,
+    commit,
+    draft.settings.voiceSource,
+    navigate,
+    prime,
+    reducedMotion,
+    shape,
+    start,
+    style,
+    text,
+  ])
 
   /* ── Derived labels for the ritual preview ── */
 

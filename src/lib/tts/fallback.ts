@@ -24,6 +24,26 @@ import type { SpeakOutcome } from './types'
 const KEEPALIVE_INTERVAL_MS = 9000
 /** If nothing is speaking or pending for this long, the utterance is over. */
 const STALL_TIMEOUT_MS = 2500
+/**
+ * How long an utterance may claim to be speaking without ever having started.
+ *
+ * `speechSynthesis` on a phone will accept a `speak()` and then never run it:
+ * the queue was cancelled a moment earlier and has not finished flushing, the
+ * app was in the background when the utterance was handed over, or the engine
+ * simply lost it. It goes on reporting `speaking === true` throughout, so the
+ * watchdog's usual test — "is anything in the queue?" — says yes forever, the
+ * promise never settles, and the loop above waits on a line that is never
+ * coming. That is a session that ends without ending.
+ *
+ * The signal that it is a ghost is `onstart` never having fired. The number is
+ * deliberately far larger than any plausible start-up delay, because being
+ * wrong in this direction cuts off a line that *is* being spoken — on an
+ * engine that speaks without firing `onstart`, which is not supposed to exist
+ * but is not worth risking a truncated affirmation over. Fifteen seconds is
+ * longer than the app's own longest line and long enough that anything still
+ * silent is not merely slow.
+ */
+const UNSTARTED_GRACE_MS = 15_000
 
 const isAppleMobile = (): boolean =>
   typeof navigator !== 'undefined' &&
@@ -63,6 +83,17 @@ export class FallbackVoice {
   private keepAlive: number | null = null
   private stallTimer: number | null = null
   private generation = 0
+  /**
+   * How to end the utterance in flight, from outside its own closure.
+   *
+   * Without this, `stop()` cancelled the queue and *hoped* the engine would
+   * fire `onerror` — which is the ordinary behaviour and is not a guarantee.
+   * When it did not, the promise the loop was awaiting never settled and the
+   * session stopped for good: no next line, no error, no way back. Holding the
+   * settler means stopping is something this class does rather than something
+   * it asks the platform to do for it.
+   */
+  private settleActive: ((outcome: SpeakOutcome) => void) | null = null
 
   get supported(): boolean {
     return isSpeechSupported()
@@ -99,19 +130,23 @@ export class FallbackVoice {
     utterance.volume = clamp(options.volume, 0, 1)
 
     let settled = false
+    let started = false
     let settle!: (outcome: SpeakOutcome) => void
     const done = new Promise<SpeakOutcome>((resolve) => {
       settle = (outcome: SpeakOutcome) => {
         if (settled) return
         settled = true
         this.pending.delete(utterance)
+        if (this.settleActive === settle) this.settleActive = null
         this.clearStall()
         this.stopKeepAlive()
         resolve(outcome)
       }
     })
+    this.settleActive = settle
 
     utterance.onstart = () => {
+      started = true
       if (generation === this.generation) options.onStart?.()
     }
     utterance.onend = () => settle('finished')
@@ -130,7 +165,7 @@ export class FallbackVoice {
     }
 
     this.startKeepAlive()
-    this.armStallWatchdog(generation, settle)
+    this.armStallWatchdog(generation, settle, () => started)
 
     return {
       done,
@@ -144,10 +179,38 @@ export class FallbackVoice {
 
   stop(): void {
     this.generation += 1
+    const settle = this.settleActive
+    this.settleActive = null
     this.pending.clear()
     this.clearStall()
     this.stopKeepAlive()
     this.cancel()
+    // After the cancel, so an engine that does fire `onerror` has already run
+    // and this is a no-op; before anything can await it again, so an engine
+    // that does not cannot leave the caller waiting forever.
+    settle?.('interrupted')
+  }
+
+  /**
+   * Un-pause an engine that was paused by something other than this app.
+   *
+   * iOS suspends `speechSynthesis` when the page goes away and does not always
+   * start it again on the way back; Chrome can be left paused by its own
+   * keep-alive if the tab was frozen between the `pause()` and the `resume()`.
+   * Either way the utterance is still there, still `paused`, and will sit like
+   * that indefinitely — a session that looks like it is speaking and is not.
+   *
+   * Called when the app returns to the foreground. Harmless at any other time:
+   * resuming an engine that is not paused does nothing.
+   */
+  resumeIfPaused(): void {
+    if (!this.supported) return
+    try {
+      const synth = window.speechSynthesis
+      if (synth.paused) synth.resume()
+    } catch {
+      /* Some engines throw on an empty queue. */
+    }
   }
 
   /* ── internals ── */
@@ -171,16 +234,52 @@ export class FallbackVoice {
   private armStallWatchdog(
     generation: number,
     settle: (outcome: SpeakOutcome) => void,
+    hasStarted: () => boolean,
   ): void {
     this.clearStall()
+    const askedAt = Date.now()
     const check = () => {
       if (generation !== this.generation) return
       const synth = window.speechSynthesis
+
+      /*
+       * Paused is not progress.
+       *
+       * This used to count as "still going" and wait, which is right for the
+       * fraction of a second the keep-alive spends there and wrong for every
+       * other way an engine ends up paused — a phone that locked, a page that
+       * was frozen between a `pause()` and its `resume()`. Those never come
+       * back on their own, so the watchdog asks, and only counts it as
+       * progress if the asking worked.
+       */
+      if (synth.paused) {
+        try {
+          synth.resume()
+        } catch {
+          /* Nothing to resume. */
+        }
+      }
+
       if (synth.speaking || synth.pending || synth.paused) {
+        /*
+         * Speaking, but never actually started, for long enough that the
+         * engine is not merely slow. Reporting this as a finish would have the
+         * loop move on as though the line had been heard; reporting it as a
+         * failure is what it is, and the loop already knows how to rest and
+         * try again rather than race.
+         */
+        if (!hasStarted() && Date.now() - askedAt >= UNSTARTED_GRACE_MS) {
+          this.cancel()
+          settle('failed')
+          return
+        }
         this.stallTimer = window.setTimeout(check, STALL_TIMEOUT_MS)
         return
       }
-      settle('finished')
+
+      // Nothing in the queue at all. If a word was ever spoken this is an end;
+      // if not, the utterance was dropped before it began.
+      settle(hasStarted() ? 'finished' : 'failed')
     }
     this.stallTimer = window.setTimeout(check, STALL_TIMEOUT_MS)
   }

@@ -18,13 +18,31 @@ import type { LoopSettings } from '../../lib/types'
  *    permission to make sound belongs to the gesture rather than to the page.
  *  - The rest of the visible lines are warmed as soon as they are shown, so
  *    the second tap and the third are instant even on a cold cache.
- *  - Speed is fixed to the app's default, which is the speed the shipped clips
- *    were generated at. Auditioning at any other speed would miss every one of
- *    them and synthesise from scratch — a beautiful voice, arriving late.
+ *  - Speed and pitch default to the app's own defaults, which are what the
+ *    shipped clips were generated at. Auditioning at any other shape would
+ *    miss every one of them and synthesise from scratch — a beautiful voice,
+ *    arriving late.
+ *
+ * That default is a default rather than a fixture, and the distinction is the
+ * point of `shape`. Somebody who has never opened Settings hears the shipped
+ * clips, instantly, which is nearly everybody on their first run. Somebody who
+ * *has* set a speed — and can reach this screen again from About — hears the
+ * line at the speed their loop will actually play it at, because a preview
+ * that does not match the thing it is previewing is worse than a preview that
+ * takes a moment to prepare. It is their setting either way: this screen never
+ * writes one.
  */
 
 /** The rate the pre-generated library exists at. See `generate-speech.mjs`. */
 export const AUDITION_SPEED: LoopSettings['rate'] = 0.9
+
+/** How a line should be rendered, when that is not simply the default. */
+export interface AuditionShape {
+  speed: number
+  pitch: number
+}
+
+const DEFAULT_SHAPE: AuditionShape = { speed: AUDITION_SPEED, pitch: 1 }
 
 /** Loud enough to be judged on, quiet enough for a phone in a quiet room. */
 const AUDITION_VOLUME = 0.9
@@ -40,9 +58,16 @@ export interface Audition {
   warm: (texts: string[], style: 'feminine' | 'masculine') => void
 }
 
-export function useAudition(): Audition {
+export function useAudition(shape: AuditionShape = DEFAULT_SHAPE): Audition {
   const [loading, setLoading] = useState<string | null>(null)
   const [speaking, setSpeaking] = useState<string | null>(null)
+  /*
+   * Read through a ref so that `play` and `warm` keep stable identities. Both
+   * are effect dependencies on the step below — a fresh `warm` on every render
+   * would re-fetch four clips every time somebody typed a character.
+   */
+  const shapeRef = useRef(shape)
+  shapeRef.current = shape
   /** Only the newest press may change what is on screen. */
   const generation = useRef(0)
   const mounted = useRef(true)
@@ -71,7 +96,8 @@ export function useAudition(): Audition {
     void tts
       .speak(line, {
         voice: voiceForStyle(style),
-        speed: AUDITION_SPEED,
+        speed: shapeRef.current.speed,
+        pitch: shapeRef.current.pitch,
         volume: AUDITION_VOLUME,
         onStart: () => {
           if (!mounted.current || generation.current !== mine) return
@@ -99,7 +125,8 @@ export function useAudition(): Audition {
       // thing it was preparing for has not been asked for yet.
       void tts.preload(text, {
         voice: voiceForStyle(style),
-        speed: AUDITION_SPEED,
+        speed: shapeRef.current.speed,
+        pitch: shapeRef.current.pitch,
       })
     }
   }, [])
