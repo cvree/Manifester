@@ -331,6 +331,19 @@ export function pointName(point: Point): string {
   return BODY_PROFILES[point].name
 }
 
+/**
+ * A glyph, forced to render as text rather than as an emoji.
+ *
+ * The zodiac signs live in a Unicode block that phones are entitled to draw in
+ * colour — ♓ arrives on an iPhone as a pink circle with a fish in it, which is
+ * a jarring thing to find in the middle of a serif headline. The variation
+ * selector below asks for the text presentation, which every platform that has
+ * an opinion honours, and which every platform that does not simply ignores.
+ */
+export function textGlyph(symbol: string): string {
+  return `${symbol}\uFE0E`
+}
+
 export function pointSymbol(point: Point): string {
   if (point === 'ascendant') return 'AC'
   if (point === 'midheaven') return 'MC'

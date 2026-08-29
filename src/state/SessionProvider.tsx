@@ -236,6 +236,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     recordListening,
   } = useLibrary()
   const [draft, setDraft] = useState<Draft>(newDraft)
+
+  /*
+   * The draft as it stands *now*, for `start()`.
+   *
+   * Several screens do the same two things in one gesture: write something
+   * into the draft, then start a session on it a tick later — the daily
+   * reading's "Loop this now", the care plan's breath, the welcome flow's
+   * final press. Reading `draft` from the closure makes that a race the
+   * caller cannot win: the callback they are holding was created before their
+   * own `updateDraft`, so it starts a session on the draft as it was *before*
+   * the line they just wrote into it, and a horoscope's line quietly becomes
+   * a wordless breathing session.
+   *
+   * A ref assigned during render is the whole fix. It is the current value by
+   * the time any callback runs, `start` no longer changes identity every time
+   * a character is typed, and the screens that queue-then-start work by
+   * construction rather than by timing.
+   */
+  const draftRef = useRef(draft)
+  draftRef.current = draft
   const [ready, setReady] = useState(false)
   const [voices, setVoices] = useState<RankedVoice[]>([])
   const [voicesReady, setVoicesReady] = useState(false)
@@ -729,10 +749,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       if (liveRef.current) finish('idle', null)
 
+      const current = draftRef.current
       const settings: LoopSettings = source
         ? normaliseSettings(source)
-        : draft.settings
-      const text = source ? source.text : draft.text
+        : current.settings
+      const text = source ? source.text : current.text
       /*
        * Nothing to say.
        *
@@ -751,7 +772,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
        * loop" on the player and something better on the card.
        */
       const title =
-        (source ? source.title : draft.title).trim() ||
+        (source ? source.title : current.title).trim() ||
         (breathOnly ? 'Breathwork' : autoTitle(text))
 
       // Reach for audio permission while we are still inside the tap.
@@ -822,8 +843,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
        */
       if (!breathOnly) {
         void recordPlay({
-          id: source?.id ?? draft.id,
-          title: source ? source.title : draft.title,
+          id: source?.id ?? current.id,
+          title: source ? source.title : current.title,
           text,
           settings,
         }).then((loop) => {
@@ -903,7 +924,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         })
       }
     },
-    [draft, finish, loops, recordPlay, requestWakeLock, startElapsed, voices],
+    [finish, loops, recordPlay, requestWakeLock, startElapsed, voices],
   )
 
   const pause = useCallback(() => {

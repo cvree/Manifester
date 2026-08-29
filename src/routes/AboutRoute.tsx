@@ -9,7 +9,7 @@ import {
 import { useNavigate } from 'react-router'
 import { AiSetupPanel } from '../components/AiSetupPanel'
 
-/** Split off for the same reason the library's Sky tab is. See `LibraryRoute`. */
+/** Split off for the same reason the library's Astrology tab is. See `LibraryRoute`. */
 const AstrologySettings = lazy(() =>
   import('../components/astrology/AstrologySettings').then((module) => ({
     default: module.AstrologySettings,
@@ -410,9 +410,9 @@ export function AboutRoute() {
 
           <Card
             data-rise
-            id="sky"
+            id="astrology"
             className="scroll-mt-6"
-            title="Your sky — set it up or remove it"
+            title="Astrology — set it up or remove it"
             description="Optional, off unless you ask for it, and computed entirely on this device."
           >
             <Suspense

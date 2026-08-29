@@ -14,15 +14,17 @@ import { SoundsSection } from './SoundsSection'
  *
  * The astrology feature is told to people as "nothing is downloaded unless you
  * ask for it", and that has to be true of the code as well as the data: the
- * ephemeris, the interpretations and two hundred cities are around forty
- * kilobytes that somebody who said "not for me" should never receive. Loading
- * it when the tab is opened makes the sentence honest.
+ * ephemeris, the interpretations, the portrait, the cycles and two hundred
+ * cities are a good deal of text that somebody who said "not for me" should
+ * never receive. Loading it when the tab is opened makes the sentence honest.
  */
-const SkySection = lazy(() =>
-  import('./SkySection').then((module) => ({ default: module.SkySection })),
+const AstrologySection = lazy(() =>
+  import('./AstrologySection').then((module) => ({
+    default: module.AstrologySection,
+  })),
 )
 
-type Half = 'loops' | 'sounds' | 'sky'
+type Half = 'loops' | 'sounds' | 'astrology'
 
 export function LibraryRoute() {
   const navigate = useNavigate()
@@ -47,9 +49,11 @@ export function LibraryRoute() {
   }, [fromUrl])
 
   useEffect(() => {
-    // The Sky tab can be reached directly by URL from Settings, and arriving
-    // that way is itself a change of mind worth honouring.
-    if (fromUrl === 'sky') setAstrology(readAstrology().status)
+    // The Astrology tab can be reached directly by URL from Settings, and
+    // arriving that way is itself a change of mind worth honouring.
+    if (fromUrl === 'astrology' || fromUrl === 'sky') {
+      setAstrology(readAstrology().status)
+    }
   }, [fromUrl])
 
   const show = (next: Half) => {
@@ -61,8 +65,8 @@ export function LibraryRoute() {
   }
 
   const total = listeningSentence(listeningStats)
-  const showSky = astrology !== 'declined'
-  const section = half === 'sky' && !showSky ? 'loops' : half
+  const showAstrology = astrology !== 'declined'
+  const section = half === 'astrology' && !showAstrology ? 'loops' : half
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 md:max-w-5xl">
@@ -83,21 +87,23 @@ export function LibraryRoute() {
           label="Library section"
           value={section}
           onChange={show}
-          className={showSky ? 'max-w-md' : 'max-w-sm'}
+          className={showAstrology ? 'max-w-md' : 'max-w-sm'}
           segments={[
             {
               value: 'loops',
               label: loops.length > 0 ? `Loops · ${loops.length}` : 'Loops',
             },
             { value: 'sounds', label: `Sounds · ${allTracks.length}` },
-            ...(showSky ? [{ value: 'sky' as const, label: 'Sky' }] : []),
+            ...(showAstrology
+              ? [{ value: 'astrology' as const, label: 'Astrology' }]
+              : []),
           ]}
         />
       </div>
 
       {section === 'loops' && <LoopsSection />}
       {section === 'sounds' && <SoundsSection />}
-      {section === 'sky' && (
+      {section === 'astrology' && (
         <Suspense
           fallback={
             <p className="type-meta" role="status">
@@ -105,7 +111,7 @@ export function LibraryRoute() {
             </p>
           }
         >
-          <SkySection />
+          <AstrologySection />
         </Suspense>
       )}
 
@@ -121,6 +127,9 @@ export function LibraryRoute() {
 
 function readSection(value: string | null): Half {
   if (value === 'sounds') return 'sounds'
-  if (value === 'sky') return 'sky'
+  // `sky` is what this section used to be called, and links to it are still in
+  // the wild — in somebody's history, in a bookmark, in an older build's
+  // Settings screen. It costs one line to keep them working.
+  if (value === 'astrology' || value === 'sky') return 'astrology'
   return 'loops'
 }

@@ -67,7 +67,7 @@ import { useTheme } from '../state/ThemeProvider'
  * ── The beats ───────────────────────────────────────────────────────────────
  *
  *   arrival → what would you like to strengthen? → hear it → make it yours
- *                                                    → your sky → begin
+ *                                              → your astrology → begin
  *
  * The first three are the original flow and are unchanged in shape: feel,
  * personal relevance, surprise. The two that follow were added for one reason,
@@ -101,11 +101,11 @@ type Step =
   | 'voice'
   | 'own-words'
   | 'attune'
-  | 'sky'
+  | 'astrology'
   | 'ritual'
 
 /** The steps with a mark at the bottom. `own-words` is a detour, not a beat. */
-const ORDER: Step[] = ['arrival', 'intent', 'voice', 'attune', 'sky', 'ritual']
+const ORDER: Step[] = ['arrival', 'intent', 'voice', 'attune', 'astrology', 'ritual']
 
 /** How resolved the field is on each step. See `SettlingField`. */
 const RESOLVE: Record<Step, number> = {
@@ -114,7 +114,7 @@ const RESOLVE: Record<Step, number> = {
   voice: 0.5,
   'own-words': 0.5,
   attune: 0.72,
-  sky: 0.88,
+  astrology: 0.88,
   ritual: 1,
 }
 
@@ -128,15 +128,15 @@ const RESOLVE: Record<Step, number> = {
 const BLOOM_MS = 460
 
 /**
- * The one step that is code-split, for the same reason the library's Sky tab
+ * The one step that is code-split, for the same reason the library's tab
  * is: the city list and everything behind it belong to people who want a
  * chart, not to every first-time visitor. By the time somebody reaches this
  * step they have spent thirty seconds on the four before it, so the fetch has
  * had plenty of time to finish in the background.
  */
-const SkyStep = lazy(() =>
-  import('../components/onboarding/SkyStep').then((module) => ({
-    default: module.SkyStep,
+const AstrologyStep = lazy(() =>
+  import('../components/onboarding/AstrologyStep').then((module) => ({
+    default: module.AstrologyStep,
   })),
 )
 
@@ -506,13 +506,13 @@ export function WelcomeRoute() {
                 ),
               })
             }
-            onContinue={() => go('sky')}
+            onContinue={() => go('astrology')}
           />
         )}
 
-        {step === 'sky' && (
+        {step === 'astrology' && (
           <Suspense fallback={<div className="min-h-[18rem]" />}>
-            <SkyStep onDone={() => go('ritual')} />
+            <AstrologyStep onDone={() => go('ritual')} />
           </Suspense>
         )}
 

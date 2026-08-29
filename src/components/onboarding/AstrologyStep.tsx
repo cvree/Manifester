@@ -28,18 +28,18 @@ import { Reveal, RevealText } from './Reveal'
  *
  * So "Not for me" sits at the same weight as the form, the refusal is
  * *remembered* rather than asked again next week, and the consequence is
- * complete: the Sky section never appears in the library, nothing else in the
- * app mentions it, and the entire ephemeris stays undownloaded. It remains in
+ * complete: the Astrology section never appears in the library, nothing else
+ * in the app mentions it, and the entire ephemeris stays undownloaded. It is in
  * Settings for anyone who changes their mind, which is where a declined
  * feature belongs — findable, and silent until it is looked for.
  */
 
-interface SkyStepProps {
+interface AstrologyStepProps {
   /** Move on, whichever way this was answered. */
   onDone: () => void
 }
 
-export function SkyStep({ onDone }: SkyStepProps) {
+export function AstrologyStep({ onDone }: AstrologyStepProps) {
   const [opened, setOpened] = useState(false)
 
   return (
@@ -52,9 +52,10 @@ export function SkyStep({ onDone }: SkyStepProps) {
 
       <Reveal delay={0.28}>
         <p className="type-body mt-3 text-center text-balance">
-          Manifester can work out where every planet was when you were born, and
-          then, each morning, what has moved since — ending with one thing to
-          strengthen today and a line to say.
+          Manifester can work out where every planet was when you were born,
+          and then, each morning, what has moved since: a horoscope that is
+          genuinely different tomorrow, a portrait of your whole chart, and a
+          care plan for the day — each one ending in a line to say.
         </p>
       </Reveal>
 
@@ -81,8 +82,8 @@ export function SkyStep({ onDone }: SkyStepProps) {
                 </li>
               </ul>
               <p className="type-meta mt-3">
-                It lives in your library, after the sounds. It will not appear
-                anywhere else.
+                It lives in your library under Astrology, after the sounds. It
+                will not appear anywhere else.
               </p>
             </div>
           </Reveal>

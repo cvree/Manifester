@@ -7,7 +7,7 @@
  * ranging from "I do not believe in it" to "I am not typing my birthday into a
  * breathing app". Both are correct answers and neither is a state to be nagged
  * out of. So a skip is *recorded* — `declined` — and the consequence is total:
- * the Sky section does not appear in the library, nothing mentions it again,
+ * the Astrology section does not appear in the library, nothing mentions it again,
  * and the whole ephemeris is code-split so it is not even downloaded.
  *
  * It stays available in Settings for ever, where somebody who changes their
