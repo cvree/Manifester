@@ -333,6 +333,12 @@ link to your sounds.
   vibrate, and both cues and haptics are one press to turn off.
 - A live audio mixer, one tap from the player: a fader and a mute for every
   background layer, plus a master, all changing while you listen.
+- **An optional astrology section**, in the Library and nowhere else: a daily
+  horoscope that is genuinely different tomorrow, a portrait of your whole
+  chart, the longer cycles, a care plan wired to the breathing guide, and two
+  charts side by side. Computed on the device from real orbital mechanics, off
+  unless you ask for it, and every panel ends in a line you can loop. See
+  [Astrology](#astrology).
 - Works offline after the first visit.
 
 ---
@@ -1425,6 +1431,133 @@ voices installed: the case where every quality signal points the wrong way.
 
 ---
 
+## Astrology
+
+> Optional, off unless you ask for it, and computed on the device from real
+> orbital mechanics. It lives in the Library under **Astrology**, and nowhere
+> else.
+
+A daily practice needs a reason to be opened on the days you do not feel like
+practising, and *there is something new here that is about me* is the oldest
+working answer there is. That is what this section is for — and every one of its
+five panels ends in something the app can actually do: a line to loop, a breath
+to follow, a session with a length attached.
+
+### It is arithmetic, not a lookup
+
+Nothing here is one of twelve paragraphs written a month ago. The positions come
+from the standard solar and lunar theories and the JPL orbital elements, and the
+whole ephemeris runs in
+[`src/lib/astrology/ephemeris.ts`](src/lib/astrology/ephemeris.ts) — a few
+hundred lines of series arithmetic, no network, no data file. From that, the
+feature computes a birth chart, the sky right now, the contacts between them,
+the exact instant of the next new and full moon, the date a retrograde turns
+round, and the year of a Saturn return.
+
+**No birth time is a first-class answer.** The rising sign moves a degree every
+four minutes, so a guessed time produces a confidently wrong Ascendant. Rather
+than invent one, the chart is built for noon, the Ascendant and the houses are
+simply absent, the Moon is marked approximate, and every screen says so. Adding
+a birth time later sharpens the chart in front of you.
+
+### The five panels
+
+**Today** — the horoscope. A headline that is different on most days, the Moon's
+sign and phase, and three or four paragraphs on the shape of the day. Then four
+dials — energy, heart, mind, calm — each derived from the transits actually in
+the sky and each captioned with where its number came from. Then the day
+answered in four areas of a life (body, heart, mind, spirit), **the hours** (the
+Moon crosses half a degree an hour, so its contacts to a chart fall in
+computable stretches — "the open one is between two and four" is a statement
+about geometry), the three strongest contacts, one thing to do, one thing to
+stop forcing, one question to sit with, and a deck of sixteen questions to
+shuffle when what you need is to be asked something you did not choose.
+
+**Chart** — the portrait. Sun, Moon and Rising in the order people say them, a
+paragraph tying the three together, the wheel with today's sky riding on the
+outside, the elemental and modal balance, the loudest planet in the chart and
+why, every placement written out in full, and the aspects your own planets make
+to each other. Every sign entry carries a gift *and* the cost of the same trait,
+because a portrait made only of compliments is one nobody believes twice.
+
+**Cycles** — the longer clocks. Where the Moon is in its month and what that
+stretch is for; the seven days ahead, each read exactly the way today is, with
+the easiest one starred; the exact time of the next new and full moon and which
+house each lands in; which planets are retrograde and the date each turns
+direct; what changes sign in the next ten weeks; the once-or-twice-in-a-life
+chapters — Saturn returns, the Jupiter return, the nodal return, the Uranus
+opposition — with the ones you have just come through as well as the ones ahead;
+and a countdown to your solar return, computed to the minute the Sun returns to
+the degree it held when you were born.
+
+**Care** — the practical half, and the reason this belongs in a breathing app.
+What to notice in the body today, a breath pattern chosen from the sky and wired
+to the player, how to rest tonight from the phase of the Moon, what your natal
+Moon actually needs, a four-step practice, three journal questions, and a
+suggested session with a length and a line. Nothing here diagnoses or treats
+anything: the traditional sign–body pairings are used as attention prompts —
+*check whether your shoulders are up by your ears* is a useful question and
+costs nothing if it is wrong — and the note saying so is on the screen rather
+than in a footnote.
+
+**Bonds** — two charts side by side. Add somebody's birthday and the feature
+lays their chart over yours: warmth, spark, mind, depth and ease, the strongest
+contacts between the two, what runs easily, where you are built differently,
+and — the useful paragraph — what each of you needs that the other would never
+think to offer. It describes **two charts, never two people**: it will not tell
+you whether a relationship is good, and it has nothing to say about what anybody
+else is thinking.
+
+### The rules the writing is held to
+
+Astrology writing has two failure modes. It flatters — *your natural magnetism
+draws opportunity to you* — which is pleasant once and worthless twice, because
+it could be said to anyone about any day. Or it predicts — *avoid signing
+contracts on Thursday* — which is a claim about the world this app has no
+business making to somebody who came here to breathe.
+
+So every fragment in [`signs.ts`](src/lib/astrology/signs.ts) and
+[`lore.ts`](src/lib/astrology/lore.ts) describes a *quality of attention*: what a
+day is shaped like, what is easy in it, what is worth noticing. There is no good
+day and no bad day — there is a day with friction in it and a day with very
+little, which are different things to walk into rather than better and worse
+ones. Nothing predicts events, and nothing makes a claim about money, health
+outcomes or another person's intentions.
+
+The dials are bounded away from both ends on purpose. A zero would say the day
+is a write-off and a hundred would promise something no arrangement of planets
+can deliver; what a dial says is *there is more of this available today than
+usual*, and the screen says so underneath in those words.
+
+### The text is tested like code
+
+Every sentence in this feature is assembled at runtime out of fragments, and the
+failure mode of that technique is not a crash — it is *your what you are
+building in public is in square*, or *at the centre you is felt before it is
+understood*. Perfectly valid code, instantly recognisable as machine-written.
+
+[`prose.ts`](src/lib/astrology/prose.ts) collects the seams where two fragments
+meet badly, and the test suite runs every one of them over hundreds of
+chart-and-day combinations — because a broken join is usually one sign in twelve
+on one day in thirty, and that one will never be on screen while somebody is
+looking. The guards themselves are tested too, against the real sentences that
+caused them, so they cannot be quietly loosened past the bug they were written
+for. Alongside them the suite checks the astronomy against the ephemeris rather
+than against itself: a computed new moon has to have an elongation of under a
+twentieth of a degree, a solar return has to put the Sun back on the natal
+degree, and a reading has to be identical at breakfast and at bedtime and
+different tomorrow.
+
+### Nothing is downloaded until you ask for it
+
+Somebody who says *not for me* — in the first minute, or later in Settings —
+sees no trace of the feature again, and their browser never fetches a byte of
+it. The ephemeris, the interpretations, the two hundred cities and all five
+panels are behind dynamic imports; the Today panel loads when the tab is opened
+and the other four when they are.
+
+---
+
 ## Privacy
 
 > Your saved loops stay on this device. Manifester does not require an account
@@ -1442,6 +1575,13 @@ voices installed: the case where every quality signal points the wrong way.
   everything else. Choosing a device voice under *Choose an exact voice* has the
   same effect on any deployment — speech is then generated entirely by your
   device.
+- **Birth details never leave the device.** A date, a time and a city is most
+  of what an identity-theft form asks for, so the astrology feature computes
+  every position locally, stores the details in this browser's own
+  `localStorage`, and attaches them to no account. The same is true of anybody
+  added under *Bonds* — somebody else's birthday is a trust rather than a
+  preference, the list is capped at ten, and removing your own chart removes
+  everybody with it.
 - The default writing helper is a table of rewrite rules in
   [`src/lib/wordcraft.ts`](src/lib/wordcraft.ts), not a language model. No API
   call, no key, nothing sent.
@@ -2427,6 +2567,40 @@ src/
       enhance.ts      the two prompts, output validation, offline fallback
       credentials.ts  the key on this device, and how it is masked
       useCredentials.ts  one nullable value, shared by two screens
+    astrology/
+      ephemeris.ts    the sky itself: solar and lunar theory, the JPL elements,
+                      retrogradation, the Moon's phase, and the bisection that
+                      finds a sign change to the second
+      zone.ts         a wall clock in a place → an instant, historical
+                      daylight-saving rules included, because sixty minutes is
+                      half a sign of Ascendant
+      places.ts       two hundred cities, packed, searched on the device — the
+                      alternative was sending a birthplace to a geocoder
+      chart.ts        a chart: placements, whole-sign houses, and the ranked
+                      contacts between two of them
+      signs.ts        the short vocabulary a day is written from: twelve signs,
+                      eleven bodies, six aspects
+      lore.ts         the long vocabulary a life is written from: what each sign
+                      is like to live inside, the twelve houses, what each
+                      planet needs to be well, the Moon's eight faces
+      reading.ts      the spine of a day: headline, temper, three contacts, an
+                      intent and a line
+      horoscope.ts    the day at full length: four areas, the hours, the dials,
+                      and a line written from the sky
+      natal.ts        the portrait: the big three, the balance, the loudest
+                      planet, every placement, and the chart's own aspects
+      cycles.ts       the month, the week, the season and the chapter
+      care.ts         the body, the breath and the evening — wired to the player
+      bonds.ts        two charts side by side, and the paragraph comparing two
+                      Moons that is worth more than the rest of it
+      people.ts       somebody else's birthday, capped, local, one press to
+                      remove
+      oracle.ts       the one part that is a shuffle, and says so
+      prose.ts        the seams where two fragments meet badly, so the tests can
+                      catch them across hundreds of charts
+      profile.ts      the details, the decision to have given them, and the
+                      instant they resolve to
+      useAstrology.ts the whole thing as one React value, recomputed at midnight
   workers/
     encode.worker.ts  mixes the timeline and encodes MP3/WAV
     kokoro.worker.ts  Kokoro-82M beside the page: WebAssembly, a warm-up that

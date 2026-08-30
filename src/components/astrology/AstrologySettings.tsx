@@ -6,12 +6,13 @@ import {
   readAstrology,
   writeAstrology,
 } from '../../lib/astrology/profile'
+import { forgetEveryone } from '../../lib/astrology/people'
 import { cue } from '../../lib/feedback'
 import { Button } from '../Button'
 import { BirthDetailsForm } from './BirthDetailsForm'
 
 /**
- * The chart, from Settings.
+ * Astrology, from Settings.
  *
  * This is the half of the feature that makes skipping it in onboarding a
  * genuinely free choice rather than a one-way door. Somebody who said "not for
@@ -43,7 +44,7 @@ export function AstrologySettings() {
             year: 'numeric',
           })}
           {birth.time ? ` at ${birth.time}` : ' · time unknown'} in {birth.place.name}.
-          Your reading is in the library, under Sky.
+          Your reading is in the library, under Astrology.
         </p>
         <div className="mt-3.5 flex flex-wrap gap-2">
           <Button
@@ -51,10 +52,10 @@ export function AstrologySettings() {
             size="md"
             onClick={() => {
               cue('tap')
-              navigate('/library?show=sky')
+              navigate('/library?show=astrology')
             }}
           >
-            Open my sky
+            Open my chart
           </Button>
           <Button
             size="md"
@@ -70,7 +71,11 @@ export function AstrologySettings() {
             size="md"
             onClick={() => {
               cue('tap')
+              // Anybody added under Bonds goes with it: leaving somebody
+              // else's birthday behind would be a strange definition of
+              // "remove from this device".
               forgetAstrology()
+              forgetEveryone()
               refresh()
             }}
           >
@@ -107,9 +112,9 @@ export function AstrologySettings() {
       {!editing && (
         <p className="type-body mb-4">
           A birth date, a time and a city, and Manifester works out where every
-          planet was — then, each morning, what has moved since and one thing to
-          strengthen today. It appears in your library under Sky and nowhere
-          else.
+          planet was — then, each morning, what has moved since, what today is
+          shaped like, what the week ahead holds, and one thing to strengthen
+          now. It appears in your library under Astrology and nowhere else.
         </p>
       )}
 

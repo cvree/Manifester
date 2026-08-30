@@ -236,7 +236,7 @@ function dominantElement(sky: Chart): Element {
   )
 }
 
-const ELEMENT_CLAUSE: Record<Element, string> = {
+export const ELEMENT_CLAUSE: Record<Element, string> = {
   fire: 'The sky is weighted towards fire, which favours starting over refining.',
   earth: 'The sky is weighted towards earth, which favours finishing over starting.',
   air: 'The sky is weighted towards air, which favours saying it out loud.',

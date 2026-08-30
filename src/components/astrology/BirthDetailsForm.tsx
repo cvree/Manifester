@@ -41,6 +41,12 @@ interface BirthDetailsFormProps {
   saveLabel?: string
   /** Rendered beside Save, when there is somewhere to go instead. */
   secondary?: React.ReactNode
+  /** Rendered above the date — the name field, when this is somebody else. */
+  lead?: React.ReactNode
+  /** Replaces the privacy line, which reads differently for another person. */
+  note?: React.ReactNode
+  /** Blocks saving while something outside the form is incomplete. */
+  disabled?: boolean
 }
 
 export function BirthDetailsForm({
@@ -48,6 +54,9 @@ export function BirthDetailsForm({
   onSave,
   saveLabel = 'Save',
   secondary,
+  lead,
+  note,
+  disabled = false,
 }: BirthDetailsFormProps) {
   const ids = useId()
 
@@ -64,6 +73,8 @@ export function BirthDetailsForm({
 
   return (
     <div className="space-y-4">
+      {lead}
+
       <div>
         <FieldLabel htmlFor={`${ids}-date`}>Date of birth</FieldLabel>
         <TextField
@@ -123,16 +134,18 @@ export function BirthDetailsForm({
         <PlaceField id={`${ids}-place`} place={place} onChange={setPlace} />
       </div>
 
-      <p className="type-meta">
-        This stays on this device. It is never uploaded, and the positions are
-        worked out here rather than asked for from anywhere.
-      </p>
+      {note ?? (
+        <p className="type-meta">
+          This stays on this device. It is never uploaded, and the positions are
+          worked out here rather than asked for from anywhere.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="primary"
           size="md"
-          disabled={!ready}
+          disabled={!ready || disabled}
           onClick={() => {
             if (!birth) return
             cue('save')
