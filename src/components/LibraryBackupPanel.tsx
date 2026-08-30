@@ -63,12 +63,22 @@ export function LibraryBackupPanel() {
         <Button
           onClick={() => void backup()}
           loading={busy === 'backup'}
+          loadingLabel="Gathering your library…"
+          disabled={busy != null}
           leading={<DownloadIcon />}
         >
           Back up library
         </Button>
+        {/*
+          Restore is the slower of the two and used to be the quieter one: it
+          only dimmed while it worked, so a large backup spent its whole read
+          and merge looking like a button that had refused the press. It reads
+          the same as its neighbour now, from the moment a file is chosen.
+        */}
         <Button
           variant="secondary"
+          loading={busy === 'restore'}
+          loadingLabel="Restoring your library…"
           disabled={busy != null}
           onClick={() => inputRef.current?.click()}
           leading={<UploadIcon />}

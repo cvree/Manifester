@@ -680,6 +680,115 @@
     border-color: var(--rose);
     background: var(--rose-soft);
   }
+
+  /*
+   * ── Waiting ──
+   *
+   * A control that has been pressed and is now working on something.
+   *
+   * It is *not* disabled, and it must not look it. The rule above fades
+   * anything unpressable to 45%, which is the app's way of saying "not for
+   * you" — exactly the wrong sentence for a button that is busy doing the
+   * thing you just asked for. Read at 45% with a small spinner, a working
+   * button and a dead one are the same picture, and the honest reading of
+   * that picture is "nothing happened".
+   *
+   * So a busy control keeps its full weight, swaps the cursor for the one
+   * the whole desktop already uses to mean "wait", and grows the strip
+   * below. `aria-busy` drives all of it, so a control cannot say it is
+   * working to a screen reader and look idle to everybody else.
+   *
+   * One catch for callers: this lives in the components layer, and a
+   * `disabled:opacity-*` utility on the element itself will still win — the
+   * utilities layer outranks this one whatever the specificity says. A
+   * control that carries its own fade has to withhold it while busy rather
+   * than rely on being overridden here. See `RitualPreview`.
+   */
+  .interactive[aria-busy='true'],
+  .interactive[aria-busy='true']:disabled,
+  .interactive[aria-busy='true'][aria-disabled='true'] {
+    cursor: progress;
+    opacity: 1;
+  }
+
+  /*
+   * The strip: a band that travels along the bottom edge of a busy control
+   * for as long as the wait lasts.
+   *
+   * The spinner beside the label is small, and on a phone at arm's length a
+   * 17px ring is easy to miss. This is the part you see without looking for
+   * it — motion across the width of the thing you just pressed, in the one
+   * place it cannot be mistaken for decoration.
+   */
+  .busy-strip,
+  .busy-track {
+    overflow: hidden;
+    background: color-mix(in oklab, currentColor 20%, transparent);
+  }
+
+  /*
+   * Inside the control that was pressed, near its foot.
+   *
+   * Inset and rounded on its own terms rather than flush to the bottom edge
+   * with the parent's radius inherited. Inheriting looks right on a square
+   * corner and wrong on every other: against a pill it resolves to a lozenge
+   * wider than the curve it is sitting under, and the ends escape the button
+   * as two stray grey ticks. Held clear of the corners it cannot foul any
+   * radius, and it is legible where it used to be lost in the shadow.
+   */
+  .busy-strip {
+    position: absolute;
+    inset-inline: 14%;
+    bottom: 0.3rem;
+    height: 3px;
+    border-radius: 999px;
+  }
+
+  /*
+   * The same band as its own element, for a wait that has a place on the page
+   * rather than a button to sit under — a progress bar that does not yet know
+   * its percentage, most of all. A determinate bar frozen at 2% and an
+   * indeterminate one look identical, and the frozen one reads as stuck.
+   */
+  .busy-track {
+    position: relative;
+  }
+
+  /*
+   * The travelling band itself, on the Studio Voice download bar's keyframes
+   * and duration. Waiting is one idea, so it gets one motion; two
+   * indeterminate sweeps at different speeds would read as two different
+   * things happening.
+   *
+   * Linear rather than the app's usual eased curve, which is the one place
+   * this parts company with that bar. `--ease-calm` slows to a stop at both
+   * ends of the travel, and the band is off the track at both ends — so an
+   * eased sweep spends a good part of each cycle parked just out of sight,
+   * and a 3px strip that keeps vanishing for half a second reads as one that
+   * has finished. At a constant speed it is off-track for four percent of
+   * the cycle, which nobody sees.
+   */
+  .busy-strip::after,
+  .busy-track::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: 33%;
+    border-radius: inherit;
+    background: currentColor;
+    animation: studio-indeterminate 1.4s linear infinite;
+  }
+
+  /* And the same answer with motion off: a still band, not nothing. */
+  @media (prefers-reduced-motion: reduce) {
+    .busy-strip::after,
+    .busy-track::after {
+      width: 100%;
+      opacity: 0.5;
+      animation: none;
+    }
+  }
 }
 
 /* ── Utilities ──────────────────────────────────────────────── */

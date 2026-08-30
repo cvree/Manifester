@@ -9,7 +9,7 @@ import { cue } from '../../lib/feedback'
 import { VOICE_PROFILES, voiceForStyle } from '../../lib/tts'
 import { useTTSStatus } from '../../lib/tts/useTTSStatus'
 import { improveWords } from '../../lib/wordcraft'
-import { Button } from '../Button'
+import { Button, BusyStrip, Spinner } from '../Button'
 import { CheckIcon, PencilIcon, PlayIcon, SparkIcon, WaveIcon } from '../Icons'
 import { SegmentedControl } from '../SegmentedControl'
 import { TextArea } from '../TextArea'
@@ -172,13 +172,15 @@ export function VoiceMomentStep({
                 size="sm"
                 variant="primary"
                 disabled={!ready}
+                loading={audition.loading != null}
+                loadingLabel="Preparing your voice…"
                 onClick={() => {
                   cue('tap')
                   speak(value)
                 }}
                 leading={<PlayIcon className="text-[0.85rem]" />}
               >
-                {audition.loading ? 'Preparing your voice…' : 'Hear it'}
+                Hear it
               </Button>
               <Button
                 size="sm"
@@ -224,6 +226,7 @@ export function VoiceMomentStep({
                     type="button"
                     onClick={() => pick(line)}
                     aria-pressed={selected}
+                    aria-busy={preparing || undefined}
                     className={cx(
                       'interactive pressable relative flex w-full items-center gap-3 rounded-[1.15rem] border px-3.5 py-3 text-left [@media(max-height:720px)]:py-2.5',
                       'transition-[background-color,border-color,box-shadow] duration-300 ease-[var(--ease-calm)]',
@@ -264,11 +267,22 @@ export function VoiceMomentStep({
                         </span>
                       )}
                     </span>
+                    {/*
+                      The line has been tapped and the voice is being made
+                      ready. Words *and* a spinner: the words are what makes
+                      it understandable, the spinner is what makes it visible
+                      from across the room.
+                    */}
                     {preparing && (
-                      <span className="type-meta shrink-0" role="status">
+                      <span
+                        className="type-meta flex shrink-0 items-center gap-1.5"
+                        role="status"
+                      >
+                        <Spinner className="text-[0.85rem] text-[var(--rose-deep)]" />
                         Preparing…
                       </span>
                     )}
+                    {preparing && <BusyStrip />}
                   </button>
                 </li>
               )

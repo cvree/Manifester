@@ -150,6 +150,17 @@ export interface SavedLoop extends LoopSettings {
 /** The player's lifecycle. */
 export type SessionStatus = 'idle' | 'playing' | 'paused' | 'complete'
 
+/**
+ * What a "hear it" button is doing.
+ *
+ * `loading` is the gap nobody sees coming: a studio line that is not already
+ * on the device has to be synthesised, and that is a second or two of silence
+ * between the press and the voice. Every control that offers a preview takes
+ * this whole value rather than a `playing` boolean, so none of them can
+ * quietly render that second as "idle".
+ */
+export type PreviewState = 'idle' | 'loading' | 'playing'
+
 export const DEFAULT_SOUND: SoundConfig = {
   mode: 'single',
   trackId: 'moon-garden',

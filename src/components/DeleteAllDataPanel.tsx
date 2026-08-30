@@ -72,6 +72,7 @@ export function DeleteAllDataPanel() {
         <Button
           variant="primary"
           loading={busy}
+          loadingLabel="Deleting everything…"
           leading={<TrashIcon className="text-[0.95rem]" />}
           onClick={() => {
             if (busy) return
@@ -87,7 +88,7 @@ export function DeleteAllDataPanel() {
             void deleteAllDataAndRestart()
           }}
         >
-          {busy ? 'Deleting…' : 'Delete everything'}
+          Delete everything
         </Button>
         <Button
           variant="ghost"

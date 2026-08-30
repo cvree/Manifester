@@ -359,26 +359,37 @@ export function ExportPanel({
         </p>
       )}
 
+      {/*
+        Two different waits, and only the second one has a number in it.
+
+        Preparing used to borrow the percentage bar and sit at a fixed 2%,
+        which is the picture of a render that has stalled on its first frame.
+        It runs the indeterminate band instead until there is a real figure to
+        show, so "working" and "stuck" stop looking the same.
+      */}
       {busy && (
         <div>
-          <div
-            className="h-2 w-full overflow-hidden rounded-pill bg-[var(--surface-sunken)]"
-            role="progressbar"
-            aria-label="Export progress"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={stage.kind === 'encoding' ? stage.percent : 0}
-          >
+          {stage.kind === 'preparing' ? (
             <div
-              className="h-full rounded-pill bg-[var(--rose)] transition-[width] duration-200"
-              style={{
-                width:
-                  stage.kind === 'encoding'
-                    ? `${Math.max(2, stage.percent)}%`
-                    : '2%',
-              }}
+              className="busy-track h-2 w-full rounded-pill bg-[var(--surface-sunken)] text-[var(--rose)]"
+              role="progressbar"
+              aria-label="Export progress"
             />
-          </div>
+          ) : (
+            <div
+              className="h-2 w-full overflow-hidden rounded-pill bg-[var(--surface-sunken)]"
+              role="progressbar"
+              aria-label="Export progress"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={stage.percent}
+            >
+              <div
+                className="h-full rounded-pill bg-[var(--rose)] transition-[width] duration-200"
+                style={{ width: `${Math.max(2, stage.percent)}%` }}
+              />
+            </div>
+          )}
           <p className="mt-2 text-[0.85rem] text-ink-muted">
             {stage.kind === 'preparing'
               ? 'Preparing the sound…'

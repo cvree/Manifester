@@ -338,10 +338,11 @@ export function SoundsSection() {
             <Button
               variant="secondary"
               onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
+              loading={importing}
+              loadingLabel="Adding your sound…"
               leading={<UploadIcon className="text-[0.95rem]" />}
             >
-              {importing ? 'Adding…' : 'Import'}
+              Import
             </Button>
           }
         >

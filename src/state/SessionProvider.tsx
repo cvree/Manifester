@@ -62,6 +62,7 @@ import { SessionTimer } from '../lib/timer'
 import {
   DEFAULT_SETTINGS,
   type LoopSettings,
+  type PreviewState,
   type SavedLoop,
   type SessionStatus,
   type SoundConfig,
@@ -135,7 +136,7 @@ interface SessionContextValue {
   /** Speak a short sample with whatever voice the settings resolve to. */
   previewVoice: (style?: 'feminine' | 'masculine', text?: string) => void
   stopPreview: () => void
-  previewState: 'idle' | 'loading' | 'playing'
+  previewState: PreviewState
 
   session: SessionSnapshot
   /**

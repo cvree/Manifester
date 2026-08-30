@@ -8,7 +8,7 @@ import {
 } from '../lib/recorder'
 import { soundtrack } from '../lib/soundtrack'
 import * as storage from '../lib/storage'
-import { Button } from './Button'
+import { Button, Spinner } from './Button'
 import { IconButton } from './IconButton'
 import { CloseIcon, PlayIcon, StopIcon, TrashIcon } from './Icons'
 
@@ -32,6 +32,18 @@ export function VoiceRecorderPanel({
   const [error, setError] = useState<string | null>(null)
   const [existing, setExisting] = useState<storage.StoredRecording | null>(null)
   const [playing, setPlaying] = useState(false)
+  /*
+   * The two waits either side of a take, both of which used to pass in
+   * silence.
+   *
+   * Opening the microphone is the longer one: the browser has to ask
+   * permission, and on a first visit that is a dialog somebody has to read
+   * and answer. Saving is shorter but not free — a three minute take is a
+   * few megabytes going into IndexedDB. Neither is an error, and neither
+   * should look like a button that missed the press.
+   */
+  const [opening, setOpening] = useState(false)
+  const [storing, setStoring] = useState(false)
 
   if (!recorderRef.current) recorderRef.current = new VoiceRecorder()
 
@@ -93,6 +105,7 @@ export function VoiceRecorderPanel({
 
   const begin = useCallback(async () => {
     setError(null)
+    setOpening(true)
     try {
       await recorderRef.current?.start({
         onLevel: setLevel,
@@ -104,14 +117,20 @@ export function VoiceRecorderPanel({
     } catch (caught) {
       setError(describeRecordingError(caught))
       cue('error')
+    } finally {
+      setOpening(false)
     }
   }, [])
 
   const finish = useCallback(async () => {
+    setStoring(true)
     const blob = await recorderRef.current?.stop()
     setRecording(false)
     setLevel(0)
-    if (!blob) return
+    if (!blob) {
+      setStoring(false)
+      return
+    }
 
     const id = createId('rec')
     const record: storage.StoredRecording = {
@@ -132,6 +151,8 @@ export function VoiceRecorderPanel({
     } catch {
       setError('There was not enough room on this device to save the recording.')
       cue('error')
+    } finally {
+      setStoring(false)
     }
   }, [onChange, recordingId, seconds])
 
@@ -217,11 +238,27 @@ export function VoiceRecorderPanel({
             block
             size="lg"
             className="mt-4"
+            loading={storing}
+            loadingLabel="Saving your recording…"
             onClick={() => void finish()}
             leading={<StopIcon className="text-[0.85rem]" />}
           >
             Stop recording
           </Button>
+        </div>
+      ) : storing ? (
+        /*
+          The take has stopped and is being written to the device. Without
+          this the panel dropped straight back to "Record your voice" for the
+          moment the write takes — offering, in the plainest possible terms,
+          to throw away the thing it was in the middle of keeping.
+        */
+        <div
+          role="status"
+          className="flex items-center gap-3 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-4"
+        >
+          <Spinner className="text-[1.1rem] text-[var(--rose-deep)]" />
+          <p className="text-[0.95rem] text-ink">Saving your recording…</p>
         </div>
       ) : existing ? (
         <div className="flex items-center gap-3 rounded-[1.25rem] border border-[var(--sage)] bg-[var(--sage-soft)] px-4 py-3">
@@ -247,12 +284,19 @@ export function VoiceRecorderPanel({
           />
         </div>
       ) : (
-        <Button variant="secondary" block size="lg" onClick={() => void begin()}>
+        <Button
+          variant="secondary"
+          block
+          size="lg"
+          loading={opening}
+          loadingLabel="Opening your microphone…"
+          onClick={() => void begin()}
+        >
           Record your voice
         </Button>
       )}
 
-      {!recording && (
+      {!recording && !storing && (
         <p className="text-[0.83rem] leading-relaxed text-ink-faint">
           {existing
             ? 'Recording again replaces this one.'

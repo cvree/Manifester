@@ -13,6 +13,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   trailing?: ReactNode
   /** Swaps the leading slot for a spinner and blocks further presses. */
   loading?: boolean
+  /**
+   * What the button says while it is loading.
+   *
+   * Optional only because a handful of callers already swap their own label.
+   * Everywhere else it is the whole point: a spinner says "something",
+   * "Saving your recording…" says what. Write it in the present tense, in the
+   * words somebody would use out loud.
+   */
+  loadingLabel?: ReactNode
 }
 
 const VARIANTS: Record<Variant, string> = {
@@ -54,6 +63,16 @@ const SIZES: Record<Size, string> = {
   xl: 'min-h-[3.75rem] px-7 text-[1.08rem] rounded-[1.35rem]',
 }
 
+/**
+ * The one button in the app.
+ *
+ * `loading` is three things at once, and it has to be all three: the label
+ * changes to say what is happening, a spinner turns beside it, and a band
+ * travels across the foot of the button. Any one of them alone is missable —
+ * the label by somebody who was already looking away, the spinner by anybody
+ * holding a phone at arm's length — and a press that appears to do nothing is
+ * the one moment people decide the app is broken and press it again.
+ */
 export function Button({
   variant = 'secondary',
   size = 'md',
@@ -61,6 +80,7 @@ export function Button({
   leading,
   trailing,
   loading = false,
+  loadingLabel,
   disabled,
   className,
   children,
@@ -73,7 +93,7 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cx(
-        'interactive inline-flex items-center justify-center gap-2.5 border font-medium',
+        'interactive relative inline-flex items-center justify-center gap-2.5 border font-medium',
         RAISED[variant] && 'pressable',
         VARIANTS[variant],
         SIZES[size],
@@ -82,8 +102,9 @@ export function Button({
       )}
     >
       {loading ? <Spinner /> : leading}
-      {children}
+      {loading && loadingLabel != null ? loadingLabel : children}
       {trailing}
+      {loading && <BusyStrip />}
     </button>
   )
 }
@@ -92,11 +113,28 @@ export function Button({
  * A ring that draws itself round rather than spinning a sprite — it keeps the
  * app's "nothing jitters" rule while still reading as work in progress.
  */
-function Spinner() {
+export function Spinner({ className }: { className?: string }) {
   return (
     <span
       aria-hidden="true"
-      className="h-[1.05em] w-[1.05em] shrink-0 animate-spin rounded-full border-2 border-[color-mix(in_oklab,currentColor_28%,transparent)] border-t-current"
+      className={cx(
+        'h-[1.05em] w-[1.05em] shrink-0 animate-spin rounded-full border-2 border-[color-mix(in_oklab,currentColor_28%,transparent)] border-t-current',
+        className,
+      )}
     />
   )
+}
+
+/**
+ * The travelling band on its own, for the few controls that are hand-built
+ * rather than a `Button` — the start button in the ritual preview, the pill
+ * row beside it. Those are styled from scratch on purpose; waiting should
+ * still look identical everywhere.
+ *
+ * The host needs `position: relative` and `aria-busy`, the second of which is
+ * also what stops it wearing the disabled fade. See `.busy-strip` in
+ * `theme.css`.
+ */
+export function BusyStrip() {
+  return <span aria-hidden="true" className="busy-strip" />
 }

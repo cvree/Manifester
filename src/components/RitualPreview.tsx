@@ -7,8 +7,9 @@ import type { BreathStyleId } from '../lib/breathing'
 import { useReducedMotion } from '../lib/motion'
 import { affirmationLines } from '../lib/summaries'
 import type { BreathingRuntime } from '../lib/useBreathing'
-import type { LoopSettings } from '../lib/types'
+import type { LoopSettings, PreviewState } from '../lib/types'
 import { BreathingVisualizer } from './BreathingVisualizer'
+import { BusyStrip, Spinner } from './Button'
 import {
   CheckIcon,
   ChevronIcon,
@@ -41,7 +42,15 @@ interface RitualPreviewProps {
   sceneKey: string
   onPreview: () => void
   onStopPreview: () => void
-  previewing: boolean
+  /**
+   * Idle, getting the voice ready, or speaking.
+   *
+   * The whole state rather than a `playing` flag, because the gap between
+   * the press and the first word is real — a studio line the device has not
+   * heard before is synthesised on the spot — and a button that says nothing
+   * during it is a button that looks broken.
+   */
+  previewState: PreviewState
   canPreview: boolean
   /**
    * Begin the loop from here.
@@ -65,6 +74,8 @@ interface RitualPreviewProps {
    */
   onSave: () => void
   saved: boolean
+  /** Set while the loop is being written to the device. */
+  saving: boolean
   /**
    * Take me to the control behind this tile. The preview does not know
    * whether that means opening a sheet or scrolling the page — Create owns
@@ -138,18 +149,21 @@ export function RitualPreview({
   sceneKey,
   onPreview,
   onStopPreview,
-  previewing,
+  previewState,
   canPreview,
   onStart,
   canStart,
   starting,
   onSave,
   saved,
+  saving,
   onOpenSetting,
   className,
 }: RitualPreviewProps) {
   const reducedMotion = useReducedMotion()
   const lines = useMemo(() => affirmationLines(text), [text])
+  /** Pressed, and now waiting on the voice rather than listening to it. */
+  const preparing = previewState === 'loading'
   const [index, setIndex] = useState(0)
 
   // Cycle the lines the way the loop will read them. Held still when someone
@@ -247,67 +261,82 @@ export function RitualPreview({
             disabled={!canStart || starting}
             aria-busy={starting || undefined}
             className={cx(
-              'interactive pressable inline-flex min-h-13 w-full max-w-[19rem] items-center justify-center gap-2.5 rounded-pill border border-transparent px-6 text-[1rem] font-medium',
+              'interactive pressable relative inline-flex min-h-13 w-full max-w-[19rem] items-center justify-center gap-2.5 rounded-pill border border-transparent px-6 text-[1rem] font-medium',
               'bg-[linear-gradient(175deg,color-mix(in_oklab,var(--rose-deep)_86%,white)_0%,var(--rose-deep)_62%)] text-[var(--bg-0)]',
               'shadow-[0_1px_0_rgb(255_255_255/0.28)_inset,0_8px_24px_-10px_var(--glow)]',
               'hover:brightness-[1.05]',
-              'disabled:cursor-not-allowed disabled:opacity-45',
+              // Faded only when it is genuinely unavailable. A busy button is
+              // disabled too, and must not borrow that look — see `.busy-strip`.
+              !starting && 'disabled:cursor-not-allowed disabled:opacity-45',
             )}
           >
-            {starting ? (
-              <span
-                aria-hidden="true"
-                className="h-[1.05em] w-[1.05em] shrink-0 animate-spin rounded-full border-2 border-[color-mix(in_oklab,currentColor_28%,transparent)] border-t-current"
-              />
-            ) : (
-              <PlayIcon className="text-[0.85rem]" />
-            )}
+            {starting ? <Spinner /> : <PlayIcon className="text-[0.85rem]" />}
             {starting ? 'Beginning…' : 'Start loop'}
+            {starting && <BusyStrip />}
           </button>
 
           <div className="flex flex-wrap items-center justify-center gap-2.5">
+            {/*
+              Pressing this can be answered instantly — the line is already on
+              the device — or after a second or two of synthesis. Both are
+              normal, so the wait is a state of the button rather than an
+              exception: it tints, it spins, it runs the strip, and it says
+              what it is doing in the four words somebody would use.
+            */}
             <button
               type="button"
               onClick={() => {
                 cue('tap')
-                if (previewing) onStopPreview()
-                else onPreview()
+                if (previewState === 'playing') onStopPreview()
+                else if (previewState === 'idle') onPreview()
               }}
-              disabled={!canPreview}
+              disabled={!canPreview || preparing}
+              aria-busy={preparing || undefined}
               className={cx(
-                'interactive pressable inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
-                previewing
-                  ? 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]'
-                  : 'border-[var(--control-border)] bg-[var(--control)] text-ink',
-                'disabled:cursor-not-allowed disabled:opacity-45',
+                'interactive pressable relative inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
+                previewState === 'idle'
+                  ? 'border-[var(--control-border)] bg-[var(--control)] text-ink'
+                  : 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]',
+                !preparing && 'disabled:cursor-not-allowed disabled:opacity-45',
               )}
             >
-              {previewing ? (
+              {preparing ? (
+                <Spinner />
+              ) : previewState === 'playing' ? (
                 <PauseIcon className="text-[0.85rem]" />
               ) : (
                 <VoiceIcon className="text-[0.95rem]" />
               )}
-              {previewing ? 'Stop preview' : 'Hear a line'}
+              {preparing
+                ? 'Getting the voice ready…'
+                : previewState === 'playing'
+                  ? 'Stop preview'
+                  : 'Hear a line'}
+              {preparing && <BusyStrip />}
             </button>
 
             <button
               type="button"
               onClick={onSave}
-              disabled={!canStart}
+              disabled={!canStart || saving}
+              aria-busy={saving || undefined}
               className={cx(
-                'interactive pressable inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
+                'interactive pressable relative inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
                 saved
                   ? 'border-[var(--sage)] bg-[var(--sage-soft)] text-[var(--sage)]'
                   : 'border-[var(--control-border)] bg-[var(--control)] text-ink',
-                'disabled:cursor-not-allowed disabled:opacity-45',
+                !saving && 'disabled:cursor-not-allowed disabled:opacity-45',
               )}
             >
-              {saved ? (
+              {saving ? (
+                <Spinner />
+              ) : saved ? (
                 <CheckIcon className="text-[0.95rem]" />
               ) : (
                 <SeedIcon className="text-[0.95rem]" />
               )}
-              {saved ? 'Saved' : 'Save'}
+              {saving ? 'Saving…' : saved ? 'Saved' : 'Save'}
+              {saving && <BusyStrip />}
             </button>
           </div>
         </div>

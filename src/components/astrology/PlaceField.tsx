@@ -12,7 +12,7 @@ import {
 import { localZone, zoneSupported } from '../../lib/astrology/zone'
 import { cx } from '../../lib/cx'
 import { cue } from '../../lib/feedback'
-import { Button } from '../Button'
+import { Button, BusyStrip, Spinner } from '../Button'
 import { CheckIcon, CloseIcon } from '../Icons'
 import { TextField } from '../TextArea'
 
@@ -120,7 +120,7 @@ export function PlaceField({ id, place, onChange }: PlaceFieldProps) {
   }
 
   const useLocation = () => {
-    if (!navigator.geolocation) return
+    if (!navigator.geolocation || locating) return
     cue('tap')
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
@@ -212,11 +212,23 @@ export function PlaceField({ id, place, onChange }: PlaceFieldProps) {
                   onClick={() => choose(placeFromZone(zoneLabel(device), device))}
                 />
               )}
+              {/*
+                The browser can take its time here — it may put up its own
+                permission dialog, and the lookup itself is given eight
+                seconds before it gives up. The row says so and stops taking
+                presses, rather than quietly firing a second request behind
+                the first.
+              */}
               {navigator.geolocation && (
                 <Row
-                  title={locating ? 'Asking your browser…' : 'Use where I am now'}
-                  detail="Only if you want to. It is never sent anywhere."
+                  title={locating ? 'Finding where you are…' : 'Use where I am now'}
+                  detail={
+                    locating
+                      ? 'Your browser may ask you first.'
+                      : 'Only if you want to. It is never sent anywhere.'
+                  }
                   onClick={useLocation}
+                  busy={locating}
                 />
               )}
             </div>
@@ -323,25 +335,34 @@ function Row({
   detail,
   onClick,
   muted = false,
+  busy = false,
 }: {
   title: string
   detail: string
   onClick: () => void
   muted?: boolean
+  /** Pressed, and now waiting on something slow — see "Use where I am now". */
+  busy?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={busy}
+      aria-busy={busy || undefined}
       className={cx(
-        'interactive w-full rounded-[1rem] border px-3.5 py-2.5 text-left transition-colors duration-200',
+        'interactive relative flex w-full items-center gap-3 rounded-[1rem] border px-3.5 py-2.5 text-left transition-colors duration-200',
         muted
           ? 'border-dashed border-[var(--border-strong)] hover:bg-[var(--surface-sunken)]'
           : 'border-[var(--border)] bg-[var(--surface-sunken)] hover:border-[var(--border-strong)]',
       )}
     >
-      <span className="block truncate text-[0.94rem] text-ink">{title}</span>
-      <span className="block truncate text-[0.78rem] text-ink-faint">{detail}</span>
+      {busy && <Spinner className="text-[1rem] text-[var(--rose-deep)]" />}
+      <span className="min-w-0 grow">
+        <span className="block truncate text-[0.94rem] text-ink">{title}</span>
+        <span className="block truncate text-[0.78rem] text-ink-faint">{detail}</span>
+      </span>
+      {busy && <BusyStrip />}
     </button>
   )
 }

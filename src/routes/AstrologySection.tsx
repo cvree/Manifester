@@ -1,7 +1,7 @@
 import { Suspense, lazy, useState } from 'react'
 import { BirthDetailsForm } from '../components/astrology/BirthDetailsForm'
 import { TodayPanel } from '../components/astrology/TodayPanel'
-import { Button } from '../components/Button'
+import { Button, Spinner } from '../components/Button'
 import { Card, SectionHeading } from '../components/Card'
 import { Disclosure } from '../components/Disclosure'
 import { SegmentedControl } from '../components/SegmentedControl'
@@ -185,7 +185,14 @@ export function AstrologySection() {
     return (
       <div data-rise>
         <SectionHeading>Astrology</SectionHeading>
-        <p className="type-meta" role="status">
+        {/*
+          A spinner beside the sentence, because this is what somebody sees
+          immediately after pressing Save on their birth details, and a line
+          of grey text on its own is as easily read as a result — a very
+          disappointing one — as it is as a wait.
+        */}
+        <p className="type-meta flex items-center gap-2" role="status">
+          <Spinner className="text-[0.95rem] text-[var(--rose-deep)]" />
           Working out where everything is…
         </p>
       </div>

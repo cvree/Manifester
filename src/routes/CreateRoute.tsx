@@ -114,6 +114,7 @@ export function CreateRoute() {
   const studioAvailable = useStudioAvailable()
 
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [starting, setStarting] = useState(false)
   const [showQuickStart, setShowQuickStart] = useState(false)
   const [helper, setHelper] = useState<HelperState | null>(null)
@@ -211,16 +212,28 @@ export function CreateRoute() {
     }, delay)
   }, [canStart, navigate, prime, reducedMotion, start, starting])
 
+  /*
+   * Writing to the device is usually instant and occasionally is not — a long
+   * loop, a busy phone, a browser that has decided to think about its storage
+   * quota. `saving` covers the difference so the button is never silent, and
+   * it guards a second press from writing the same loop twice.
+   */
   const handleSave = useCallback(async () => {
-    const existing = draft.id ? loops.find((loop) => loop.id === draft.id) : null
-    const loop = draftToLoop(draft, existing)
-    await saveLoop(loop)
-    updateDraft({ id: loop.id, title: loop.title })
-    cue('save')
-    recordEngagement()
-    setSaved(true)
-    window.setTimeout(() => setSaved(false), 2200)
-  }, [draft, loops, saveLoop, updateDraft])
+    if (saving) return
+    setSaving(true)
+    try {
+      const existing = draft.id ? loops.find((loop) => loop.id === draft.id) : null
+      const loop = draftToLoop(draft, existing)
+      await saveLoop(loop)
+      updateDraft({ id: loop.id, title: loop.title })
+      cue('save')
+      recordEngagement()
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 2200)
+    } finally {
+      setSaving(false)
+    }
+  }, [draft, loops, saveLoop, saving, updateDraft])
 
   const appendStarter = (phrase: string) => {
     cue('select')
@@ -444,6 +457,7 @@ export function CreateRoute() {
                   size="sm"
                   className="w-full sm:w-auto"
                   loading={busy === 'add'}
+                  loadingLabel="Writing…"
                   disabled={busy != null}
                   onClick={() =>
                     void runHelper(
@@ -455,12 +469,13 @@ export function CreateRoute() {
                   }
                   leading={<PlusIcon className="text-[0.95rem]" />}
                 >
-                  {busy === 'add' ? 'Writing…' : 'Add to my words'}
+                  Add to my words
                 </Button>
                 <Button
                   size="sm"
                   className="w-full sm:w-auto"
                   loading={busy === 'improve'}
+                  loadingLabel="Reshaping…"
                   disabled={!canStart || busy != null}
                   onClick={() =>
                     void runHelper(
@@ -471,7 +486,7 @@ export function CreateRoute() {
                   }
                   leading={<SparkIcon className="text-[0.95rem]" />}
                 >
-                  {busy === 'improve' ? 'Reshaping…' : 'Improve my words'}
+                  Improve my words
                 </Button>
               </div>
               {/* Undo belongs beside the sentence describing what to undo. */}
@@ -579,7 +594,7 @@ export function CreateRoute() {
             timer={timerSummary(draft.settings.timerMinutes)}
             delay={delaySummary(draft.settings.repeatPauseSeconds)}
             sceneKey={sceneKey}
-            previewing={previewState === 'playing'}
+            previewState={previewState}
             canPreview={speechSupported}
             onPreview={() => previewVoice(undefined, lines[0])}
             onStopPreview={stopPreview}
@@ -588,6 +603,7 @@ export function CreateRoute() {
             starting={starting}
             onSave={() => void handleSave()}
             saved={saved}
+            saving={saving}
             onOpenSetting={openSetting}
           />
         </div>
@@ -627,16 +643,25 @@ export function CreateRoute() {
               size="xl"
               className="grow"
               loading={starting}
+              loadingLabel="Beginning…"
               onClick={handleStart}
-              leading={!starting && <PlayIcon className="text-[0.9rem]" />}
+              leading={<PlayIcon className="text-[0.9rem]" />}
             >
-              {starting ? 'Beginning…' : 'Start loop'}
+              Start loop
             </Button>
             <Button
               variant="secondary"
               size="xl"
+              loading={saving}
+              loadingLabel="Saving…"
               onClick={() => void handleSave()}
-              aria-label={saved ? 'Saved to your library' : 'Save this loop'}
+              aria-label={
+                saving
+                  ? 'Saving this loop'
+                  : saved
+                    ? 'Saved to your library'
+                    : 'Save this loop'
+              }
               leading={
                 saved ? (
                   <CheckIcon className="text-[0.95rem]" />

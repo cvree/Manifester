@@ -368,10 +368,11 @@ function SetupForm({
           block={!testing}
           className={testing ? 'grow' : undefined}
           loading={testing}
+          loadingLabel="Checking the key…"
           disabled={!key || blocked}
           onClick={() => void connect()}
         >
-          {testing ? 'Checking the key…' : 'Connect'}
+          Connect
         </Button>
         {testing && (
           <Button size="lg" variant="ghost" onClick={() => abort.current?.()}>
@@ -537,8 +538,13 @@ function ConnectedState({
       </p>
 
       <div className="flex flex-wrap gap-2">
-        <Button size="md" loading={testing} onClick={() => void test()}>
-          {testing ? 'Testing…' : 'Test connection'}
+        <Button
+          size="md"
+          loading={testing}
+          loadingLabel="Testing the connection…"
+          onClick={() => void test()}
+        >
+          Test connection
         </Button>
         {testing ? (
           <Button size="md" variant="ghost" onClick={() => abort.current?.()}>

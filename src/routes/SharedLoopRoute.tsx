@@ -83,6 +83,7 @@ export function SharedLoopRoute() {
             variant="secondary"
             size="lg"
             loading={saving}
+            loadingLabel="Saving to your library…"
             onClick={() => void saveAndUse()}
             leading={<SeedIcon />}
           >

@@ -5,7 +5,7 @@ import { VOICE_PROFILES, voiceForStyle } from '../../lib/tts'
 import { useTTSStatus } from '../../lib/tts/useTTSStatus'
 import type { LoopSettings } from '../../lib/types'
 import { useSession } from '../../state/SessionProvider'
-import { Button } from '../Button'
+import { Button, Spinner } from '../Button'
 import { DeviceVoicePicker } from '../DeviceVoicePicker'
 import { BreathIcon, ClockIcon, VoiceIcon, WaveIcon } from '../Icons'
 import { StudioVoicePanel } from '../StudioVoicePanel'
@@ -114,6 +114,9 @@ export function RitualStep({
             “{line}”
           </span>
           <span className="type-meta mt-2 inline-flex items-center gap-1.5">
+            {audition.loading === line && (
+              <Spinner className="text-[0.85rem] text-[var(--rose-deep)]" />
+            )}
             {audition.speaking === line
               ? 'Playing'
               : audition.loading === line
@@ -220,13 +223,14 @@ export function RitualStep({
           block
           className="mt-4"
           loading={beginning}
+          loadingLabel="Beginning…"
           onClick={() => {
             cue('start')
             audition.stop()
             onBegin()
           }}
         >
-          {beginning ? 'Beginning…' : 'Begin my first loop'}
+          Begin my first loop
         </Button>
 
         <p className="type-meta mt-2.5">Stop whenever you like.</p>

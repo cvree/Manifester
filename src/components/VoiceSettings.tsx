@@ -3,10 +3,11 @@ import { cx } from '../lib/cx'
 import { MAX_VOICE_VOLUME } from '../lib/speech'
 import { STUDIO_PITCH, VOICE_PROFILES, clampStudioPitch, voiceForStyle } from '../lib/tts'
 import { useStudioAvailable, useTTSStatus } from '../lib/tts/useTTSStatus'
-import type { LoopSettings } from '../lib/types'
+import type { LoopSettings, PreviewState } from '../lib/types'
 import { contentLanguage, voiceSpeaks } from '../lib/voiceLanguage'
 import type { RankedVoice, VoiceTier } from '../lib/voiceRanking'
 import { BetterVoicesPanel } from './BetterVoicesPanel'
+import { BusyStrip, Spinner } from './Button'
 import { FieldLabel } from './Card'
 import { StudioVoicePanel } from './StudioVoicePanel'
 import { Disclosure } from './Disclosure'
@@ -20,7 +21,7 @@ interface VoiceSettingsProps {
   settings: LoopSettings
   onChange: (patch: Partial<LoopSettings>) => void
   onPreview: (style?: 'feminine' | 'masculine') => void
-  previewState: 'idle' | 'loading' | 'playing'
+  previewState: PreviewState
 }
 
 const TIER_BADGE: Record<VoiceTier, { label: string; tone: string }> = {
@@ -160,14 +161,41 @@ export function VoiceSettings({
           })}
         </div>
 
+        {/*
+          Three states, three sentences. The middle one is the whole reason
+          this is not a boolean: a studio voice that is not already on the
+          device is synthesised on the spot, and until this said so out loud
+          the button spent that second looking exactly like a button that had
+          not registered the press.
+        */}
         <button
           type="button"
           onClick={() => onPreview()}
           disabled={previewState !== 'idle'}
-          className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-pill border border-[var(--border)] px-4 text-[0.92rem] font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-60"
+          aria-busy={previewState === 'loading' || undefined}
+          className={cx(
+            'interactive relative mt-3 inline-flex min-h-11 items-center gap-2 rounded-pill border px-4 text-[0.92rem] font-medium transition-colors',
+            // Only the *playing* state is a genuinely unpressable button;
+            // the busy one keeps its full weight. The utility has to be held
+            // back rather than overridden — utilities outrank the components
+            // layer whatever their specificity. See `.busy-strip`.
+            previewState !== 'loading' && 'disabled:opacity-60',
+            previewState === 'loading'
+              ? 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]'
+              : 'border-[var(--border)] text-ink-muted hover:text-ink',
+          )}
         >
-          <PlayIcon className="text-[0.8rem]" />
-          {previewState === 'playing' ? 'Listening…' : 'Hear this voice'}
+          {previewState === 'loading' ? (
+            <Spinner className="text-[0.8rem]" />
+          ) : (
+            <PlayIcon className="text-[0.8rem]" />
+          )}
+          {previewState === 'loading'
+            ? 'Getting the voice ready…'
+            : previewState === 'playing'
+              ? 'Listening…'
+              : 'Hear this voice'}
+          {previewState === 'loading' && <BusyStrip />}
         </button>
 
         <p className="mt-2.5 text-[0.82rem] leading-snug text-ink-faint">
