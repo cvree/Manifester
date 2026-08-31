@@ -128,6 +128,57 @@ describe('the daily horoscope', () => {
     }
   })
 
+  it('gives the day a horizon without spending tomorrow', () => {
+    for (let day = 0; day < 20; day += 1) {
+      const at = new Date(Date.UTC(2026, 6, 1 + day, 9, 0))
+      const horoscope = horoscopeOf(natal(), LISBON, at)
+      const next = horoscopeOf(natal(), LISBON, new Date(at.getTime() + 86_400_000))
+
+      // The claim it makes about tomorrow is the reading tomorrow will make.
+      expect(horoscope.tomorrow.moonSign).toBe(
+        next.sky.placements.find((placement) => placement.body === 'moon')!.sign.name,
+      )
+      expect(horoscope.tomorrow.word).toBe(next.reading.weatherWord)
+      expect(horoscope.tomorrow.line).toContain(horoscope.tomorrow.moonSign)
+      // One line and no more: printing tomorrow's reading a day early would
+      // teach people that the morning visit is optional.
+      expect(horoscope.tomorrow.line.length).toBeLessThan(260)
+    }
+  })
+
+  it('shows its working, and the working matches the sky it used', () => {
+    const horoscope = horoscopeOf(natal(), LISBON, new Date('2026-04-02T09:00:00Z'))
+    const labels = horoscope.workings.map((row) => row.label)
+    expect(labels).toContain('Moon')
+    expect(labels).toContain('Sun')
+    expect(labels).toContain('Phase')
+    expect(labels).toContain('Read from')
+
+    const moon = horoscope.workings.find((row) => row.label === 'Moon')!
+    expect(moon.value).toContain('°')
+    expect(moon.value).toContain('a day')
+    expect(
+      horoscope.workings.find((row) => row.label === 'Phase')!.value,
+    ).toContain(horoscope.sky.phase.name)
+  })
+
+  it('only claims a void stretch that ends where the Moon changes sign', () => {
+    for (let day = 0; day < 30; day += 1) {
+      const horoscope = horoscopeOf(
+        natal(),
+        LISBON,
+        new Date(Date.UTC(2026, 4, 1 + day, 9, 0)),
+      )
+      if (!horoscope.quiet) continue
+      expect(horoscope.quiet.from.getTime()).toBeLessThan(horoscope.quiet.to.getTime())
+      expect(horoscope.quiet.hours).toBeGreaterThan(1 / 3)
+      expect(horoscope.quiet.into.name).not.toBe(
+        horoscope.sky.placements.find((placement) => placement.body === 'moon')!.sign
+          .name,
+      )
+    }
+  })
+
   it('hands the share sheet something worth pasting', () => {
     const horoscope = horoscopeOf(natal(), LISBON, new Date('2026-04-02T09:00:00Z'))
     expect(horoscope.shareText).toContain(horoscope.reading.affirmation)

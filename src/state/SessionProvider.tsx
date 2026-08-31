@@ -215,6 +215,21 @@ const EMPTY_SESSION: SessionSnapshot = {
   breathOnly: false,
 }
 
+/**
+ * A blank loop.
+ *
+ * Silent to begin with, which is a deliberate reversal. A bed of ambience
+ * under the first thing somebody ever hears sounds generous and is not: it
+ * covers the voice they are still deciding whether they trust, it makes the
+ * one control that answers back — pressing a sound and hearing it — look like
+ * a thing that was already decided for them, and it is the setting most likely
+ * to be wrong for somebody putting an earbud in on a train. Silence is the
+ * honest default and every sound is one tap away from it, in the welcome flow
+ * and in Sounds.
+ *
+ * `trackId` is kept rather than cleared, so the moment somebody turns sound
+ * on they land on Moon Garden instead of on an empty player.
+ */
 function newDraft(): Draft {
   return {
     id: null,
@@ -222,7 +237,7 @@ function newDraft(): Draft {
     text: '',
     settings: {
       ...DEFAULT_SETTINGS,
-      sound: { ...DEFAULT_SETTINGS.sound },
+      sound: { ...DEFAULT_SETTINGS.sound, mode: 'off' },
       brainwave: { ...DEFAULT_SETTINGS.brainwave },
     },
   }

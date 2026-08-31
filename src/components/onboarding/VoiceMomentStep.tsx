@@ -84,7 +84,8 @@ export function VoiceMomentStep({
   // Memoised because it is an effect dependency: a fresh array on every render
   // would re-warm four clips every time somebody typed a character.
   const starters = useMemo(() => blendStarters(focuses), [focuses])
-  const recommended = focuses.length > 0 ? recommendedFor(focuses[0]) : starters[0]
+  /* The line the list opens on, and which arrives pre-selected. */
+  const leadLine = focuses.length > 0 ? recommendedFor(focuses[0]) : starters[0]
   const [note, setNote] = useState<string | null>(null)
   const status = useTTSStatus()
   const { warm, play } = audition
@@ -217,7 +218,7 @@ export function VoiceMomentStep({
           <ul className="mt-5 space-y-1.5 [@media(max-height:720px)]:mt-3">
             {starters.map((line) => {
               const selected = value.trim() === line
-              const isRecommended = line === recommended
+              const isFirstOffered = line === leadLine
               const playing = audition.speaking === line
               const preparing = audition.loading === line
               return (
@@ -232,9 +233,17 @@ export function VoiceMomentStep({
                       'transition-[background-color,border-color,box-shadow] duration-300 ease-[var(--ease-calm)]',
                       selected
                         ? 'border-[var(--rose)] bg-[var(--rose-soft)]'
-                        : isRecommended
-                          ? // Elevated, never forced: a warmer surface and a
-                            // quiet label, and every other line is one tap away.
+                        : isFirstOffered
+                          ? /*
+                             * The line that arrives pre-selected keeps a
+                             * slightly warmer surface, and nothing else. It
+                             * used to carry the word "Recommended" under it,
+                             * which was the app grading somebody's intent
+                             * before they had said a word — and a person who
+                             * then picks the third line has been told, by
+                             * their own app, that they chose the worse one.
+                             * The elevation is enough to say "start here".
+                             */
                             'border-[var(--border-strong)] bg-[var(--surface-strong)] shadow-[0_8px_24px_-18px_var(--glow)] hover:border-[var(--rose)]'
                           : 'border-[var(--border)] bg-[var(--surface-sunken)] hover:border-[var(--border-strong)]',
                     )}
@@ -254,18 +263,6 @@ export function VoiceMomentStep({
                       <span className="block text-[0.96rem] leading-snug text-ink">
                         {line}
                       </span>
-                      {/*
-                        Shown whether or not it is selected. It arrives
-                        pre-selected, so hiding the label on selection would
-                        mean the recommendation is never actually legible as
-                        one — the elevation would read as "this happens to be
-                        first" rather than "we think this is the one".
-                      */}
-                      {isRecommended && (
-                        <span className="type-label mt-0.5 block text-[0.62rem] text-ink-faint">
-                          Recommended
-                        </span>
-                      )}
                     </span>
                     {/*
                       The line has been tapped and the voice is being made

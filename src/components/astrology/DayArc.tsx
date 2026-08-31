@@ -1,5 +1,14 @@
-import type { HourBand, PowerWindow } from '../../lib/astrology/horoscope'
+import {
+  whenPhrase,
+  type HourBand,
+  type PowerWindow,
+} from '../../lib/astrology/horoscope'
+import type { VoidMoon } from '../../lib/astrology/voidmoon'
+import { downloadWindow } from '../../lib/calendar'
 import { cx } from '../../lib/cx'
+import { cue } from '../../lib/feedback'
+import { Button } from '../Button'
+import { ClockIcon } from '../Icons'
 
 /**
  * The shape of the day, in six stretches.
@@ -17,6 +26,8 @@ import { cx } from '../../lib/cx'
 interface DayArcProps {
   hours: HourBand[]
   power: PowerWindow | null
+  /** The stretch with nothing left in it, when today has one. */
+  quiet?: VoidMoon | null
   /** Used to mark the stretch the clock is currently in. */
   now?: Date
 }
@@ -27,7 +38,24 @@ function time(at: Date): string {
   return at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
-export function DayArc({ hours, power, now = new Date() }: DayArcProps) {
+/**
+ * A length of time, said the way somebody would say it.
+ *
+ * Minutes matter for a short stretch and are noise in a long one — "29 hours
+ * and 4 minutes" is a spreadsheet reading a clock — so they are dropped past
+ * six hours and the number becomes an "about".
+ */
+function span(hours: number): string {
+  if (hours >= 6) return `about ${Math.round(hours)} hours`
+  const whole = Math.floor(hours)
+  const minutes = Math.round((hours - whole) * 60)
+  if (whole === 0) return `${minutes} minutes`
+  return `${whole} ${whole === 1 ? 'hour' : 'hours'}${
+    minutes > 0 ? ` and ${minutes} minutes` : ''
+  }`
+}
+
+export function DayArc({ hours, power, quiet, now = new Date() }: DayArcProps) {
   const current = hours.find((band) => now >= band.from && now <= band.to)
 
   return (
@@ -92,6 +120,31 @@ export function DayArc({ hours, power, now = new Date() }: DayArcProps) {
         })}
       </ul>
 
+      {/*
+        The void stretch.
+
+        Placed under the bars rather than inside them because it cuts across
+        them — it starts and ends at real minutes, not at the edges of a
+        three-hour band — and because it is the one line here that is genuine
+        classical astrology rather than this app's own reading of a chart. It
+        says what it is, and it does not tell anybody not to do something.
+      */}
+      {quiet && (
+        <div className="rounded-[1.15rem] border border-[var(--border-strong)] bg-[var(--surface-sunken)] px-4 py-3">
+          <p className="type-label text-ink">
+            Nothing left on the clock · {whenPhrase(quiet.from, now)}–
+            {whenPhrase(quiet.to, now)}
+          </p>
+          <p className="type-meta mt-1 text-ink-muted">
+            After {quiet.after}, the Moon makes no further contact with anything
+            for {span(quiet.hours)}, until it moves into {quiet.into.name}. This is
+            the void of course — traditionally a stretch that suits finishing,
+            tidying and resting far better than launching something you want to
+            travel.
+          </p>
+        </div>
+      )}
+
       {power ? (
         <div className="rounded-[1.15rem] border border-[color-mix(in_oklab,var(--sage)_40%,transparent)] bg-[var(--sage-soft)] px-4 py-3">
           <p className="type-label text-ink">
@@ -100,6 +153,27 @@ export function DayArc({ hours, power, now = new Date() }: DayArcProps) {
           <p className="type-meta mt-1 text-ink-muted">
             {power.what}. {power.why}
           </p>
+          {/*
+            The one control on this screen that puts something in a person's
+            actual day. A window worked out to the minute is worth nothing if
+            it stays on a page somebody read at breakfast.
+          */}
+          <Button
+            size="sm"
+            className="mt-2.5"
+            leading={<ClockIcon className="text-[0.85rem]" />}
+            onClick={() => {
+              cue('tap')
+              downloadWindow({
+                title: 'The open window',
+                description: `${power.what}. ${power.why}`,
+                from: power.from,
+                to: power.to,
+              })
+            }}
+          >
+            Put it in my calendar
+          </Button>
         </div>
       ) : (
         <p className="type-meta">

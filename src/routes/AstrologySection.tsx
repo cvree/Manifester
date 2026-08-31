@@ -111,7 +111,13 @@ export function AstrologySection() {
                   <li>
                     <span className="text-ink">A daily horoscope</span> that is
                     genuinely different tomorrow — the shape of the day, four
-                    areas of a life, and which hours are the open ones.
+                    areas of a life, which hours are the open ones, and the
+                    stretch where the Moon has nothing left to say.
+                  </li>
+                  <li>
+                    <span className="text-ink">A paragraph to say</span>, written
+                    from today&rsquo;s sky and yours, that goes straight into the
+                    player in the voice you chose.
                   </li>
                   <li>
                     <span className="text-ink">A portrait</span> of your whole

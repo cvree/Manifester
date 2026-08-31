@@ -48,18 +48,80 @@ export function createCalendarEvent(
   ].join('\r\n')
 }
 
+/**
+ * Any stretch of a day, as a calendar event.
+ *
+ * The daily reading works out an open window to the minute — "the easiest
+ * contact of the day is exact between ten past two and three" — and a fact
+ * like that is worth nothing sitting on a screen somebody read at breakfast.
+ * Getting it into the calendar they actually plan from is the difference
+ * between a horoscope and a tool, and it is eleven lines of iCalendar.
+ *
+ * No alarm on this one, unlike a loop reminder. A window is a suggestion about
+ * when to have a conversation; being buzzed at by a planet is not the
+ * relationship this app wants with anybody.
+ */
+export function createWindowEvent(event: {
+  title: string
+  description: string
+  from: Date
+  to: Date
+}): string {
+  if (!Number.isFinite(event.from.getTime()) || !Number.isFinite(event.to.getTime())) {
+    throw new Error('That window has no time on it.')
+  }
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Manifester//Sky//EN',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${escapeIcs(`sky-${event.from.getTime()}@manifester.local`)}`,
+    `DTSTAMP:${formatUtc(new Date())}`,
+    `DTSTART:${formatUtc(event.from)}`,
+    `DTEND:${formatUtc(event.to)}`,
+    `SUMMARY:${escapeIcs(event.title)}`,
+    `DESCRIPTION:${escapeIcs(event.description)}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+    '',
+  ].join('\r\n')
+}
+
+/** The same, handed to whatever the device opens `.ics` files with. */
+export function downloadWindow(event: {
+  title: string
+  description: string
+  from: Date
+  to: Date
+}): void {
+  offerFile(createWindowEvent(event), `${slug(event.title)}.ics`)
+}
+
 export function downloadCalendarReminder(loop: SavedLoop, startsAt: Date): void {
-  const blob = new Blob([createCalendarEvent(loop, startsAt)], {
-    type: 'text/calendar;charset=utf-8',
-  })
+  offerFile(createCalendarEvent(loop, startsAt), calendarFilename(loop.title))
+}
+
+function offerFile(body: string, filename: string): void {
+  const blob = new Blob([body], { type: 'text/calendar;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = calendarFilename(loop.title)
+  link.download = filename
   document.body.appendChild(link)
   link.click()
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+function slug(title: string): string {
+  return (
+    title
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'manifester'
+  )
 }
 
 function formatUtc(date: Date): string {

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import type { Horoscope } from '../../lib/astrology/horoscope'
+import { whenPhrase, type Horoscope } from '../../lib/astrology/horoscope'
 import { drawCard, DECK_SIZE, type Card as OracleCard } from '../../lib/astrology/oracle'
 import { placementOf } from '../../lib/astrology/chart'
 import { textGlyph } from '../../lib/astrology/signs'
@@ -10,7 +10,8 @@ import { shareText } from '../../lib/share'
 import { useSession } from '../../state/SessionProvider'
 import { Button } from '../Button'
 import { Card, SectionHeading } from '../Card'
-import { CopyIcon, PlayIcon, SparkIcon, StarIcon } from '../Icons'
+import { Disclosure } from '../Disclosure'
+import { CopyIcon, MoonIcon, PlayIcon, SparkIcon, StarIcon } from '../Icons'
 import { DayArc } from './DayArc'
 import { Meters } from './Meters'
 import { MoonDisc } from './MoonDisc'
@@ -33,13 +34,34 @@ import { MoonDisc } from './MoonDisc'
  *
  * Because the reading is a doorway and not a destination. Every visit that
  * ends in a session is the feature doing its job; every visit that ends in a
- * paragraph is a horoscope app wearing this one's clothes. So the line and the
- * button are above the fold on a phone, and everything below them is optional
- * by design.
+ * paragraph is a horoscope app wearing this one's clothes. So the passage and
+ * the button are above the fold on a phone, and everything below them is
+ * optional by design.
+ *
+ * ── Why the card offers a paragraph and a line ──────────────────────────────
+ *
+ * The paragraph is what the day is actually worth — six or seven sentences
+ * assembled out of the same arithmetic as the rest of the screen, running
+ * about a minute a pass, so the second pass lands differently from the first.
+ * The single line underneath it is for the mornings that have four minutes in
+ * them. Both are on the same card, and neither is described as the lesser one.
  */
 
 interface TodayPanelProps {
   horoscope: Horoscope
+}
+
+/**
+ * How long a pass takes, rounded to something a person would say.
+ *
+ * "About 47 seconds" is a machine talking. The estimate is worth showing —
+ * somebody deciding between the paragraph and the one line wants to know what
+ * they are agreeing to — and it is not worth pretending it is precise.
+ */
+function aboutSeconds(seconds: number): string {
+  if (seconds < 55) return `${Math.round(seconds / 5) * 5} seconds`
+  if (seconds < 80) return 'a minute'
+  return `${Math.round(seconds / 30) / 2} minutes`
 }
 
 export function TodayPanel({ horoscope }: TodayPanelProps) {
@@ -48,10 +70,16 @@ export function TodayPanel({ horoscope }: TodayPanelProps) {
   const [card, setCard] = useState<OracleCard | null>(null)
   const [copied, setCopied] = useState(false)
 
-  const { reading, sky } = horoscope
+  const { reading, sky, passage } = horoscope
   const moon = placementOf(sky, 'moon')
 
   const today = new Date(`${reading.day}T12:00:00`)
+
+  /** What a session started from this screen is called in the library. */
+  const dayTitle = `${reading.focus.label} · ${today.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  })}`
 
   /** Start a session on a line, from wherever on this page it was pressed. */
   const loop = (text: string, title: string) => {
@@ -121,11 +149,7 @@ export function TodayPanel({ horoscope }: TodayPanelProps) {
           {reading.ingress && (
             <p className="type-meta mt-2">
               The Moon crosses into {reading.ingress.sign.name} at{' '}
-              {reading.ingress.at.toLocaleTimeString(undefined, {
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-              , and the mood turns with it.
+              {whenPhrase(reading.ingress.at, today)}, and the mood turns with it.
             </p>
           )}
         </div>
@@ -150,23 +174,29 @@ export function TodayPanel({ horoscope }: TodayPanelProps) {
         </p>
         <p className="type-meta mt-1">Because {reading.focusReason}.</p>
 
-        <p className="font-display mt-3 text-[1.5rem] leading-snug text-balance text-ink">
-          &ldquo;{reading.affirmation}&rdquo;
+        {/*
+          The passage, whole.
+
+          Set at a reading size rather than a headline one: this is six or
+          seven sentences and the display face at 1.5rem, which was right for a
+          single line, turns a paragraph into a poster. The first sentence is
+          the library line the reading chose, so the eye still lands on
+          something quotable in the first half second.
+        */}
+        <p className="font-display mt-3 max-w-[54ch] text-[1.12rem] leading-relaxed text-ink">
+          &ldquo;{passage.text}&rdquo;
+        </p>
+
+        <p className="type-meta mt-2.5">
+          {passage.sentences.length} sentences, about {aboutSeconds(passage.seconds)}{' '}
+          a pass. {passage.why}
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
             variant="primary"
             size="lg"
-            onClick={() =>
-              loop(
-                reading.affirmation,
-                `${reading.focus.label} · ${today.toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                })}`,
-              )
-            }
+            onClick={() => loop(passage.text, dayTitle)}
             leading={<PlayIcon className="text-[0.85rem]" />}
           >
             Loop this now
@@ -175,7 +205,7 @@ export function TodayPanel({ horoscope }: TodayPanelProps) {
             size="lg"
             onClick={() => {
               cue('tap')
-              updateDraft({ text: reading.affirmation })
+              updateDraft({ text: passage.text, title: dayTitle })
               navigate('/create')
             }}
           >
@@ -183,8 +213,17 @@ export function TodayPanel({ horoscope }: TodayPanelProps) {
           </Button>
         </div>
 
+        {/*
+          The short way out.
+
+          A paragraph is the right default and it is not right for everybody
+          on every morning — somebody with four minutes wants one sentence,
+          repeated. Both are on the same card, and the short one is written
+          from today's sky rather than taken from the library, so choosing it
+          is not choosing less of the day.
+        */}
         <div className="mt-4 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3">
-          <p className="type-label">Written from today&rsquo;s sky</p>
+          <p className="type-label">Or one line, written from today&rsquo;s sky</p>
           <p className="font-display mt-1 text-[1.1rem] leading-snug text-ink">
             &ldquo;{horoscope.skyLine}&rdquo;
           </p>
@@ -193,7 +232,7 @@ export function TodayPanel({ horoscope }: TodayPanelProps) {
             onClick={() => loop(horoscope.skyLine, `Sky line · ${reading.day}`)}
             className="interactive mt-1.5 min-h-11 rounded-pill text-[0.86rem] text-ink-muted underline decoration-[var(--border-strong)] underline-offset-4 hover:text-ink"
           >
-            Loop this one instead
+            Loop the line instead
           </button>
         </div>
       </Card>
@@ -263,7 +302,11 @@ export function TodayPanel({ horoscope }: TodayPanelProps) {
         title="The hours"
         description="The Moon moves half a degree an hour, so the stretches of a day genuinely differ. This is where its contacts to your chart fall."
       >
-        <DayArc hours={horoscope.hours} power={horoscope.power} />
+        <DayArc
+          hours={horoscope.hours}
+          power={horoscope.power}
+          quiet={horoscope.quiet}
+        />
       </Card>
 
       {/* ── The three contacts ── */}
@@ -323,6 +366,24 @@ export function TodayPanel({ horoscope }: TodayPanelProps) {
         </div>
       </div>
 
+      {/* ── The horizon ── */}
+
+      <Card data-rise level="quiet">
+        <p className="type-label flex items-center gap-1.5">
+          <MoonIcon aria-hidden="true" className="text-[0.9rem]" />
+          Tomorrow, briefly
+        </p>
+        <p className="type-body mt-1.5 max-w-[62ch]">{horoscope.tomorrow.line}</p>
+        {/*
+          One line and no further. The whole reading exists for tomorrow as
+          well, and printing it a day early would teach people that the
+          morning visit is optional.
+        */}
+        <p className="type-meta mt-2">
+          The rest of it is worked out fresh in the morning.
+        </p>
+      </Card>
+
       {/* ── The one part that is a shuffle ── */}
 
       <Card data-rise className="text-center">
@@ -360,6 +421,30 @@ export function TodayPanel({ horoscope }: TodayPanelProps) {
           {card ? 'Draw another' : 'Draw a question'}
         </Button>
       </Card>
+
+      {/* ── The arithmetic, for anybody who wants to check it ── */}
+
+      <div data-rise>
+        <Disclosure
+          title="How today was worked out"
+          summary="The positions this reading is standing on"
+        >
+          <dl className="astro-rows space-y-2 text-[0.88rem] leading-relaxed">
+            {horoscope.workings.map((row) => (
+              <div key={row.label} className="flex gap-x-3 pt-2 first:pt-0">
+                <dt className="w-28 shrink-0 text-ink-faint sm:w-32">{row.label}</dt>
+                <dd className="min-w-0 grow text-ink-muted">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="type-meta mt-3">
+            Every one of these can be checked against any ephemeris in the
+            world. That is the point of showing them: this reading is
+            arithmetic you are allowed to audit, and the only part of the whole
+            screen that is a shuffle says so on its own card.
+          </p>
+        </Disclosure>
+      </div>
     </div>
   )
 }

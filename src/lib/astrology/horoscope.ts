@@ -10,7 +10,7 @@
  * what kind of day this is, where in it the good hours are, what each part of
  * a life is being asked for, and what to do about any of it.
  *
- * So this file wraps the reading and adds the four things a daily practice can
+ * So this file wraps the reading and adds the things a daily practice can
  * genuinely use:
  *
  *  1. **An overview in paragraphs**, not clauses — the shape of the day, the
@@ -28,6 +28,15 @@
  *     number is scannable and because people like them, and which are
  *     labelled, in the interface, as weather rather than fortune. They are
  *     derived from the same transits as everything else; nothing is random.
+ *  5. **A passage to say**, in `passage.ts` — six or seven sentences built
+ *     from the same day, because the reading is a doorway into a session and
+ *     one sentence pulled out of nine paragraphs throws the reading away.
+ *  6. **The void-of-course stretch**, in `voidmoon.ts` — the one classical
+ *     claim in the whole feature that is falsifiable to the minute, and the
+ *     most practical thing astrology has ever offered a person with a diary.
+ *  7. **Tomorrow in a line, and the arithmetic in a panel.** The first gives
+ *     the reading a horizon; the second means none of it has to be taken on
+ *     faith, which is an unusual thing for a horoscope to be able to say.
  *
  * ── Stability ──────────────────────────────────────────────────────────────
  *
@@ -49,11 +58,20 @@ import {
   type Where,
 } from './chart'
 import { longitudeOf, type Body } from './ephemeris'
-import { aspectBetween, BODY_PROFILES, ELEMENT_LABEL, pointName, type Element } from './signs'
+import {
+  aspectBetween,
+  BODY_PROFILES,
+  ELEMENT_LABEL,
+  formatShort,
+  pointName,
+  type Element,
+} from './signs'
 import { ASPECT_LORE, BODY_LORE, ELEMENT_CARE, phaseLore, SIGN_LORE } from './lore'
 import { ELEMENT_CLAUSE, readToday, type DailyReading } from './reading'
 import { longitudeOfPoint } from './chart'
 import type { Point } from './signs'
+import { passageOf, type Passage } from './passage'
+import { moonMotion, voidToday, type VoidMoon } from './voidmoon'
 
 /* ── Small shared helpers ────────────────────────────────────── */
 
@@ -62,6 +80,26 @@ export function noonOf(at: Date): Date {
   const noon = new Date(at)
   noon.setHours(12, 0, 0, 0)
   return noon
+}
+
+/**
+ * A time, with the day attached when the day is not this one.
+ *
+ * "The Moon crosses into Taurus at 8:03" is a true sentence about tomorrow
+ * morning roughly half the time it is printed, because the Moon takes two and
+ * a half days to cross a sign and the search that finds the crossing does not
+ * stop at midnight. Saying "at 8:03 tomorrow" costs four words and is the
+ * difference between a timing feature and a plausible-looking one.
+ */
+export function whenPhrase(at: Date, day: Date): string {
+  const clock = at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  const days = Math.round(
+    (new Date(at).setHours(0, 0, 0, 0) - new Date(day).setHours(0, 0, 0, 0)) / 86_400_000,
+  )
+  if (days === 0) return clock
+  if (days === 1) return `${clock} tomorrow`
+  if (days === -1) return `${clock} yesterday`
+  return `${clock} on ${at.toLocaleDateString(undefined, { weekday: 'long' })}`
 }
 
 function clamp(value: number, low: number, high: number): number {
@@ -646,6 +684,24 @@ function skyLineFor(reading: DailyReading, day: string, seed: number): string {
 
 /* ── The whole thing ─────────────────────────────────────────── */
 
+/** Where tomorrow differs from today, in two sentences. */
+export interface Tomorrow {
+  /** The word for tomorrow's texture. */
+  word: string
+  /** The sign the Moon is in at noon tomorrow. */
+  moonSign: string
+  /** True when the Moon changes sign between the two readings. */
+  turns: boolean
+  /** The two sentences themselves. */
+  line: string
+}
+
+/** One row of the arithmetic, for the people who want to check it. */
+export interface Working {
+  label: string
+  value: string
+}
+
 export interface Horoscope {
   /** The spine: headline, weather, highlights, focus and affirmation. */
   reading: DailyReading
@@ -656,7 +712,15 @@ export interface Horoscope {
   areas: AreaRead[]
   hours: HourBand[]
   power: PowerWindow | null
+  /** The stretch with no lunar contacts left in it, when today has one. */
+  quiet: VoidMoon | null
   dials: Dial[]
+  /** The paragraph this day hands to the player. */
+  passage: Passage
+  /** What changes overnight. */
+  tomorrow: Tomorrow
+  /** The numbers underneath all of it. */
+  workings: Working[]
   /** One thing that goes well today. */
   doThis: string
   /** One thing to stop pushing at. */
@@ -667,6 +731,126 @@ export interface Horoscope {
   skyLine: string
   /** The whole reading as plain text, for copying and sharing. */
   shareText: string
+}
+
+/* ── Tomorrow ────────────────────────────────────────────────── */
+
+/**
+ * The one line that gives the reading a horizon.
+ *
+ * A daily horoscope that only ever describes today has no reason to be opened
+ * tomorrow, which is a strange property for a daily thing to have. One
+ * sentence about what changes overnight does two jobs at once: it makes today
+ * legible by contrast — "slower than today" says more about today than another
+ * adjective would — and it leaves somebody with a reason to come back.
+ *
+ * It is deliberately two sentences and never more. The whole reading exists
+ * for tomorrow as well, and printing it a day early would only teach people
+ * that the morning visit is optional.
+ */
+function tomorrowOf(natal: Chart, where: Where | null, day: Date): Tomorrow {
+  const next = new Date(day)
+  next.setDate(next.getDate() + 1)
+
+  const reading = readToday(natal, where, noonOf(next))
+  const moon = placementOf(reading.sky, 'moon')
+  const today = placementOf(momentChart(where, day), 'moon').sign.name
+  const turns = moon.sign.name !== today
+
+  /*
+   * The mood, to its first break.
+   *
+   * Half of them are written as "clause; second clause" and half as "clause —
+   * second clause", and either second half is a whole sentence's worth of
+   * advice about a day that has not happened yet. One line about tomorrow
+   * takes the first half and stops.
+   */
+  const mood = moon.sign.mood.split(/[;—]/)[0].trim()
+
+  const shape = turns
+    ? `Tomorrow the Moon moves on into ${moon.sign.name} and the mood turns with it: ${mood}.`
+    : `Tomorrow the Moon is still in ${moon.sign.name}, so the shape of the day holds.`
+
+  const lead = `${reading.headline}, and it reads as a ${reading.weatherWord.toLowerCase()} day.`
+
+  return {
+    word: reading.weatherWord,
+    moonSign: moon.sign.name,
+    turns,
+    line: `${shape} ${lead}`,
+  }
+}
+
+/* ── The arithmetic, shown ───────────────────────────────────── */
+
+/**
+ * The numbers the whole reading is standing on.
+ *
+ * Every horoscope on the internet asks to be taken on faith, and this one does
+ * not have to: the positions are computed on the device from orbital elements
+ * and can be checked against any ephemeris in the world in about ninety
+ * seconds. Putting them on the screen is the difference between *trust me* and
+ * *here is the working*, and it costs one folded-away panel.
+ */
+function workingsOf(
+  natal: Chart,
+  sky: Chart,
+  where: Where | null,
+  all: Transit[],
+  day: Date,
+): Working[] {
+  const moon = placementOf(sky, 'moon')
+  const sun = placementOf(sky, 'sun')
+  const speed = moonMotion(sky)
+
+  const rows: Working[] = [
+    {
+      label: 'Computed for',
+      value: `Local noon, ${day.toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })}`,
+    },
+    {
+      label: 'Moon',
+      value: `${formatShort(moon.longitude)}, travelling ${speed.toFixed(2)}° a day`,
+    },
+    { label: 'Sun', value: formatShort(sun.longitude) },
+    {
+      label: 'Phase',
+      value: `${sky.phase.name}, ${(sky.phase.illumination * 100).toFixed(1)}% lit and ${
+        sky.phase.waxing ? 'waxing' : 'waning'
+      }`,
+    },
+    {
+      label: 'Your chart',
+      value: natal.precise
+        ? `${formatShort(placementOf(natal, 'sun').longitude)} Sun, houses from a known birth time`
+        : `${formatShort(placementOf(natal, 'sun').longitude)} Sun, no birth time — the Moon is approximate and there are no houses`,
+    },
+    {
+      label: 'Contacts in orb',
+      value: `${all.length} between the sky and your chart; the three strongest are shown above`,
+    },
+  ]
+
+  if (where) {
+    rows.push({
+      label: 'Read from',
+      value: `${Math.abs(where.latitude).toFixed(2)}° ${
+        where.latitude >= 0 ? 'N' : 'S'
+      }, ${Math.abs(where.longitude).toFixed(2)}° ${where.longitude >= 0 ? 'E' : 'W'}`,
+    })
+  }
+
+  rows.push({
+    label: 'Where the numbers come from',
+    value:
+      'Orbital elements evaluated on this device — no network, no account, nothing sent anywhere',
+  })
+
+  return rows
 }
 
 export function horoscopeOf(
@@ -713,9 +897,9 @@ export function horoscopeOf(
     [
       `${sky.phase.name}, ${Math.round(sky.phase.illumination * 100)}% lit. ${phase.is}`,
       reading.ingress
-        ? `The Moon crosses into ${reading.ingress.sign.name} at ${reading.ingress.at.toLocaleTimeString(
-            undefined,
-            { hour: 'numeric', minute: '2-digit' },
+        ? `The Moon crosses into ${reading.ingress.sign.name} at ${whenPhrase(
+            reading.ingress.at,
+            day,
           )}, and the mood turns with it.`
         : `The Moon stays in ${moon.sign.name} all day, so the mood holds its shape.`,
       reading.retrogrades.length > 0
@@ -733,6 +917,8 @@ export function horoscopeOf(
 
   const seed = Math.round(placementOf(natal, 'sun').longitude)
 
+  const passage = passageOf(reading, sky, natal, leading)
+
   const easeOffFrom = all.find((transit) => transit.kind.temper === 'charged')
 
   return {
@@ -742,7 +928,11 @@ export function horoscopeOf(
     areas: areasOf(natal, sky, all),
     hours: hoursOf(natal, day),
     power: powerWindowOf(natal, day),
+    quiet: voidToday(sky, day),
     dials: dialsOf(sky, all),
+    passage,
+    tomorrow: tomorrowOf(natal, where, day),
+    workings: workingsOf(natal, sky, where, all, day),
     /*
      * Deliberately not `ASPECT_LORE[...].use` — the overview paragraph above
      * already ends on that sentence, and a card repeating the paragraph two
@@ -759,12 +949,20 @@ export function horoscopeOf(
       hash(`${reading.day}:ask:${seed}`) % 3
     ],
     skyLine: skyLineFor(reading, reading.day, seed),
-    shareText: shareTextOf(reading, sky),
+    shareText: shareTextOf(reading, sky, passage),
   }
 }
 
-/** The reading as plain text, for the copy button. */
-function shareTextOf(reading: DailyReading, sky: Chart): string {
+/**
+ * The reading as plain text, for the copy button.
+ *
+ * The passage goes in last and whole. It is the part somebody is most likely
+ * to want somewhere else — pasted to a friend, kept in a notes app, read out
+ * at the end of a hard week — and a share sheet that hands over four bullet
+ * points about orbs while withholding the only paragraph written to be said
+ * aloud has the priorities of this feature exactly backwards.
+ */
+function shareTextOf(reading: DailyReading, sky: Chart, passage: Passage): string {
   const moon = placementOf(sky, 'moon')
   return [
     `${new Date(`${reading.day}T12:00:00`).toLocaleDateString(undefined, {
@@ -782,6 +980,6 @@ function shareTextOf(reading: DailyReading, sky: Chart): string {
     ...reading.highlights.map((highlight) => `· ${highlight.title} — ${highlight.body}`),
     '',
     `Today, strengthen ${reading.focus.label.toLowerCase()}.`,
-    `“${reading.affirmation}”`,
+    `“${passage.text}”`,
   ].join('\n')
 }
