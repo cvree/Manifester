@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AMBIENT_PRESETS, findAmbientPreset } from './ambient'
-import { MAX_MUSIC_VOLUME, MUSIC_MAKEUP_GAIN, buildBusGraph } from './audioBus'
+import {
+  AudioBus,
+  MAX_MUSIC_VOLUME,
+  MUSIC_MAKEUP_GAIN,
+  buildBusGraph,
+} from './audioBus'
 import { createBrainwaveGraph } from './brainwaveAudio'
 import { peakOf, render, rmsOf } from './testing/audioHarness'
 
@@ -263,5 +268,90 @@ describe('the generated-sound mix', () => {
     // And the crossfade never sums into distortion.
     expect(peakOf(channels[0])).toBeLessThanOrEqual(1)
     expect(rmsOf(channels[0])).toBeGreaterThan(0.001)
+  })
+})
+
+/*
+ * The media route, which is a different thing from the mix.
+ *
+ * On iOS this app keeps a silent track playing so its Web Audio is not muted
+ * by the hardware silent switch — and a playing media element is a lock-screen
+ * widget, whether or not anybody wanted one. So "let the route go" is real,
+ * visible behaviour, and it has two opposite ways of going wrong: letting go
+ * while the soundtrack is still playing, which mutes the music on a silenced
+ * phone; and asking to let go a moment too early, being told no, and leaving a
+ * widget sitting on the lock screen over silence for the rest of the day.
+ *
+ * `audioSession` is stubbed here because the thing worth asserting is *when*
+ * the route is released, and the module that actually releases it needs a
+ * document and an iPhone. Nothing above this point imports it — `buildBusGraph`
+ * is arithmetic — so the stub is invisible to the rest of the file.
+ */
+vi.mock('./audioSession', () => ({
+  claimPlaybackSession: () => undefined,
+  claimMediaChannel: () => undefined,
+  releaseMediaChannel: () => released(),
+  keepAwake: () => () => undefined,
+  wake: () => undefined,
+}))
+
+const released = vi.fn()
+
+describe('standing down from the media route', () => {
+  beforeEach(() => {
+    released.mockClear()
+  })
+
+  it('lets the route go when nothing else is using it', () => {
+    const bus = new AudioBus()
+    bus.standDown()
+    expect(released).toHaveBeenCalledOnce()
+  })
+
+  /*
+   * The music is on its own branch and nobody asked it to stop. Taking the
+   * route away from it would leave it playing where a silenced phone cannot
+   * hear it — the exact thing the silent track exists to prevent.
+   */
+  it('will not take the route from the soundtrack', () => {
+    const bus = new AudioBus()
+    bus.hold('soundtrack')
+    bus.standDown()
+    expect(released).not.toHaveBeenCalled()
+  })
+
+  /*
+   * And a request made too early is remembered rather than dropped. Turning
+   * the music off starts a fade and only lets go of the hold a second later,
+   * so the stand-down asked for on the press *always* arrives first.
+   */
+  it('remembers a request that arrived while the music was still fading', () => {
+    const bus = new AudioBus()
+    bus.hold('soundtrack')
+    bus.standDown()
+    expect(released).not.toHaveBeenCalled()
+
+    bus.releaseHold('soundtrack')
+    expect(released).toHaveBeenCalledOnce()
+  })
+
+  /* Something wanting the room again cancels a stand-down that never landed. */
+  it('forgets the request once something wants the room again', () => {
+    const bus = new AudioBus()
+    bus.hold('soundtrack')
+    bus.standDown()
+    bus.hold('soundtrack')
+    bus.releaseHold('soundtrack')
+    expect(released).not.toHaveBeenCalled()
+  })
+
+  it('answers one request once, however often the holder comes and goes', () => {
+    const bus = new AudioBus()
+    bus.hold('soundtrack')
+    bus.standDown()
+    bus.releaseHold('soundtrack')
+    bus.hold('soundtrack')
+    bus.releaseHold('soundtrack')
+    expect(released).toHaveBeenCalledOnce()
   })
 })

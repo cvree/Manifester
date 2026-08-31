@@ -176,6 +176,18 @@ export class AudioBus {
   private holds = new Set<string>()
   /** True while `master` is being held down by a park rather than by a start. */
   private parkedQuietly = false
+  /**
+   * True while the app has asked for the media route back and something was
+   * still using it.
+   *
+   * A stand-down is not always answerable when it is asked. Turning the music
+   * off starts an eight-hundred-millisecond fade and only lets go of its hold
+   * a second after that — so a stand-down that ran on the press would find a
+   * hold still in place, decline, and leave an iPhone holding a lock-screen
+   * widget over silence for ever. Remembering the request means the answer
+   * arrives when the last holder actually lets go.
+   */
+  private standingDown = false
 
   get context(): AudioContext | null {
     return this.ctx
@@ -231,6 +243,8 @@ export class AudioBus {
      */
     claimPlaybackSession()
     claimMediaChannel()
+    // Whatever was being stood down from, the app wants the room again.
+    this.standingDown = false
 
     if (!this.ctx) {
       const Ctor =
@@ -349,6 +363,7 @@ export class AudioBus {
    */
   hold(id: string): void {
     this.holds.add(id)
+    this.standingDown = false
     if (!this.parked) return
     // The session parked while this was silent, so the clock is stopped and
     // the mix is down. Bring the clock back and leave the mix where it is.
@@ -360,10 +375,42 @@ export class AudioBus {
 
   releaseHold(id: string): void {
     if (!this.holds.delete(id)) return
-    if (!this.parked || this.holds.size > 0) return
+    if (this.holds.size > 0) return
+    // A stand-down that was asked for while this was still fading out has been
+    // waiting for exactly this moment.
+    this.settleStandDown()
+    if (!this.parked) return
     // The last thing that wanted the room has stopped, and the session it was
     // playing over is still paused. Park properly.
     this.suspend()
+  }
+
+  /**
+   * Let the media route go, without touching the clock.
+   *
+   * The route is claimed by `ensure()`, and `ensure()` is reached by things
+   * far smaller than a session: auditioning a voice opens the audio hardware
+   * exactly the way pressing play does. On iOS that starts the silent track,
+   * and the silent track is what puts a widget on the lock screen — so
+   * previewing one line and then putting the phone down used to leave a media
+   * widget sitting there for the rest of the day, over nothing.
+   *
+   * `suspend()` would be too much: the context is wanted, and freezing it
+   * would stop a preview that is still finishing. This is only the route, and
+   * only when nothing outside the session — the soundtrack — still needs it.
+   * If something does, the request is remembered rather than dropped, and
+   * answered the moment the last holder lets go.
+   */
+  standDown(): void {
+    this.standingDown = true
+    this.settleStandDown()
+  }
+
+  /** Answer a pending stand-down, if nothing is holding the route any more. */
+  private settleStandDown(): void {
+    if (!this.standingDown || this.holds.size > 0) return
+    this.standingDown = false
+    releaseMediaChannel()
   }
 
   /** Whether the audio clock should be running right now. */

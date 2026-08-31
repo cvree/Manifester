@@ -148,6 +148,7 @@ export function WelcomeRoute() {
     draft,
     prime,
     start,
+    stopPreview,
     voices,
     voicesReady,
   } = useSession()
@@ -291,10 +292,17 @@ export function WelcomeRoute() {
     (destination: '/create' = '/create') => {
       commit()
       markOnboarded()
-      tts.stop()
+      /*
+       * `stopPreview` rather than `tts.stop()`: leaving the welcome without
+       * starting a session has to put the audio route down as well as the
+       * voice. Auditioning a line opens the hardware, and on iOS an open route
+       * is a lock-screen widget — so walking out of onboarding used to leave
+       * one there, over a session that had never begun.
+       */
+      stopPreview()
       navigate(destination, { replace: true })
     },
-    [commit, navigate],
+    [commit, navigate, stopPreview],
   )
 
   const begin = useCallback(() => {

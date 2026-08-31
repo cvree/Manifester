@@ -44,7 +44,11 @@
  * yet work on the phones people actually have.
  *
  * The visible cost is a lock-screen media widget while a session is running,
- * which for a thirty-minute spoken loop is arguably where it belongs.
+ * which for a thirty-minute spoken loop is arguably where it belongs — but
+ * only once it is telling the truth. A widget the app has not claimed shows no
+ * title, no artwork, and a pause button wired to the silent track rather than
+ * to the session: press it on a locked phone and the glass says paused while
+ * the voice keeps speaking. `mediaSession.ts` is what connects it.
  *
  * ── 2. The interrupted context ──
  *
@@ -140,6 +144,15 @@ function isIOS(): boolean {
 
 let channel: HTMLAudioElement | null = null
 let channelWanted = false
+
+/**
+ * How long to wait before treating a paused silent track as an interruption.
+ *
+ * Long enough that a deliberate pause — which clears `channelWanted` in the
+ * same turn as the handler that caused it — has always won by the time this
+ * fires, and short enough to be inaudible when it really was an interruption.
+ */
+const PAUSE_GRACE_MS = 250
 
 /**
  * A fraction of a second of digital silence, built rather than shipped.
@@ -243,7 +256,43 @@ export function claimMediaChannel(): void {
         void channel.play().catch(() => undefined)
       }
     }
-    element.addEventListener('pause', recover)
+
+    /*
+     * The element's own `pause` is the one signal that is ambiguous, and it
+     * became ambiguous the moment the lock-screen widget started working.
+     *
+     * Every other signal here means "something took the audio away"; this one
+     * can also mean "somebody pressed pause". Registering a Media Session
+     * handler is supposed to stop the platform touching the element at all,
+     * and on most builds it does — but not on all of them, and a build that
+     * pauses the element *and* calls the handler would, with an immediate
+     * recovery, have the silent track playing again before the session
+     * finished pausing. The widget would then snap back to playing over a
+     * session that had genuinely stopped: the old lie, inverted.
+     *
+     * A tick's grace is enough to tell them apart. An intentional pause runs
+     * `releaseMediaChannel()` synchronously from the same handler, so
+     * `channelWanted` is already false by the time this looks; an interruption
+     * clears nothing, and a recovery a few hundred milliseconds later is
+     * indistinguishable from an immediate one — the platform refuses `play()`
+     * mid-interruption either way, and the visibility and gesture listeners
+     * are what actually get it back.
+     */
+    let pending: number | null = null
+    const recoverAfterPause = () => {
+      if (pending != null) clearTimeout(pending)
+      pending = window.setTimeout(() => {
+        pending = null
+        recover()
+      }, PAUSE_GRACE_MS)
+    }
+
+    element.addEventListener('pause', recoverAfterPause)
+    element.addEventListener('play', () => {
+      if (pending == null) return
+      clearTimeout(pending)
+      pending = null
+    })
     document.addEventListener('visibilitychange', recover)
     window.addEventListener('pointerdown', recover, { passive: true })
     window.addEventListener('touchstart', recover, { passive: true })

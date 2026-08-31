@@ -21,6 +21,13 @@ import { AudioBus } from '../lib/audioBus'
 import { configureBreath, setBreathActive } from '../lib/breathEngine'
 import { setCueDucking } from '../lib/feedback'
 import { beat } from '../lib/heartbeat'
+import {
+  bindMediaControls,
+  clearMediaSession,
+  publishNowPlaying,
+  setMediaPlaybackState,
+  setMediaPosition,
+} from '../lib/mediaSession'
 import { useLibrary } from './LibraryProvider'
 import { usePreferences } from './PreferencesProvider'
 import {
@@ -94,6 +101,16 @@ interface SessionSnapshot {
   notice: string | null
   /** Seconds left in the delay between loops, or `null` while speaking. */
   delayRemaining: number | null
+  /**
+   * How long this session was set to run, or `null` for an open-ended one.
+   *
+   * Held rather than derived from `remainingSeconds`, because the only other
+   * way to know it is `elapsedSeconds + remainingSeconds` and those two are
+   * counted by different clocks — a total assembled from them wobbles by a
+   * second every tick, which is invisible in the app and very visible on a
+   * lock-screen progress bar drawn against it.
+   */
+  timerSeconds: number | null
   /**
    * True while a line is being fetched or synthesised.
    *
@@ -211,6 +228,7 @@ const EMPTY_SESSION: SessionSnapshot = {
   trackName: null,
   notice: null,
   delayRemaining: null,
+  timerSeconds: null,
   voicePreparing: false,
   breathOnly: false,
 }
@@ -244,7 +262,7 @@ function newDraft(): Draft {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const { preferences } = usePreferences()
+  const { preferences, update: updatePreferences } = usePreferences()
   const {
     loops,
     ready: libraryReady,
@@ -459,6 +477,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /* ── Voice preview ── */
 
   /**
+   * Put the audio route down again once a preview has finished with it.
+   *
+   * Opening the hardware for one auditioned line claims the same media route a
+   * session does — see `AudioBus.standDown` — and on iOS a claimed route is a
+   * lock-screen widget, so previewing one line and putting the phone down used
+   * to leave a widget sitting there over nothing. A session is the one thing
+   * allowed to keep the route: this asks first, so a preview played *over* a
+   * paused session cannot take it away from the session it is playing over.
+   */
+  const settleRoute = useCallback(() => {
+    if (statusRef.current === 'playing' || statusRef.current === 'paused') return
+    busRef.current?.standDown()
+  }, [])
+
+  /**
    * Hear the voice, now.
    *
    * The one place in the app where somebody is waiting on a single line rather
@@ -492,16 +525,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           deviceVoiceURI: style ? null : settings.voiceURI,
           onStart: () => setPreviewState('playing'),
         })
-        .then(() => setPreviewState('idle'))
-        .catch(() => setPreviewState('idle'))
+        .then(() => {
+          setPreviewState('idle')
+          settleRoute()
+        })
+        .catch(() => {
+          setPreviewState('idle')
+          settleRoute()
+        })
     },
-    [draft.settings],
+    [draft.settings, settleRoute],
   )
 
   const stopPreview = useCallback(() => {
     tts.stop()
     setPreviewState('idle')
-  }, [])
+    settleRoute()
+  }, [settleRoute])
 
   /* ── What the voice is doing, for the player's status line ── */
 
@@ -713,6 +753,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       musicRef.current?.stop()
       brainwaveRef.current?.stop()
       timerRef.current?.stop()
+      /*
+       * And let the audio route go with the session that was using it.
+       *
+       * Pausing did this and stopping did not, which is how a finished
+       * practice left an iPhone holding a lock-screen media widget for the
+       * rest of the afternoon: the silent track that keeps this app's mix off
+       * the ringer channel goes on playing until something says otherwise, and
+       * nothing did. `suspend()` is the right verb rather than a bare release
+       * because it already knows the one case where the route has to stay —
+       * the soundtrack playing on over a session that has ended — and holds it
+       * open for exactly that. Anything that wants the bus back calls
+       * `ensure()` first, which every entry point here already does.
+       */
+      busRef.current?.suspend()
       liveRef.current = false
       pendingSoundRef.current = false
       stopElapsed()
@@ -895,6 +949,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         breathOnly,
         chunkTotal: breathOnly ? 0 : speech.chunkCount,
         remainingSeconds:
+          settings.timerMinutes != null ? settings.timerMinutes * 60 : null,
+        timerSeconds:
           settings.timerMinutes != null ? settings.timerMinutes * 60 : null,
       })
       startElapsed(true)
@@ -1215,6 +1271,166 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setBreathActive(preferences.breathingEnabled && session.status === 'playing')
   }, [preferences.breathingEnabled, session.status])
+
+  /* ── The lock screen ── */
+
+  /*
+   * On iOS this app is *always* holding a media widget open while it makes a
+   * sound — `audioSession.ts` keeps a silent track playing to get the mix off
+   * the ringer channel, and a playing media element is what a lock screen
+   * draws. That widget existed long before anything filled it in, which made
+   * it the one part of the app nobody had designed: no title, no artwork, and
+   * a pause button the platform had helpfully wired to the silent track, so
+   * pressing it on a locked phone paused forty milliseconds of nothing while
+   * the voice carried on speaking over the top of it.
+   *
+   * Everything below is that widget told the truth. See `mediaSession.ts`.
+   */
+
+  /**
+   * Turn the music under the app on or off, exactly as its own switch does.
+   *
+   * The lock screen needs this because the widget outlives the session: the
+   * soundtrack holds the audio route open after a practice ends — see
+   * `AudioBus.hold` — so the widget is still there with the music playing
+   * under it, and a pause button that could not stop the one thing still
+   * making a sound would be the original bug wearing a different hat.
+   *
+   * Said to the audio layer and stored, in that order and for the reason
+   * `MusicSettings` says it in that order: a browser will not open audio a
+   * beat after the press, and a preference is a beat later.
+   */
+  const setMusicPlaying = useCallback(
+    (on: boolean) => {
+      soundtrack.setEnabled(on, true)
+      if (on) soundtrack.begin()
+      updatePreferences({ music: on })
+      // Nothing else is sounding, so the route can go with it.
+      if (!on) settleRoute()
+    },
+    [settleRoute, updatePreferences],
+  )
+
+  /*
+   * The verbs, read through a ref rather than closed over.
+   *
+   * `start` changes identity whenever the library does, and re-registering
+   * handlers on a running session is not free on iOS — it can redraw the
+   * widget, and a widget that flickers on a locked screen is exactly the kind
+   * of thing this app should never do. So the handlers are installed once and
+   * always call whatever the current verbs are.
+   */
+  const verbsRef = useRef({ prime, start, pause, resume, stop, setMusicPlaying })
+  useEffect(() => {
+    verbsRef.current = { prime, start, pause, resume, stop, setMusicPlaying }
+  })
+
+  useEffect(() => {
+    bindMediaControls({
+      /*
+       * Play means whatever the button on the player would have meant from
+       * where the session actually is.
+       *
+       * `complete` is the case worth naming: a widget the phone has not
+       * redrawn since the timer ran out is the most likely one to be pressed,
+       * and "listen again" — the same words on the finished screen — is a far
+       * better answer than nothing happening. With no session at all, the only
+       * thing the widget can be describing is the music under the app, so play
+       * is what turns it back on.
+       */
+      play: () => {
+        const verbs = verbsRef.current
+        const status = statusRef.current
+        if (status === 'playing') return
+        if (status === 'paused') {
+          verbs.resume()
+          return
+        }
+        if (status === 'complete') {
+          verbs.prime()
+          verbs.start()
+          return
+        }
+        verbs.setMusicPlaying(true)
+      },
+      pause: () => {
+        const verbs = verbsRef.current
+        if (statusRef.current === 'playing') {
+          verbs.pause()
+          return
+        }
+        // No session, so the music is the only thing left that can be stopped.
+        verbs.setMusicPlaying(false)
+      },
+      /*
+       * Stop is the end of everything the widget is describing: the session if
+       * there is one, and otherwise the music that is holding the widget open.
+       * Read before the verb runs, because ending a session changes the answer.
+       */
+      stop: () => {
+        const verbs = verbsRef.current
+        const live =
+          statusRef.current === 'playing' || statusRef.current === 'paused'
+        verbs.stop()
+        if (!live) verbs.setMusicPlaying(false)
+      },
+    })
+    return () => clearMediaSession()
+  }, [])
+
+  /*
+   * What the glass says, and what its play/pause symbol shows.
+   *
+   * Three states, in the order they are worth answering: a session, the music
+   * on its own, and nothing at all.
+   */
+  useEffect(() => {
+    /*
+     * A finished session still owns the glass, and deliberately.
+     *
+     * The route does not go away when a practice ends if the music is still
+     * playing under the app, so the widget is still there — and the most
+     * useful thing it can say at that moment is the name of the loop that has
+     * just finished, over a play button that starts it again.
+     */
+    if (session.status !== 'idle') {
+      publishNowPlaying({
+        title:
+          session.title.trim() || (session.breathOnly ? 'Breathwork' : 'Your loop'),
+        // What this is, in the two or three words a lock screen has room for.
+        artist: session.breathOnly ? 'Breathing practice' : 'Looping affirmation',
+      })
+      setMediaPlaybackState(session.status === 'playing' ? 'playing' : 'paused')
+      return
+    }
+
+    /*
+     * And with no session at all, the widget is not describing nothing — the
+     * soundtrack holds the audio route open on its own, which on iOS means the
+     * widget is still on the lock screen with music playing under it. Naming
+     * it is the difference between a media control and a mystery.
+     */
+    if (preferences.music) {
+      publishNowPlaying({ title: 'Manifester', artist: 'Ambient music' })
+      setMediaPlaybackState('playing')
+      setMediaPosition(0, null)
+      return
+    }
+
+    publishNowPlaying(null)
+    setMediaPlaybackState('none')
+    setMediaPosition(0, null)
+  }, [session.status, session.title, session.breathOnly, preferences.music])
+
+  /*
+   * The progress bar, for a session that has an end to move towards. An
+   * open-ended loop passes `null` and is drawn the way live radio is: no
+   * timeline, because there is nothing honest to put on one.
+   */
+  useEffect(() => {
+    if (session.status !== 'playing' && session.status !== 'paused') return
+    setMediaPosition(session.elapsedSeconds, session.timerSeconds)
+  }, [session.status, session.elapsedSeconds, session.timerSeconds])
 
   /* ── Lifecycle ── */
 
