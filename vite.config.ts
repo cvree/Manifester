@@ -5,6 +5,15 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { PAGES } from './src/site/content'
+import {
+  DEFAULT_ORIGIN,
+  renderAppHead,
+  renderPage,
+  renderRobots,
+  renderSitemap,
+  type SiteContext,
+} from './src/site/render'
 
 /**
  * Manifester ships to GitHub Pages at https://<owner>.github.io/Manifester/
@@ -14,6 +23,18 @@ import { VitePWA } from 'vite-plugin-pwa'
  * domain (e.g. a custom domain or Netlify).
  */
 const base = process.env.MANIFESTER_BASE ?? '/Manifester/'
+
+/**
+ * The origin the site is served from, for the absolute URLs a crawler needs.
+ *
+ * Canonical links, `og:image` and the sitemap all have to be absolute, and
+ * none of them can be worked out at runtime from a page that ships as static
+ * HTML. Set `MANIFESTER_ORIGIN` alongside `MANIFESTER_BASE` when the site
+ * moves to a domain of its own.
+ */
+const origin = process.env.MANIFESTER_ORIGIN ?? DEFAULT_ORIGIN
+
+const site: SiteContext = { origin, base }
 
 const THEME_COLOR = '#EFE7DC'
 const BACKGROUND_COLOR = '#F7F1E8'
@@ -111,6 +132,78 @@ function phonemizerRuntime(): Plugin {
   }
 }
 
+/**
+ * The written pages, as plain HTML at plain URLs.
+ *
+ * Manifester is hash-routed, which is the right call for an app that has to
+ * survive being reloaded from a service worker on a plane — and it means the
+ * whole app is one address to a search engine. Seven routes, one indexable
+ * URL, and a served `<body>` that is an empty `<div>`. Nothing about the app
+ * is findable, which for something distributed only as a URL is the whole
+ * distribution strategy failing quietly.
+ *
+ * So the site ships beside the app rather than inside it: one small document
+ * per subject, no script, no bundle, its own copy of a stylesheet small enough
+ * to inline, each with a canonical URL, a share card and a link into the app.
+ * They are generated from `src/site/`, which is where the words live and where
+ * the tests that check them run.
+ *
+ * They are emitted rather than written to `public/`, so there is one source of
+ * truth and no generated HTML to keep in sync by hand; and they are served in
+ * development by the middleware below, so the pages can be read at the same
+ * addresses they will have in production.
+ */
+function staticSite(): Plugin {
+  const pageFiles = () => {
+    const lastModified = new Date().toISOString().slice(0, 10)
+    return [
+      ...PAGES.map((page) => ({
+        fileName: `${page.slug}/index.html`,
+        source: renderPage(page, site),
+      })),
+      { fileName: 'sitemap.xml', source: renderSitemap(site, lastModified) },
+      { fileName: 'robots.txt', source: renderRobots(site) },
+    ]
+  }
+
+  return {
+    name: 'manifester:static-site',
+
+    generateBundle() {
+      for (const { fileName, source } of pageFiles()) {
+        this.emitFile({ type: 'asset', fileName, source })
+      }
+    },
+
+    transformIndexHtml: {
+      order: 'pre',
+      handler: (html) => html.replace('<!--seo-->', renderAppHead(site)),
+    },
+
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const path = (request.url ?? '/').split('?')[0]
+        const file = pageFiles().find(
+          ({ fileName }) =>
+            path === `${base}${fileName}` ||
+            // `/affirmations/` and `/affirmations` both mean the page.
+            path === `${base}${fileName.replace(/index\.html$/, '')}` ||
+            path === `${base}${fileName.replace(/\/index\.html$/, '')}`,
+        )
+        if (!file) return next()
+
+        const type = file.fileName.endsWith('.xml')
+          ? 'application/xml'
+          : file.fileName.endsWith('.txt')
+            ? 'text/plain'
+            : 'text/html'
+        response.setHeader('Content-Type', `${type}; charset=utf-8`)
+        response.end(file.source)
+      })
+    },
+  }
+}
+
 export default defineConfig({
   base,
   resolve: {
@@ -163,6 +256,7 @@ export default defineConfig({
     phonemizerRuntime(),
     react(),
     tailwindcss(),
+    staticSite(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: [
@@ -176,7 +270,7 @@ export default defineConfig({
         name: 'Manifester',
         short_name: 'Manifester',
         description:
-          'Paste an intention, choose a voice, and let it loop over gentle ambient sound. Everything stays on your device.',
+          'Affirmations in your own words, in a voice you choose, looping over gentle ambient sound. Everything stays on your device.',
         start_url: base,
         scope: base,
         display: 'standalone',
@@ -194,6 +288,32 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
+          },
+        ],
+        /*
+         * What a long-press on the home-screen icon offers.
+         *
+         * The two things anybody opens this app to do. The first is what a
+         * plain launch already does — `launchDestination` restores the loop
+         * you played last — and naming it out loud is the point: a shortcut
+         * that says "Start my last loop" promises the app will not make you
+         * choose again, which is the promise the app keeps and the one nobody
+         * can see from an icon.
+         */
+        shortcuts: [
+          {
+            name: 'Start my last loop',
+            short_name: 'Last loop',
+            description: 'Open the loop you played most recently and press play.',
+            url: base,
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Write something new',
+            short_name: 'New loop',
+            description: 'Start a new loop from a blank page.',
+            url: `${base}#/create`,
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
           },
         ],
       },
@@ -317,6 +437,8 @@ export default defineConfig({
          * three are runtime-cached instead, above.
          */
         globIgnores: [
+          // The share card is for link previews. No screen in the app shows it.
+          '**/og.png',
           '**/ai-provider-*.js',
           '**/kokoro.worker-*.js',
           '**/kokoro-*.js',
@@ -324,6 +446,18 @@ export default defineConfig({
           '**/phonemizer-*.js',
         ],
         navigateFallback: `${base}index.html`,
+        /*
+         * Except for the written pages, which are documents of their own.
+         *
+         * They are precached like any other HTML and would be matched by the
+         * precache route before the fallback ever ran — but only because of a
+         * rule ordering nothing in this file controls. An installed visitor
+         * following a link to `/affirmations/` and landing on the app instead
+         * would be a strange, quiet failure, so it is denied outright.
+         */
+        navigateFallbackDenylist: PAGES.map(
+          (page) => new RegExp(`^${base}${page.slug}/?$`),
+        ),
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,

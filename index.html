@@ -6,10 +6,10 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Manifester</title>
+    <title>Manifester — affirmations in your own words</title>
     <meta
       name="description"
-      content="Paste an intention, choose a voice, and let it loop over gentle ambient sound. Private by design — everything stays on your device."
+      content="Write your own affirmations, choose a voice, and loop them over gentle ambient sound. Free, no account, no subscription — everything stays on your device."
     />
 
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
@@ -29,11 +29,20 @@
     />
 
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Manifester" />
+    <meta property="og:title" content="Manifester — affirmations in your own words" />
     <meta
       property="og:description"
-      content="A tiny calm garden for your intentions. Paste text, pick a voice, press play."
+      content="Your words, a voice you choose, and a loop that runs as long as you want it to. Free, private, and it works offline."
     />
+
+    <!--
+      The canonical link, the share image and the structured data are written
+      by `staticSite()` in `vite.config.ts`: every one of them has to be an
+      absolute URL, and this file has no idea which origin or base path it was
+      built for. The words above are the half a person edits; this is the half
+      the deployment decides.
+    -->
+    <!--seo-->
 
     <script>
       // Set the theme and the palette's hue before first paint, so there is
@@ -64,11 +73,46 @@
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      Without JavaScript there is no app — it reads text aloud, which is not a
+      thing HTML does. But "please enable JavaScript" is a dead end, and the
+      site has five written pages that need nothing at all to render. So the
+      fallback is those: what the app is, for a reader whose browser cannot run
+      it, and for the crawlers that still do not execute one.
+
+      Relative links on purpose. This file is served from the site root
+      whatever the base path is, so `./affirmations/` is correct under
+      `/Manifester/` and under a domain of its own without being told which.
+    -->
     <noscript>
-      <p style="font-family: system-ui; padding: 2rem; text-align: center">
-        Manifester needs JavaScript to read your words aloud. Please enable it
-        and reload.
-      </p>
+      <div
+        style="
+          font-family: ui-serif, Georgia, serif;
+          max-width: 36rem;
+          margin: 0 auto;
+          padding: 3rem 1.5rem;
+          line-height: 1.6;
+          color: #2f2823;
+        "
+      >
+        <h1 style="font-weight: 600">Manifester</h1>
+        <p>
+          Affirmations in your own words, in a voice you choose, looping over
+          gentle ambient sound. It is free, it keeps everything on your device,
+          and it works offline once installed.
+        </p>
+        <p>
+          The app itself reads your words aloud, so it needs JavaScript. These
+          pages do not:
+        </p>
+        <ul>
+          <li><a href="./affirmations/">Affirmations in your own words</a></li>
+          <li><a href="./voices/">Choose the voice</a></li>
+          <li><a href="./scripts/">Loop a script, not a slogan</a></li>
+          <li><a href="./private/">It stays on your device</a></li>
+          <li><a href="./breathing/">Breathe, with or without words</a></li>
+        </ul>
+      </div>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>

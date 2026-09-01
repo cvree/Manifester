@@ -1,6 +1,6 @@
 # Manifester
 
-**A tiny calm garden for your intentions.**
+**Affirmations in your own words, in a voice you choose.**
 
 Write or paste the words you want to hear, choose a voice, and let them loop over
 gentle ambient sound for as long as you like. It speaks in its own voice — the
@@ -2608,6 +2608,57 @@ src/
   styles/
     theme.css     Cosmic Garden — surfaces, type scale, states, the visualiser
 ```
+
+---
+
+## The website
+
+The app is hash-routed, which is right for something that has to survive being
+reloaded from a service worker on a plane and wrong for something that has to be
+found: seven routes collapse into one address, and the served `<body>` is an
+empty `<div>`. Nothing about the app was findable, which — for a product
+distributed only as a URL — was the whole distribution strategy failing quietly.
+
+So the site ships *beside* the app rather than inside it. Five plain HTML
+documents, no script and no bundle, generated at build time from
+[`src/site/`](src/site) by the `staticSite()` plugin in
+[`vite.config.ts`](vite.config.ts):
+
+| Path | What it is for |
+| --- | --- |
+| `/affirmations/` | Your own words, and everything about a ritual you can change. |
+| `/voices/` | The two studio voices, the device's own, and recording your own. |
+| `/scripts/` | Looping a long passage — the thing no library-based app does. |
+| `/private/` | What stays on the device, what does not, and the two exceptions. |
+| `/breathing/` | The guide with no words in it at all. |
+
+[`content.ts`](src/site/content.ts) holds the words and
+[`render.ts`](src/site/render.ts) turns them into documents; every count in the
+prose is counted from the source it describes, and
+[`site.test.ts`](src/site/site.test.ts) checks the parts that rot silently —
+that each page has one canonical URL and it is its own, that the onward links
+point at pages that exist, that the sitemap lists every page exactly once, that
+nothing claims a rating nobody has given, and that the no-JavaScript list in
+`index.html` still names all five.
+
+The same plugin writes `sitemap.xml`, `robots.txt`, and the tags `index.html`
+cannot write for itself — a canonical link, the `og:image`, and
+`SoftwareApplication` structured data — because all of those need an absolute
+URL and a static file has no idea which origin it was built for. Set
+`MANIFESTER_ORIGIN` alongside `MANIFESTER_BASE` when deploying anywhere but the
+Pages sub-path.
+
+`public/og.png` is the share card, drawn from the icon's own motif by
+`npm run icons`. Before it existed, every link to this app rendered in a group
+chat as a bare box.
+
+One caveat worth stating: only the `robots.txt` at a *domain* root is obeyed, so
+under `/Manifester/` that file is inert. The sitemap is not — a sitemap under a
+sub-path is valid for every URL beneath it, and it is submitted by hand in
+Search Console.
+
+Putting the app in the App Store is a different problem with a different answer;
+[`docs/app-store.md`](docs/app-store.md) is the whole route, in order.
 
 ---
 

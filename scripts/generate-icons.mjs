@@ -1,5 +1,5 @@
 /**
- * Renders the app icons from one original SVG motif.
+ * Renders the app icons — and the share card — from one original SVG motif.
  *
  * Run with `npm run icons` after editing the artwork below. The generated PNGs
  * are committed so a plain `npm ci && npm run build` never needs sharp.
@@ -78,6 +78,51 @@ function motif({ inset = 0, background = 'rounded' } = {}) {
 </svg>`
 }
 
+
+/**
+ * The image every link to Manifester shows.
+ *
+ * A shared link that renders as a bare grey box is a share that does not get
+ * clicked, and until this existed that was every share of this app. It is the
+ * same motif as the icon beside the same sentence the site leads with, so a
+ * link in a group chat and the page it opens are recognisably one thing.
+ *
+ * 1200×630 is what the card readers crop to. The text sits well inside the
+ * left half, because several of them centre-crop to a square on small screens
+ * and the words are the part that has to survive it.
+ */
+function shareCard() {
+  // The icon artwork, nested as an element rather than re-drawn.
+  const inner = motif().replace(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"',
+    '<svg x="760" y="105" width="420" height="420"',
+  )
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="card" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0%" stop-color="#F8F3EC"/>
+      <stop offset="55%" stop-color="#EFE9F3"/>
+      <stop offset="100%" stop-color="#E4DCEF"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#card)"/>
+  ${inner}
+
+  <g font-family="Georgia, 'Times New Roman', serif" fill="${TWILIGHT}">
+    <text x="88" y="150" font-size="26" letter-spacing="6"
+          font-family="Helvetica, Arial, sans-serif" fill="${ROSE_DEEP}">MANIFESTER</text>
+    <text x="88" y="272" font-size="72" font-weight="600">Affirmations in</text>
+    <text x="88" y="356" font-size="72" font-weight="600">your own words</text>
+    <text x="88" y="440" font-size="34" fill="#5F544B"
+          font-family="Helvetica, Arial, sans-serif">In a voice you choose.</text>
+    <text x="88" y="512" font-size="27" fill="#8A7C71"
+          font-family="Helvetica, Arial, sans-serif">Free · no account · works offline</text>
+  </g>
+</svg>`
+}
+
 const OUTPUTS = [
   { file: 'icons/icon-192.png', size: 192, svg: motif() },
   { file: 'icons/icon-512.png', size: 512, svg: motif() },
@@ -100,5 +145,12 @@ for (const { file, size, svg } of OUTPUTS) {
   await sharp(Buffer.from(svg)).resize(size, size).png({ quality: 92 }).toFile(target)
   console.log(`wrote public/${file} (${size}×${size})`)
 }
+
+// The share card is the one output that is not square.
+await sharp(Buffer.from(shareCard()))
+  .resize(1200, 630)
+  .png({ quality: 92 })
+  .toFile(path.join(root, 'public', 'og.png'))
+console.log('wrote public/og.png (1200×630)')
 
 console.log('wrote public/favicon.svg')
