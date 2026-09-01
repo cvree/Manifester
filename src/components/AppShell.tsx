@@ -267,6 +267,8 @@ export function AppShell() {
 
       {showMiniPlayer && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-20 px-4 lg:bottom-6 lg:left-auto lg:right-6 lg:px-0">
+          {/* The page recedes under this one too. See `.dock-veil`. */}
+          <div aria-hidden="true" className="dock-veil lg:hidden" />
           <div className="surface-sheet pointer-events-auto mx-auto flex w-full max-w-md items-center gap-3 rounded-[1.25rem] px-3 py-2.5 lg:mx-0 lg:w-80">
             <button
               type="button"
@@ -295,6 +297,22 @@ export function AppShell() {
           </div>
         </div>
       )}
+
+      {/*
+        The page dissolving under the dock, rather than colliding with it.
+        Below the docked panels and above the page, and gone the moment the
+        chrome it belongs to is gone — an immersive session has nothing
+        floating over the words, so there is nothing for the page to recede
+        under. See `.page-veil`.
+      */}
+      <div
+        aria-hidden="true"
+        className={cx(
+          'page-veil pointer-events-none fixed inset-x-0 bottom-0 z-10 lg:hidden',
+          'transition-opacity duration-500 ease-[var(--ease-calm)]',
+          (chromeHidden || onboarding) && 'opacity-0',
+        )}
+      />
 
       {/* The phone's floating navigation. */}
       <nav

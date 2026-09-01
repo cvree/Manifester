@@ -393,8 +393,16 @@ export function CreateRoute() {
         */}
         <Card level="panel" data-rise className="lg:col-start-1">
           <FieldLabel htmlFor="loop-title">Title</FieldLabel>
+          {/*
+            The title is set in the display face too, because it is the one
+            field on this screen whose contents end up *on the stage* — in that
+            same serif, an inch below the state line. The rest of the app's
+            fields are things you operate and stay in the sans. See
+            `.type-spoken`.
+          */}
           <TextField
             id="loop-title"
+            className="type-spoken text-[1.06rem]"
             value={draft.title}
             placeholder="Morning steadiness"
             maxLength={80}
@@ -433,7 +441,13 @@ export function CreateRoute() {
                   key={phrase}
                   type="button"
                   onClick={() => appendStarter(phrase)}
-                  className="interactive pressable surface-control min-h-11 px-4 text-left text-[0.88rem] text-ink-muted hover:bg-[var(--surface-strong)] hover:text-ink"
+                  /*
+                    A starter is an affirmation somebody may be about to hear,
+                    so it is set like one — the same face it will wear in the
+                    box above the moment it is tapped, and on the stage after
+                    that. What it is *wrapped in* is still a control.
+                  */
+                  className="interactive pressable surface-control type-spoken min-h-11 px-4 text-left text-[0.95rem] text-ink-muted hover:bg-[var(--surface-strong)] hover:text-ink"
                 >
                   {phrase}
                 </button>
@@ -637,6 +651,12 @@ export function CreateRoute() {
           className="animate-sheet-in pointer-events-none fixed inset-x-0 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 px-4 lg:hidden"
           style={{ paddingBottom: 'max(0.25rem, env(safe-area-inset-bottom))' }}
         >
+          {/*
+            The page dissolves into the background as it goes under this bar,
+            rather than running full-contrast into the edge of a glass panel.
+            See `.dock-veil`.
+          */}
+          <div aria-hidden="true" className="dock-veil" />
           <div className="surface-sheet pointer-events-auto mx-auto flex w-full max-w-md items-center gap-2 rounded-[1.5rem] p-2">
             <Button
               variant="primary"

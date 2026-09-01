@@ -42,9 +42,19 @@ export function TextArea({
        */
       data-lenis-prevent
       {...props}
+      /*
+       * Set in the voice's own face, not the interface's.
+       *
+       * Both places this box appears — the editor on Create and the writing
+       * step of the welcome — hold one thing: words somebody is choosing to
+       * hear read aloud. Setting them in the display serif at the leading the
+       * stage gives them makes this a page being written rather than a field
+       * being filled, and means nothing about the words changes when they
+       * arrive on the stage. See `.type-spoken`.
+       */
       className={cx(
-        'scroll-quiet w-full resize-none rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-3.5',
-        'text-[1.02rem] leading-relaxed text-ink placeholder:text-ink-faint',
+        'type-spoken scroll-quiet w-full resize-none rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-3.5',
+        'text-[1.08rem] leading-[1.72] text-ink placeholder:text-ink-faint',
         'transition-colors duration-200 focus:border-[var(--border-strong)] focus:bg-[var(--surface-strong)]',
         className,
       )}

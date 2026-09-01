@@ -417,11 +417,29 @@
  */
 
 @layer components {
+  /*
+   * ── Where the lines break ──
+   *
+   * The base layer already asks for `balance` on `h1`–`h3` and `pretty` on
+   * `p`, and these carry the same rule wherever the classes themselves go —
+   * which is a great many spans, divs, `h4`s and list items, since a type class
+   * here names a *role* rather than a tag. Between them they remove the two
+   * things that make a well-set page look accidental: a two-line title with
+   * four words above one, and a paragraph ending in a single orphaned word.
+   *
+   * It matters more here than in most apps because almost every heading in
+   * Manifester is a *sentence* — "Create a calming loop", "That is the
+   * practice." — set large, in a serif, over a measure that changes with the
+   * viewport. Those are exactly the strings a greedy line breaker makes ugly,
+   * and there is no width at which somebody could have hand-tuned it. Where it
+   * is unsupported the text simply breaks as it always did.
+   */
   .type-display {
     font-family: var(--font-display);
     font-size: clamp(2.1rem, 1.6rem + 2vw, 3rem);
     line-height: 1.06;
     letter-spacing: -0.024em;
+    text-wrap: balance;
     color: var(--ink);
   }
 
@@ -430,6 +448,7 @@
     font-size: clamp(1.6rem, 1.35rem + 1vw, 2.1rem);
     line-height: 1.12;
     letter-spacing: -0.02em;
+    text-wrap: balance;
     color: var(--ink);
   }
 
@@ -438,6 +457,7 @@
     font-size: 1.375rem;
     line-height: 1.22;
     letter-spacing: -0.014em;
+    text-wrap: balance;
     color: var(--ink);
   }
 
@@ -452,6 +472,7 @@
   .type-body {
     font-size: 1rem;
     line-height: 1.65;
+    text-wrap: pretty;
     color: var(--ink-muted);
     max-width: 62ch;
   }
@@ -459,15 +480,74 @@
   .type-meta {
     font-size: 0.875rem;
     line-height: 1.5;
+    text-wrap: pretty;
     color: var(--ink-muted);
   }
 
+  /*
+   * The label that names a thing, set as an inscription rather than a badge.
+   *
+   * It used to be 0.75rem at weight 600 on 0.1em of tracking, which is the
+   * house style of a settings screen: heavy, tight, and shouting one notch
+   * louder than the sentence it introduces. Sixty-five of them appear across
+   * this app, above text fields, over sections, beside sliders — enough that
+   * their weight *is* the app's texture.
+   *
+   * Lighter, smaller and set much wider says the same words in a completely
+   * different voice. The tracking is what buys the smallness back: capitals
+   * with air between them stay legible far below the size at which set-solid
+   * capitals turn into a grey bar, so this reads more easily than what it
+   * replaces while taking up less of the eye. `--ink-muted` is untouched — it
+   * is the quietest a label is allowed to get, and it clears 4.5:1 on both
+   * themes at this weight.
+   *
+   * The stage's own state line takes the same idea two steps further, where it
+   * is centred and alone. See `.stage__state`.
+   */
   .type-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--ink-muted);
+  }
+
+  /*
+   * ── Words the app will say out loud ──
+   *
+   * One rule, everywhere: anything Manifester is going to read back to
+   * somebody is set in the display serif, and everything you *operate* is set
+   * in the sans. The stage has always done this, and the ritual preview beside
+   * the editor does — but the editor itself, the starters under it and the
+   * lines the writing helper offers were all sans, so an affirmation changed
+   * face at the moment it stopped being a plan and became a practice.
+   *
+   * Closing that gap is worth more than it sounds. Somebody writing here is
+   * choosing words they will hear in their own quiet room, and seeing them in
+   * the face they will wear on the stage — the same size, the same warmth, the
+   * same generous leading — makes the editor a page rather than a form field.
+   * What you write is already what you will see.
+   *
+   * The placeholder goes italic with it, which is the same distinction the
+   * stage draws between an invitation and the words themselves: three example
+   * lines in a box that is otherwise waiting for yours should never be
+   * mistakable, at a glance, for something already written.
+   */
+  .type-spoken {
+    font-family: var(--font-display);
+    /*
+     * A serif set at reading size wants a hair of air that the display sizes,
+     * which are tracked slightly *tight*, do not — so this is its own rule
+     * rather than something the stage could share.
+     */
+    letter-spacing: 0.004em;
+    /* The cursor in your own words, in the app's own colour. */
+    caret-color: var(--rose-deep);
+  }
+
+  .type-spoken::placeholder {
+    font-style: italic;
+    letter-spacing: 0.01em;
   }
 
   .type-numeral {
@@ -538,6 +618,74 @@
       var(--panel-shadow-lift);
     backdrop-filter: blur(28px) saturate(1.4);
     -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  }
+
+  /*
+   * Where the page goes under the dock.
+   *
+   * A phone carries two floating things at the bottom of every screen — the
+   * three tabs, and above them whatever is docked there at the time — and until
+   * now the page simply ran underneath them. Long-form text kept its full
+   * contrast right up to the moment it disappeared behind a glass panel, which
+   * reads as a collision rather than as a layer: two things at the same weight,
+   * overlapping, with nothing saying which is on top.
+   *
+   * So the last few centimetres of the page dissolve into the background
+   * instead. Nothing is hidden that was not already going to be hidden, the
+   * scroll is unchanged, and what it buys is depth: the dock is clearly *above*
+   * a page that recedes under it. Two stops rather than one — the fade holds
+   * back for the first half and then commits — because a straight linear ramp
+   * over this distance is visible as a band, and the point is that nobody sees
+   * this at all.
+   *
+   * It is only ever on the phone: a desktop has no bottom navigation, and
+   * fading the foot of that page would be fading nothing into nowhere.
+   */
+  /*
+   * The ramp both of them use, weighted low.
+   *
+   * A linear fade is the obvious shape and the wrong one: spread evenly, the
+   * half that matters — the centimetre right above the dock, where the collision
+   * actually happens — is only half veiled, and the half nobody would have
+   * noticed is dimming perfectly readable text. So most of the travel is spent
+   * near the dock, and the last stretch is a long, nearly invisible tail that
+   * keeps the whole thing from reading as an edge.
+   */
+  .page-veil,
+  .dock-veil {
+    pointer-events: none;
+    background: linear-gradient(
+      to top,
+      var(--bg-0) 0%,
+      color-mix(in oklab, var(--bg-0) 94%, transparent) 40%,
+      color-mix(in oklab, var(--bg-0) 62%, transparent) 65%,
+      color-mix(in oklab, var(--bg-0) 22%, transparent) 85%,
+      transparent 100%
+    );
+  }
+
+  /* The shell's own, sized to the three tabs and nothing else. */
+  .page-veil {
+    height: calc(8.5rem + env(safe-area-inset-bottom));
+  }
+
+  /*
+   * And one for anything that docks *above* the tabs — the mini-player, the
+   * quick-start bar on Create. Each brings its own rather than the shell
+   * growing to cover the tallest thing that might appear, because a fade sized
+   * for a dock that is not there is a list of perfectly readable items dimmed
+   * for no reason. It reaches a little below its dock, into the shell's fade,
+   * where both are at full strength and the seam cannot be seen.
+   *
+   * Placed as the first child of a dock's fixed container, so the dock itself
+   * paints over it.
+   */
+  .dock-veil {
+    position: absolute;
+    /* Past the container's own gutter, so the fade reaches both screen edges. */
+    inset-inline: -2rem;
+    bottom: -3rem;
+    height: 11rem;
   }
 
   /* Kept so older markup keeps rendering while the redesign lands. */
