@@ -6,6 +6,8 @@ import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
 import { useIsCompact, useReducedMotion } from '../lib/motion'
 import { sceneFor, soundtrack } from '../lib/soundtrack'
+import { voiceForStyle } from '../lib/tts'
+import { useWarmVoice } from '../lib/tts/useWarmVoice'
 import { useSession } from '../state/SessionProvider'
 import { useStage } from '../state/StageProvider'
 import { useTheme } from '../state/ThemeProvider'
@@ -39,7 +41,7 @@ export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const { theme, toggleTheme, nightLight } = useTheme()
-  const { session, pause, resume } = useSession()
+  const { draft, session, pause, resume } = useSession()
   const { expanded: stageExpanded } = useStage()
   const reducedMotion = useReducedMotion()
   const compact = useIsCompact()
@@ -47,6 +49,29 @@ export function AppShell() {
   const [navRevealed, setNavRevealed] = useState(false)
 
   const isPlaying = session.status === 'playing'
+
+  /*
+   * The voice, prepared out of whatever time the app is not otherwise using.
+   *
+   * At the shell rather than on the player, which is the whole point: the
+   * seconds worth spending on this are the ones somebody spends writing the
+   * words, choosing a sound, or reading their library, and none of those are
+   * spent on the player screen. By the time they press play the loop is
+   * usually already in the cache and the first word is immediate.
+   *
+   * Off while a session is running — there the loop is doing this itself, in
+   * the order it actually wants the lines and with far better information. See
+   * `useWarmVoice` and `voiceLoop.ts`.
+   */
+  useWarmVoice({
+    text: draft.text,
+    voice: voiceForStyle(draft.settings.voiceStyle),
+    rate: draft.settings.rate,
+    pitch: draft.settings.pitch,
+    preferDevice: draft.settings.voiceSource === 'device',
+    enabled: session.status !== 'playing',
+  })
+
   const hasSession = session.status !== 'idle'
   const onPlayer = location.pathname === '/player'
   const showMiniPlayer = hasSession && !onPlayer

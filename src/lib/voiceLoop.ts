@@ -20,7 +20,9 @@
  * The one addition is the preload. The loop always knows its next line, so it
  * fetches it while the current one is still speaking; by the time the gap ends
  * the audio is decoded and in memory, and the next line starts in the time it
- * takes to schedule a buffer.
+ * takes to schedule a buffer. Behind that window it keeps walking — one line at
+ * a time, quietly, until the whole pass is prepared under the settings in force
+ * — so that a session never runs into a line nothing has made. See `warmPass`.
  */
 
 import { scheduleAt } from './heartbeat'
@@ -129,7 +131,9 @@ const RESTART_SETTLE_MS = 140
  * to replace the current one, and the one after it, so the loop is a line
  * ahead again by the time the change has landed. Larger is not better — an
  * on-device model synthesises one line at a time, so a deep queue is only a
- * way of putting work the loop needs *now* behind work it needs later.
+ * way of putting work the loop needs *now* behind work it needs later. The rest
+ * of the pass is covered instead by a walk that asks for one line at a time and
+ * waits for each; see `warmPass`, where that distinction is the whole design.
  */
 const PRELOAD_AHEAD = 2
 
@@ -160,6 +164,8 @@ export class VoiceLooper {
   private primeTimer: number | null = null
   /** Invalidates a swap that was being prepared when a newer one arrived. */
   private swapToken = 0
+  /** Invalidates the quiet walk through the rest of the pass. See `warmPass`. */
+  private warmToken = 0
 
   /** The singleton in the app; a fake in a test. */
   constructor(voice: Speaker = tts) {
@@ -422,6 +428,7 @@ export class VoiceLooper {
     this.clearGap()
     this.clearRestart()
     this.clearPrime()
+    this.clearWarm()
     this.voice.stop()
   }
 
@@ -455,6 +462,7 @@ export class VoiceLooper {
     this.clearGap()
     this.clearRestart()
     this.clearPrime()
+    this.clearWarm()
     this.voice.stop()
   }
 
@@ -611,6 +619,11 @@ export class VoiceLooper {
     }
   }
 
+  /** Abandon the walk through the rest of the pass, wherever it had got to. */
+  private clearWarm(): void {
+    this.warmToken += 1
+  }
+
   /**
    * Everything the voice needs to say a line the way it is currently set.
    *
@@ -650,6 +663,66 @@ export class VoiceLooper {
   private preloadAhead(from: number): void {
     for (let step = 0; step < PRELOAD_AHEAD; step += 1) {
       this.preload(from + step)
+    }
+    // And, quietly and one at a time, everything after that. See `warmPass`.
+    void this.warmPass(from + PRELOAD_AHEAD)
+  }
+
+  /**
+   * Walk the rest of the pass, a line at a time, behind the window.
+   *
+   * ── The case the window alone cannot cover ──
+   *
+   * `PRELOAD_AHEAD` keeps the loop two lines in front of itself, which is
+   * exactly right while nothing changes: each line's successor is prepared
+   * during it, and the pass never touches an engine after its first round. A
+   * *change* throws all of that away. Moving the speed re-renders every clip in
+   * the affirmation — the ones already heard included — so from that moment the
+   * loop is walking into lines nothing has ever made, with only two lines of
+   * runway to make each one in. On a phone doing the synthesising itself, that
+   * is a wait before a line somewhere in the pass, which is the one place the
+   * player still had to admit it was waiting.
+   *
+   * So the window is followed by a walk: the same lines, in the same order,
+   * asked for one at a time until the whole pass is prepared under the settings
+   * currently in force. It is started afresh from wherever the loop now is
+   * every time the window moves, and abandoned the moment the settings are
+   * replaced, the session stops, or a newer walk begins.
+   *
+   * **One at a time is the entire discipline.** A model on this device
+   * synthesises serially, so anything asked for ahead of a line the loop
+   * actually needs is time that line spends waiting. Awaiting each preload
+   * bounds that cost at exactly one line — the same cost the second slot of the
+   * window has always had — where asking for the whole pass at once would put a
+   * dozen speculative lines in front of the next real one.
+   *
+   * Everything it prepares is either wanted within the minute or free: a clip
+   * that already exists resolves out of memory without touching an engine, so
+   * on the ordinary path — a warm loop playing round again — this walk is a
+   * handful of map lookups and nothing else.
+   */
+  private async warmPass(from: number): Promise<void> {
+    const options = this.options
+    if (!options || options.preferDevice) return
+
+    const total = this.chunks.length
+    if (total <= PRELOAD_AHEAD) return
+
+    const token = (this.warmToken += 1)
+    for (let step = 0; step < total - PRELOAD_AHEAD; step += 1) {
+      // A newer walk, a change of settings, or a session that has stopped or
+      // paused: whatever this was preparing is not wanted by anybody now.
+      if (token !== this.warmToken) return
+      if (!this.running || this.paused || this.options !== options) return
+
+      const index = from + step
+      if (!options.loop && index >= total) return
+      const text = this.chunks[index % total]
+      if (!text) return
+
+      await this.voice
+        .preload(text, this.speakSettings(options))
+        .catch(() => undefined)
     }
   }
 

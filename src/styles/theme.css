@@ -5123,6 +5123,165 @@ html:not(.dark) .breath-aurora__veil {
   transition-property: padding-inline, opacity;
 }
 
+/* ── The state line ───────────────────────────────────────────────────────
+ *
+ * The smallest type on the stage, and the first thing read after pressing
+ * play. See `StageStatus.tsx` for what each of these is for; the short version
+ * is that wide-set capitals at 0.68rem read as an inscription where the same
+ * words at 0.75rem/600 read as a badge, and the badge is what this replaces.
+ *
+ * The tracking is paid back with `text-indent`: letter-spacing adds its space
+ * *after* the final letter too, so centred tracked type sits half a space to
+ * the left of where the eye expects it. Indenting by one unit of the tracking
+ * moves the whole line back into optical centre.
+ */
+.stage__state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7em;
+  min-height: 1rem;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.stage__state-text {
+  display: inline-block;
+  animation: state-settle 720ms var(--ease-calm) both;
+}
+
+/*
+ * A state arriving, at the pace of the rest of the stage.
+ *
+ * The type settles *inwards* — from wider tracking and a little blur to its
+ * set width — which is the one entrance that reads as type rather than as a
+ * transition: nothing slides, nothing scales, the letters simply find their
+ * places. Slower than the spoken line's own 220ms entrance on purpose, because
+ * this one is chrome and must never be the thing catching the eye.
+ */
+@keyframes state-settle {
+  from {
+    opacity: 0;
+    letter-spacing: 0.62em;
+    filter: blur(5px);
+  }
+
+  to {
+    opacity: 1;
+    letter-spacing: 0.3em;
+    filter: blur(0);
+  }
+}
+
+/*
+ * A wait, said in light rather than in punctuation.
+ *
+ * A single slow pass of gold across the letters, once every three and a half
+ * seconds — closer to a candle than to a progress bar, and the only honest
+ * shape for a wait whose length nothing here knows. It starts after the
+ * settle has finished so the two never run over each other.
+ */
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .stage__state--waiting .stage__state-text {
+    background-image: linear-gradient(
+      100deg,
+      var(--ink-faint) 0%,
+      var(--ink-faint) 36%,
+      var(--gold) 50%,
+      var(--ink-faint) 64%,
+      var(--ink-faint) 100%
+    );
+    background-size: 320% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation:
+      state-settle 720ms var(--ease-calm) both,
+      state-sheen 3.4s 720ms var(--ease-breath) infinite;
+  }
+}
+
+@keyframes state-sheen {
+  from {
+    background-position: 150% 0;
+  }
+
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/*
+ * And three dots that breathe, in place of an ellipsis.
+ *
+ * At this tracking a typed "…" is three full-width dots sitting a third of an
+ * em apart, which is a lot of type doing nothing. These are 3px, gold, and
+ * they rise and fade in sequence on a two-second cycle — so "still working" is
+ * legible from across a room without reading a word of it.
+ */
+.stage__state-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  /* The tracking has already left a space after the last letter. */
+  margin-inline-start: -0.15em;
+}
+
+.stage__state-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--gold);
+  opacity: 0.2;
+  animation: state-dot 2.2s var(--ease-breath) infinite;
+}
+
+.stage__state-dots i:nth-child(2) {
+  animation-delay: 0.26s;
+}
+
+.stage__state-dots i:nth-child(3) {
+  animation-delay: 0.52s;
+}
+
+@keyframes state-dot {
+  0%,
+  100% {
+    opacity: 0.16;
+    transform: translateY(0);
+  }
+
+  42% {
+    opacity: 0.85;
+    transform: translateY(-1px);
+  }
+}
+
+/*
+ * Asked for less motion: the words still change and still say the same thing,
+ * and nothing on this line moves by itself. The sheen goes — it is a travelling
+ * highlight, which is exactly what somebody has asked to be spared — and the
+ * dots hold at a steady, readable weight instead of pulsing.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .stage__state-text,
+  .stage__state--waiting .stage__state-text {
+    animation: line-fade 240ms var(--ease-calm) both;
+    background: none;
+    color: var(--ink-faint);
+  }
+
+  .stage__state-dots i {
+    animation: none;
+    opacity: 0.55;
+  }
+}
+
 .stage__focus {
   flex: 0 1 auto;
   transition-property: flex-grow;

@@ -1,28 +1,48 @@
 /**
- * Fetch the first words of a loop before anybody asks for them.
+ * Fetch the words of a loop before anybody asks for them.
  *
- * ── Why the player is the right place for this ──
+ * ── Why this runs the whole time the app is open ──
  *
  * Everything else about the voice is prepared *during* a session: the loop
- * fetches the line after the one it is speaking, so from the second line
- * onwards there is nothing to wait for. The first line is the exception, and
- * it is the one that matters most — it is the one somebody is sitting in front
- * of, having just pressed play, listening to nothing.
+ * fetches the lines around the one it is speaking, so from the second line
+ * onwards there is nothing to wait for. What that never covered is the start —
+ * the one line somebody is sitting in front of, having just pressed play,
+ * listening to nothing — and it is the line that decides what the app feels
+ * like.
  *
  * `start()` does ask for it, but it asks at the moment it is needed. There is
  * a settling silence before the first word and the fetch overlaps it, and on a
  * warm cache that is already enough. On a cold one — a phrase nobody has ever
  * played, on a build where the model runs on the device — it is not remotely
- * enough, and the settling silence turns into a wait.
+ * enough, and the settling silence turns into a wait with a label on it.
  *
- * Somebody looking at the play button has, on the other hand, usually been
- * looking at it for several seconds. That is the time this uses.
+ * The time this uses is all the other time. Somebody writing an affirmation,
+ * reading their library, or looking at the play button has usually been doing
+ * it for several seconds, and none of those seconds were doing any work. So
+ * this is mounted at the shell rather than on the player, and every one of them
+ * goes on the voice: by the time the play button is pressed the whole loop is
+ * usually already in the cache, and pressing it is instant.
  *
- * Two lines, not the whole affirmation: the aim is to cover the start, and
- * anything past that is speculative work against words that may never be
- * played and a model that has better things to do. It is skipped entirely
- * while a session is running, because then the loop's own lookahead is doing
- * this properly and with better information.
+ * ── Why the whole text, and why one line at a time ──
+ *
+ * It used to fetch the first two lines, which covered the opening and left the
+ * rest of the pass to the loop. That is enough only while nothing changes; the
+ * moment somebody moves the speed, or plays a long affirmation on a slow
+ * device, the pass runs into lines nothing has ever made. Warming all of them
+ * costs nothing extra in the common case — a clip that exists is a lookup —
+ * and removes the last case where the app has to say it is waiting.
+ *
+ * Sequentially, and this is the important half: a model on this device
+ * synthesises one line at a time, so twenty lines asked for at once is not
+ * twenty lines sooner, it is the *first* line stuck behind nineteen it does not
+ * need yet. Awaiting each one keeps them arriving in the order they will be
+ * wanted, and keeps the queue short enough that a real request — somebody
+ * pressing play — is never more than one line behind.
+ *
+ * Everything here is quiet on failure and abandoned on change. Nothing has been
+ * promised to anybody: the words have not been played and may never be, so a
+ * warm-up that could not reach the model is simply a warm-up that did not
+ * happen, and `start()` does its own work when the time comes.
  */
 
 import { useEffect } from 'react'
@@ -30,11 +50,25 @@ import { chunkText } from '../speech'
 import { tts } from '.'
 import type { LogicalVoice } from './types'
 
-/** Long enough that arriving, glancing and leaving costs nothing. */
-const SETTLE_MS = 700
+/**
+ * How long the settings have to stop moving before any of this starts.
+ *
+ * Short enough to be finished with before somebody's hand reaches the play
+ * button, and long enough that typing a sentence is one round of warming
+ * rather than one per keystroke — every character changes the text, and each
+ * change abandons the round before it. A speed or pitch drag is the same
+ * shape: sixty events, one warm-up, on the value the finger stopped on.
+ */
+const SETTLE_MS = 320
 
-/** The opening, and the line behind it. Matches the loop's own window. */
-const LINES = 2
+/**
+ * The most lines that are worth preparing in advance.
+ *
+ * A ceiling on wasted work rather than a limit anybody will meet: an
+ * affirmation is a handful of lines, and something pasted in at fifty is
+ * something being read once, where the loop's own lookahead is the right tool.
+ */
+const MAX_LINES = 48
 
 export interface WarmVoiceOptions {
   text: string
@@ -55,22 +89,37 @@ export function useWarmVoice({
   enabled,
 }: WarmVoiceOptions): void {
   useEffect(() => {
+    /*
+     * The device's own voice has nothing to prepare — the platform is handed
+     * the words at the moment they are spoken — so warming it is not cheaper,
+     * it is impossible.
+     */
     if (!enabled || preferDevice) return
-    const chunks = chunkText(text).slice(0, LINES)
+    const chunks = chunkText(text).slice(0, MAX_LINES)
     if (chunks.length === 0) return
 
+    let abandoned = false
+
     const timer = window.setTimeout(() => {
-      for (const chunk of chunks) {
-        /*
-         * Quiet on every failure. Nothing has been promised to anybody yet —
-         * the words have not been played and may never be — so a warm-up that
-         * cannot reach the model is simply a warm-up that did not happen, and
-         * `start()` will do its own work when the time comes.
-         */
-        void tts.preload(chunk, { voice, speed: rate, pitch, prefer: 'studio' })
-      }
+      void (async () => {
+        for (const chunk of chunks) {
+          if (abandoned) return
+          await tts
+            .preload(chunk, { voice, speed: rate, pitch, prefer: 'studio' })
+            .catch(() => undefined)
+        }
+      })()
     }, SETTLE_MS)
 
-    return () => window.clearTimeout(timer)
+    /*
+     * A change abandons the walk rather than cancelling what is in flight. The
+     * line already being fetched is left to land in the cache — it cost what it
+     * cost, and the next round is very often the same words at a new speed,
+     * where the layers underneath still save the round trip. See `client.ts`.
+     */
+    return () => {
+      abandoned = true
+      window.clearTimeout(timer)
+    }
   }, [text, voice, rate, pitch, preferDevice, enabled])
 }

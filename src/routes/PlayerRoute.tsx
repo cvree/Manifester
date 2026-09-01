@@ -16,6 +16,7 @@ import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
 import { DesktopPlayerPanel } from '../components/DesktopPlayerPanel'
 import { EmptyState } from '../components/EmptyState'
 import { Notice } from '../components/Notice'
+import { StageStatus } from '../components/StageStatus'
 import { AmbienceMixer } from '../components/AmbienceMixer'
 import { PlayerAdjust } from '../components/PlayerAdjust'
 import { PlayerAtmosphere } from '../components/PlayerAtmosphere'
@@ -35,8 +36,6 @@ import {
 import { cx } from '../lib/cx'
 import { primeBreathAudio } from '../lib/breathAudio'
 import { formatBreathRate, isPatternValid } from '../lib/breathing'
-import { voiceForStyle } from '../lib/tts'
-import { useWarmVoice } from '../lib/tts/useWarmVoice'
 import { cue } from '../lib/feedback'
 import { countWords, formatClock } from '../lib/format'
 import { listeningSentence } from '../lib/listening'
@@ -122,20 +121,6 @@ export function PlayerRoute() {
     pattern: preferences.breathPattern,
     active: preferences.breathingEnabled && playing,
     mirrors: [stageRef, fieldRef],
-  })
-
-  /*
-   * The opening lines, fetched while somebody is still deciding to press play.
-   * It is the one line of a session that has nothing in front of it to hide a
-   * synthesis behind — see `useWarmVoice`.
-   */
-  useWarmVoice({
-    text: draft.text,
-    voice: voiceForStyle(draft.settings.voiceStyle),
-    rate: draft.settings.rate,
-    pitch: draft.settings.pitch,
-    preferDevice: draft.settings.voiceSource === 'device',
-    enabled: idle && hasText,
   })
 
   /*
@@ -269,6 +254,23 @@ export function PlayerRoute() {
       ? 'remaining'
       : 'elapsed'
 
+  /*
+   * The one state on this line that is a *wait* rather than a fact.
+   *
+   * It is rare now and meant to be rarer still: the lines of a draft are
+   * fetched while somebody is looking at the play button, the loop keeps the
+   * whole pass warm behind itself, and the flag underneath is not believed
+   * until the wait has lasted about a second — so a cached line, which is
+   * nearly every line, never lights this at all. What is left is the honest
+   * case: words nobody has ever played, on a device making them itself. See
+   * `useWarmVoice` and `SessionProvider`.
+   */
+  const waitingOnVoice =
+    playing &&
+    !wordless &&
+    session.delayRemaining == null &&
+    session.voicePreparing
+
   const stateLabel = complete
     ? 'Complete'
     : paused
@@ -278,8 +280,8 @@ export function PlayerRoute() {
           ? 'Breathing'
           : session.delayRemaining != null
             ? `Resting · ${session.delayRemaining}s`
-            : session.voicePreparing
-              ? 'Preparing the voice…'
+            : waitingOnVoice
+              ? 'Finding the voice'
               : 'Now looping'
         : 'Ready when you are'
 
@@ -460,9 +462,7 @@ export function PlayerRoute() {
                 </button>
 
                 <div className="stage__top flex w-full flex-col items-center">
-                  <p className="type-label" role="status" aria-live="polite">
-                    {stateLabel}
-                  </p>
+                  <StageStatus label={stateLabel} waiting={waitingOnVoice} />
                   <h1 className="stage__title mt-2 max-w-full truncate text-center font-display text-[1.75rem] leading-tight text-ink sm:text-[2rem]">
                     {session.title ||
                       draft.title.trim() ||

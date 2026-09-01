@@ -608,4 +608,84 @@ describe('changing settings without a silence', () => {
     expect(speaker.preloaded).toContain('Two.')
     expect(speaker.preloaded).toContain('Three.')
   })
+
+  it('prepares the rest of the pass behind the window', async () => {
+    const long = {
+      ...options,
+      text: 'One.\nTwo.\nThree.\nFour.\nFive.',
+      initialDelayMs: 0,
+    }
+    loop.start(long)
+    await flush()
+
+    // The window covers the next few seconds; the walk behind it covers the
+    // rest of the pass, so a session cannot run into a line nothing has made —
+    // which is what used to happen to every line after a change of speed.
+    for (const line of ['One.', 'Two.', 'Three.', 'Four.', 'Five.']) {
+      expect(speaker.preloaded).toContain(line)
+    }
+  })
+
+  it('walks the rest of the pass one line at a time, never in a heap', async () => {
+    const releases: Array<() => void> = []
+    const slow = new FakeSpeaker()
+    slow.preload = (text: string) => {
+      slow.preloaded.push(text)
+      // A line nobody has ever synthesised, on a phone doing the synthesising.
+      return new Promise<void>((resolve) => {
+        releases.push(resolve)
+      })
+    }
+
+    const running = new VoiceLooper(slow)
+    try {
+      running.start({
+        ...options,
+        text: 'One.\nTwo.\nThree.\nFour.\nFive.',
+        initialDelayMs: 0,
+      })
+      await flush()
+
+      // The whole point of the walk: a model synthesises one line at a time,
+      // so asking for the far end of the pass while the near end is still
+      // being made would put speculative work in front of the next real line.
+      expect(slow.preloaded).toContain('Four.')
+      expect(slow.preloaded).not.toContain('Five.')
+
+      releases.splice(0).forEach((release) => release())
+      await flush()
+
+      expect(slow.preloaded).toContain('Five.')
+    } finally {
+      running.stop()
+    }
+  })
+
+  it('abandons the walk when the session stops', async () => {
+    const releases: Array<() => void> = []
+    const slow = new FakeSpeaker()
+    slow.preload = (text: string) => {
+      slow.preloaded.push(text)
+      return new Promise<void>((resolve) => {
+        releases.push(resolve)
+      })
+    }
+
+    const running = new VoiceLooper(slow)
+    running.start({
+      ...options,
+      text: 'One.\nTwo.\nThree.\nFour.\nFive.',
+      initialDelayMs: 0,
+    })
+    await flush()
+    running.stop()
+
+    const asked = slow.preloaded.length
+    releases.splice(0).forEach((release) => release())
+    await flush()
+
+    // Nothing is owed to a session that has ended, and a model left
+    // synthesising into it is a battery being spent on nobody.
+    expect(slow.preloaded).toHaveLength(asked)
+  })
 })

@@ -112,13 +112,16 @@ interface SessionSnapshot {
    */
   timerSeconds: number | null
   /**
-   * True while a line is being fetched or synthesised.
+   * True while a line is being waited on — for long enough to be a wait.
    *
-   * Nearly always false for long enough to be invisible — a cached line is
-   * ready in a millisecond — and true for a second or two the first time
-   * somebody plays words nobody has ever played before. Saying so is the
-   * difference between a considered pause and an app that appears to have
-   * ignored the button.
+   * Not the raw "the voice is busy" flag, which is true for the millisecond a
+   * cached line takes and would flicker a label on and off at the top of every
+   * pass. This is that flag held for most of a second before it is believed,
+   * and it is dropped the instant the line arrives. What survives it is the one
+   * case worth a word on screen: the first time somebody plays words nobody has
+   * ever played, on a device making them itself. See
+   * `VOICE_WAIT_VISIBLE_AFTER_MS`, and `useWarmVoice` for the work that makes
+   * even that rare.
    */
   voicePreparing: boolean
   /**
@@ -215,6 +218,23 @@ interface SessionContextValue {
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null)
+
+/**
+ * How long the voice may be busy before the screen mentions it.
+ *
+ * Not a debounce for its own sake: it is the line between a pause and a wait.
+ * A line that is already in memory is answered in under a millisecond, and a
+ * line being fetched over a warm connection in a few tens of them — announcing
+ * either is a label that appears and disappears before it can be read, which is
+ * the flicker this exists to remove. Anything still unanswered after this has
+ * become something somebody is actually waiting on, and is worth saying.
+ *
+ * Set past the 420 ms of settling silence the loop holds before its first word,
+ * so an opening that is merely settling never says anything about itself — and
+ * well inside the seconds a genuinely cold on-device synthesis takes, so a real
+ * wait is still named while somebody is still waiting on it.
+ */
+const VOICE_WAIT_VISIBLE_AFTER_MS = 900
 
 const EMPTY_SESSION: SessionSnapshot = {
   status: 'idle',
@@ -331,6 +351,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    */
   const pendingSoundRef = useRef(false)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
+  /**
+   * Whether the screen is currently *saying* the voice is busy.
+   *
+   * Held beside the session snapshot rather than read out of it, because the
+   * subscription that keeps it is created once and would otherwise close over
+   * the first value it ever saw. See `VOICE_WAIT_VISIBLE_AFTER_MS`.
+   */
+  const preparingRef = useRef(false)
 
   const speechSupported = useMemo(isSpeechSupported, [])
 
@@ -545,28 +573,75 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   /* ── What the voice is doing, for the player's status line ── */
 
-  useEffect(
-    () =>
-      tts.subscribe((status) => {
-        setSession((current) =>
-          current.voicePreparing === status.loading
-            ? current
-            : { ...current, voicePreparing: status.loading },
-        )
-        /*
-         * And the music steps back under the words.
-         *
-         * Driven by the utterance rather than by the session — unlike the
-         * interface cues two blocks down — because this one is loud enough for
-         * the difference to matter: a bed of music at a steady level under a
-         * spoken affirmation is exactly the thing that makes the affirmation
-         * harder to hear. The soundtrack holds the duck through the gaps
-         * between phrases so it cannot flutter; see `DUCK_HOLD_MS`.
-         */
-        soundtrack.setDucked(status.speaking)
-      }),
-    [],
-  )
+  useEffect(() => {
+    let announce: number | null = null
+    const clearAnnounce = () => {
+      if (announce != null) {
+        window.clearTimeout(announce)
+        announce = null
+      }
+    }
+
+    const unsubscribe = tts.subscribe((status) => {
+      /*
+       * A wait is only worth saying out loud once it has become a wait.
+       *
+       * The flag underneath is true from the instant a line is asked for, and
+       * most lines are answered from memory in less than a millisecond — so
+       * repeating it straight to the screen meant "Preparing the voice…"
+       * flickering on at the top of every pass and off again before it could
+       * be read. A label nobody can finish reading is not information; it is
+       * the interface looking busy while doing something instant.
+       *
+       * So the claim is held for a moment before it is believed. Shorter than
+       * the settling silence before the first word, so a real wait is still
+       * named while somebody is waiting on it, and comfortably longer than any
+       * cached line takes — which, now that the whole loop is warmed before
+       * play, is very nearly all of them. Going quiet is never delayed: the
+       * moment a line is ready the label is gone.
+       */
+      if (status.loading) {
+        if (announce == null && !preparingRef.current) {
+          announce = window.setTimeout(() => {
+            announce = null
+            preparingRef.current = true
+            setSession((current) =>
+              current.voicePreparing
+                ? current
+                : { ...current, voicePreparing: true },
+            )
+          }, VOICE_WAIT_VISIBLE_AFTER_MS) as unknown as number
+        }
+      } else {
+        clearAnnounce()
+        if (preparingRef.current) {
+          preparingRef.current = false
+          setSession((current) =>
+            current.voicePreparing
+              ? { ...current, voicePreparing: false }
+              : current,
+          )
+        }
+      }
+
+      /*
+       * And the music steps back under the words.
+       *
+       * Driven by the utterance rather than by the session — unlike the
+       * interface cues two blocks down — because this one is loud enough for
+       * the difference to matter: a bed of music at a steady level under a
+       * spoken affirmation is exactly the thing that makes the affirmation
+       * harder to hear. The soundtrack holds the duck through the gaps
+       * between phrases so it cannot flutter; see `DUCK_HOLD_MS`.
+       */
+      soundtrack.setDucked(status.speaking)
+    })
+
+    return () => {
+      clearAnnounce()
+      unsubscribe()
+    }
+  }, [])
 
   /*
    * Step the interface cues back while a session is running.
