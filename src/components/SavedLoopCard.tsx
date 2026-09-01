@@ -184,8 +184,13 @@ export function SavedLoopCard({
         </Button>
       </div>
 
+      {/*
+        The words themselves, in the face they are read in. Everything else on
+        this card is chrome — a title, a count, the buttons — and this is the
+        one part of it that is the loop. See `.type-spoken`.
+      */}
       {preview && (
-        <p className="mt-3 line-clamp-3 text-[0.93rem] leading-relaxed text-ink-muted">
+        <p className="type-spoken mt-3 line-clamp-3 text-[0.98rem] leading-[1.6] text-ink-muted">
           {preview}
           {loop.text.trim().length > 150 && '…'}
         </p>
