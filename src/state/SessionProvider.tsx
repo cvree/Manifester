@@ -14,6 +14,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react'
 import { findAmbientPreset } from '../lib/ambient'
@@ -44,6 +45,7 @@ import {
   type Draft,
 } from '../lib/loops'
 import { ActiveTimeClock } from '../lib/sessionClock'
+import { ClockStore, type ClockReading } from '../lib/clockStore'
 import { soundPlaybackChanged } from '../lib/soundChoice'
 import { soundtrack } from '../lib/soundtrack'
 import {
@@ -84,9 +86,12 @@ import {
 interface SessionSnapshot {
   status: SessionStatus
   title: string
-  /** `null` while the session runs without a timer. */
-  remainingSeconds: number | null
-  elapsedSeconds: number
+  /*
+   * The elapsed time, the countdown and the rest between passes are not here.
+   * They change every second and almost nothing reads them, so they live in a
+   * `ClockStore` of their own — see `useSessionClock`. Keeping them in this
+   * object re-rendered every screen in the app once a second.
+   */
   cycles: number
   chunkIndex: number
   chunkTotal: number
@@ -100,13 +105,11 @@ interface SessionSnapshot {
   chunkText: string
   trackName: string | null
   notice: string | null
-  /** Seconds left in the delay between loops, or `null` while speaking. */
-  delayRemaining: number | null
   /**
    * How long this session was set to run, or `null` for an open-ended one.
    *
-   * Held rather than derived from `remainingSeconds`, because the only other
-   * way to know it is `elapsedSeconds + remainingSeconds` and those two are
+   * Held rather than derived from the clock's remaining seconds, because the
+   * only other way to know it is elapsed + remaining, and those two are
    * counted by different clocks — a total assembled from them wobbles by a
    * second every tick, which is invisible in the app and very visible on a
    * lock-screen progress bar drawn against it.
@@ -160,6 +163,11 @@ interface SessionContextValue {
   previewState: PreviewState
 
   session: SessionSnapshot
+  /**
+   * The per-second numbers, as a store rather than as state. Stable for the
+   * life of the app; read it with `useSessionClock`.
+   */
+  clock: ClockStore
   /**
    * Opens the audio hardware from inside a user gesture. The Start button
    * animates for a beat before it navigates, and by then the tap is over as
@@ -251,15 +259,12 @@ const QUICK_FADE_SECONDS = 0.35
 const EMPTY_SESSION: SessionSnapshot = {
   status: 'idle',
   title: '',
-  remainingSeconds: null,
-  elapsedSeconds: 0,
   cycles: 0,
   chunkIndex: 0,
   chunkTotal: 0,
   chunkText: '',
   trackName: null,
   notice: null,
-  delayRemaining: null,
   timerSeconds: null,
   voicePreparing: false,
   breathOnly: false,
@@ -326,6 +331,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [voices, setVoices] = useState<RankedVoice[]>([])
   const [voicesReady, setVoicesReady] = useState(false)
   const [session, setSession] = useState<SessionSnapshot>(EMPTY_SESSION)
+  const [clock] = useState(() => new ClockStore())
   const [previewState, setPreviewState] =
     useState<SessionContextValue['previewState']>('idle')
 
@@ -738,24 +744,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const delayRemaining = remaining == null ? null : Math.ceil(remaining)
         /*
          * Four ticks a second, and three of them change nothing a person can
-         * see. Handing React a new object anyway re-rendered every screen
-         * that reads the session four times a second — on the same main
-         * thread that draws the breath — so the same state is handed back
-         * whenever the numbers on screen have not moved.
+         * see. The store only tells its subscribers when a whole second moves,
+         * and its subscribers are the clock readouts alone — React state, and
+         * with it the rest of the app, never hears about the tick at all.
          */
-        setSession((current) =>
-          current.status === 'playing' &&
-          (current.elapsedSeconds !== elapsedSeconds ||
-            current.delayRemaining !== delayRemaining)
-            ? { ...current, elapsedSeconds, delayRemaining }
-            : current,
-        )
+        if (statusRef.current === 'playing') {
+          clock.set({ elapsedSeconds, delayRemaining })
+        }
         if (elapsedSeconds - listeningRef.current.recordedSeconds >= 5) {
           flushListening(tickAt)
         }
       }, 250)
     },
-    [clearElapsedInterval, flushListening],
+    [clearElapsedInterval, clock, flushListening],
   )
 
   const pauseElapsed = useCallback(() => {
@@ -763,10 +764,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const state = elapsedRef.current
     state.clock.pause(now)
     clearElapsedInterval()
-    const elapsedSeconds = Math.floor(state.clock.elapsedSeconds(now))
-    setSession((current) => ({ ...current, elapsedSeconds }))
+    clock.set({ elapsedSeconds: state.clock.elapsedSeconds(now) })
     flushListening(now)
-  }, [clearElapsedInterval, flushListening])
+  }, [clearElapsedInterval, clock, flushListening])
 
   const stopElapsed = useCallback(() => {
     pauseElapsed()
@@ -871,15 +871,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         startedAt: 0,
       }
       releaseWakeLock()
+      clock.set({
+        remainingSeconds: status === 'complete' ? 0 : null,
+        delayRemaining: null,
+      })
       setSession((current) => ({
         ...current,
         status,
-        remainingSeconds: status === 'complete' ? 0 : null,
         trackName: null,
         notice,
       }))
     },
-    [releaseWakeLock, stopElapsed],
+    [clock, releaseWakeLock, stopElapsed],
   )
 
   const stop = useCallback(() => finish('idle', null), [finish])
@@ -1043,9 +1046,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         title,
         breathOnly,
         chunkTotal: breathOnly ? 0 : speech.chunkCount,
-        remainingSeconds:
-          settings.timerMinutes != null ? settings.timerMinutes * 60 : null,
         timerSeconds:
+          settings.timerMinutes != null ? settings.timerMinutes * 60 : null,
+      })
+      clock.reset()
+      clock.set({
+        remainingSeconds:
           settings.timerMinutes != null ? settings.timerMinutes * 60 : null,
       })
       startElapsed(true)
@@ -1081,17 +1087,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       if (settings.timerMinutes != null) {
         timer.start(settings.timerMinutes * 60_000, {
-          onTick: (remainingSeconds) =>
-            setSession((current) =>
-              current.status === 'playing'
-                ? { ...current, remainingSeconds }
-                : current,
-            ),
+          onTick: (remainingSeconds) => {
+            if (statusRef.current === 'playing') clock.set({ remainingSeconds })
+          },
           onComplete: () => finish('complete', null),
         })
       }
     },
-    [finish, loops, recordPlay, requestWakeLock, startElapsed, voices],
+    [clock, finish, loops, recordPlay, requestWakeLock, startElapsed, voices],
   )
 
   const pause = useCallback(() => {
@@ -1104,12 +1107,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     pauseElapsed()
     releaseWakeLock()
     const remaining = speechRef.current?.delayRemainingSeconds ?? null
-    setSession((current) => ({
-      ...current,
-      status: 'paused',
-      delayRemaining: remaining == null ? null : Math.ceil(remaining),
-    }))
-  }, [pauseElapsed, releaseWakeLock])
+    clock.set({ delayRemaining: remaining })
+    setSession((current) => ({ ...current, status: 'paused' }))
+  }, [clock, pauseElapsed, releaseWakeLock])
 
   const resume = useCallback(() => {
     if (statusRef.current !== 'paused') return
@@ -1567,8 +1567,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    */
   useEffect(() => {
     if (session.status !== 'playing' && session.status !== 'paused') return
-    setMediaPosition(session.elapsedSeconds, session.timerSeconds)
-  }, [session.status, session.elapsedSeconds, session.timerSeconds])
+    const publish = () =>
+      setMediaPosition(clock.get().elapsedSeconds, session.timerSeconds)
+    publish()
+    return clock.subscribe(publish)
+  }, [clock, session.status, session.timerSeconds])
 
   /* ── Lifecycle ── */
 
@@ -1656,6 +1659,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       stopPreview,
       previewState,
       session,
+      clock,
       prime,
       start,
       pause,
@@ -1688,6 +1692,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       stopPreview,
       previewState,
       session,
+      clock,
       prime,
       start,
       pause,
@@ -1708,6 +1713,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+}
+
+/**
+ * One number off the session clock, re-rendering only the caller, and only
+ * when that number changes.
+ *
+ *     const elapsed = useSessionClock((clock) => clock.elapsedSeconds)
+ *
+ * Select a primitive. A selector that builds a new object each call would
+ * look like a change every time it is asked.
+ */
+export function useSessionClock<T>(select: (reading: ClockReading) => T): T {
+  const { clock } = useSession()
+  return useSyncExternalStore(clock.subscribe, () => select(clock.get()))
 }
 
 export function useSession(): SessionContextValue {

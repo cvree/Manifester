@@ -16,7 +16,11 @@ import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
 import { DesktopPlayerPanel } from '../components/DesktopPlayerPanel'
 import { EmptyState } from '../components/EmptyState'
 import { Notice } from '../components/Notice'
-import { StageStatus } from '../components/StageStatus'
+import {
+  ClockReadout,
+  ElapsedText,
+  LiveStageStatus,
+} from '../components/SessionClock'
 import { AmbienceMixer } from '../components/AmbienceMixer'
 import { PlayerAdjust } from '../components/PlayerAdjust'
 import { PlayerAtmosphere } from '../components/PlayerAtmosphere'
@@ -36,7 +40,7 @@ import { cx } from '../lib/cx'
 import { primeBreathAudio } from '../lib/breathAudio'
 import { formatBreathRate, isPatternValid } from '../lib/breathing'
 import { cue } from '../lib/feedback'
-import { countWords, formatClock } from '../lib/format'
+import { countWords } from '../lib/format'
 import { listeningSentence } from '../lib/listening'
 import { autoTitle } from '../lib/loops'
 import { useMotionLevel, useReducedMotion } from '../lib/motion'
@@ -251,51 +255,6 @@ export function PlayerRoute() {
     )
   }
 
-  const timeLabel = complete
-    ? formatClock(session.elapsedSeconds)
-    : session.remainingSeconds != null
-      ? formatClock(session.remainingSeconds)
-      : formatClock(session.elapsedSeconds)
-
-  const timeCaption = complete
-    ? wordless
-      ? 'breathed'
-      : 'listened'
-    : session.remainingSeconds != null
-      ? 'remaining'
-      : 'elapsed'
-
-  /*
-   * The one state on this line that is a *wait* rather than a fact.
-   *
-   * It is rare now and meant to be rarer still: the lines of a draft are
-   * fetched while somebody is looking at the play button, the loop keeps the
-   * whole pass warm behind itself, and the flag underneath is not believed
-   * until the wait has lasted about a second — so a cached line, which is
-   * nearly every line, never lights this at all. What is left is the honest
-   * case: words nobody has ever played, on a device making them itself. See
-   * `useWarmVoice` and `SessionProvider`.
-   */
-  const waitingOnVoice =
-    playing &&
-    !wordless &&
-    session.delayRemaining == null &&
-    session.voicePreparing
-
-  const stateLabel = complete
-    ? 'Complete'
-    : paused
-      ? 'Paused'
-      : playing
-        ? wordless
-          ? 'Breathing'
-          : session.delayRemaining != null
-            ? `Resting · ${session.delayRemaining}s`
-            : waitingOnVoice
-              ? 'Finding the voice'
-              : 'Now looping'
-        : 'Ready when you are'
-
   const passProgress =
     session.chunkTotal > 0
       ? ((session.chunkIndex + 1) / session.chunkTotal) * 100
@@ -371,12 +330,12 @@ export function PlayerRoute() {
                   <p className="type-body mt-3 max-w-[34ch] text-center">
                     {wordless ? (
                       <>
-                        You breathed for {formatClock(session.elapsedSeconds)}.
+                        You breathed for <ElapsedText />.
                         Sit with it a moment before you move on.
                       </>
                     ) : (
                       <>
-                        You listened for {formatClock(session.elapsedSeconds)} across{' '}
+                        You listened for <ElapsedText /> across{' '}
                         {session.cycles} {session.cycles === 1 ? 'pass' : 'passes'}.
                         Take a breath before you move on.
                       </>
@@ -462,7 +421,11 @@ export function PlayerRoute() {
                 </button>
 
                 <div className="stage__top flex w-full flex-col items-center">
-                  <StageStatus label={stateLabel} waiting={waitingOnVoice} />
+                  <LiveStageStatus
+                    status={session.status}
+                    wordless={wordless}
+                    voicePreparing={session.voicePreparing}
+                  />
                   <h1 className="stage__title mt-2 max-w-full truncate text-center font-display text-[1.75rem] leading-tight text-ink sm:text-[2rem]">
                     {session.title ||
                       draft.title.trim() ||
@@ -556,18 +519,7 @@ export function PlayerRoute() {
                     )}
                   </button>
 
-                  <div className="flex items-center gap-3">
-                    {/*
-                      A timer, not a live region. As `aria-live="polite"` it
-                      changed every second and a screen reader read the clock
-                      aloud once a second for the whole session; `timer` is
-                      there to be asked, and stays quiet otherwise.
-                    */}
-                    <span className="type-numeral text-[1.05rem] text-ink" role="timer">
-                      {timeLabel}
-                    </span>
-                    <span className="type-meta">{timeCaption}</span>
-                  </div>
+                  <ClockReadout status={session.status} wordless={wordless} />
 
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     <button
