@@ -38,10 +38,12 @@
  * below tidies up what the quantisation into whole lines leaves over.
  *
  * The cost is a handful of forced layout reads each time the line changes,
- * which is a few times a minute. Nothing here runs per frame.
+ * which is a few times a minute. Nothing here runs per frame — including while
+ * the stage expands, when the fit is held and done once on landing.
  */
 
 import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
+import { STAGE_SETTLED } from './useStageExpansion'
 
 /** Below this the words stop being the loudest thing on the screen. */
 const MIN_SCALE = 0.55
@@ -75,14 +77,24 @@ export function useFittedLine(
       // Half a pixel of slack: sub-pixel line heights should not cost a pass.
       if (natural <= available + 0.5) break
       if (scale <= MIN_SCALE) break
-      scale = Math.max(MIN_SCALE, scale * Math.sqrt(available / natural) * 0.99)
+      /*
+       * Rounded *down* to a step of 0.02. Unrounded, two lines of nearly the
+       * same length landed at two nearly-the-same sizes — 0.8731 and 0.8694 —
+       * and the words changed size by a fraction of a pixel from one line to
+       * the next, which reads as a wobble rather than as a choice. Down, so a
+       * step never lands back above the size that was measured to fit.
+       */
+      const next = scale * Math.sqrt(available / natural) * 0.99
+      scale = Math.max(MIN_SCALE, Math.floor(next * 50) / 50)
     }
   }
 
-  // Before paint, so the words are never briefly the wrong size.
+  // Before paint, so the words are never briefly the wrong size. Not while the
+  // stage is mid-flight: the box is a moving target, and the landing refits.
   useLayoutEffect(() => {
+    if (boxRef.current?.closest('[data-travelling]')) return
     fit.current()
-  }, [line, expanded])
+  }, [boxRef, line, expanded])
 
   /*
    * The box changes width while the stage travels, and again whenever the
@@ -96,13 +108,22 @@ export function useFittedLine(
     let frame = 0
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame)
+      // Held while the stage is travelling; fitted once when it lands.
+      if (box.closest('[data-travelling]')) return
       frame = requestAnimationFrame(() => fit.current())
     })
     observer.observe(box)
 
+    const onSettled = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => fit.current())
+    }
+    document.addEventListener(STAGE_SETTLED, onSettled)
+
     return () => {
       cancelAnimationFrame(frame)
       observer.disconnect()
+      document.removeEventListener(STAGE_SETTLED, onSettled)
     }
   }, [boxRef])
 }

@@ -133,27 +133,53 @@ export function CosmicBackground({ active = false }: CosmicBackgroundProps) {
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
 
+    /*
+     * On a phone, `resize` fires while the URL bar slides in and out — that
+     * is, during an ordinary scroll. This used to reallocate the canvas and
+     * scatter every mote to a new random place on each one, so the garden
+     * visibly jumped whenever someone scrolled. Now the buffer is reallocated
+     * only when the width changes (a rotation, a real window resize) or the
+     * height grows past what it already holds, and the motes that exist are
+     * carried across rather than re-rolled.
+     */
+    let bufferHeight = 0
+
+    const spawn = (index: number): Mote => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      radius: 0.6 + Math.random() * 1.6,
+      speed: 0.04 + Math.random() * 0.14,
+      drift: 0.15 + Math.random() * 0.5,
+      phase: Math.random() * Math.PI * 2,
+      alpha: 0.2 + Math.random() * 0.5,
+      // Roughly one in three is a firefly, so the garden has warm points
+      // among the cool ones without turning into a light show.
+      firefly: index % 3 === 0,
+    })
+
     const resize = () => {
-      width = window.innerWidth
-      height = window.innerHeight
+      const nextWidth = window.innerWidth
+      const nextHeight = window.innerHeight
+      if (nextWidth === width && nextHeight <= bufferHeight) {
+        height = nextHeight
+        return
+      }
+
+      const scaleX = width > 0 ? nextWidth / width : 1
+      const scaleY = height > 0 ? nextHeight / height : 1
+      width = nextWidth
+      height = nextHeight
+      bufferHeight = nextHeight
       canvas.width = Math.floor(width * dpr)
       canvas.height = Math.floor(height * dpr)
       canvas.style.width = `${width}px`
       canvas.style.height = `${height}px`
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-      motes = Array.from({ length: MOTE_COUNT }, (_, index) => ({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        radius: 0.6 + Math.random() * 1.6,
-        speed: 0.04 + Math.random() * 0.14,
-        drift: 0.15 + Math.random() * 0.5,
-        phase: Math.random() * Math.PI * 2,
-        alpha: 0.2 + Math.random() * 0.5,
-        // Roughly one in three is a firefly, so the garden has warm points
-        // among the cool ones without turning into a light show.
-        firefly: index % 3 === 0,
-      }))
+      motes =
+        motes.length === MOTE_COUNT
+          ? motes.map((mote) => ({ ...mote, x: mote.x * scaleX, y: mote.y * scaleY }))
+          : Array.from({ length: MOTE_COUNT }, (_, index) => spawn(index))
     }
 
     /*
@@ -182,21 +208,31 @@ export function CosmicBackground({ active = false }: CosmicBackgroundProps) {
     let colours = readColours()
     let time = 0
     let frames = 0
+    let last = 0
 
-    const draw = () => {
+    const draw = (now: number) => {
       if (!running) return
-      time += 0.016
+      /*
+       * Measured, not assumed. A fixed 16ms a frame ran the garden twice as
+       * fast on a 120Hz phone and stuttered it on any dropped frame. `step` is
+       * the same frame expressed in sixtieths of a second, so the per-frame
+       * speeds below keep their meaning; it is capped so a long pause does not
+       * fling every mote across the screen on the first frame back.
+       */
+      const step = last > 0 ? Math.min(3, Math.max(0, (now - last) / (1000 / 60))) : 1
+      last = now
+      time += 0.016 * step
 
       /*
        * Twice a second, which is often enough that the motes travel with the
        * palette while the hue dial sweeps, and rare enough to cost nothing.
        */
       if (frames++ % 30 === 0) colours = readColours()
-      ctx.clearRect(0, 0, width, height)
+      ctx.clearRect(0, 0, width, bufferHeight)
 
       for (const mote of motes) {
-        mote.y -= mote.speed
-        mote.phase += 0.004
+        mote.y -= mote.speed * step
+        mote.phase += 0.004 * step
         if (mote.y < -10) {
           mote.y = height + 10
           mote.x = Math.random() * width
@@ -230,6 +266,7 @@ export function CosmicBackground({ active = false }: CosmicBackgroundProps) {
         cancelAnimationFrame(frame)
       } else if (!running) {
         running = true
+        last = 0
         colours = readColours()
         frame = requestAnimationFrame(draw)
       }
@@ -246,6 +283,10 @@ export function CosmicBackground({ active = false }: CosmicBackgroundProps) {
       window.removeEventListener('resize', resize)
       document.removeEventListener('visibilitychange', onVisibility)
       probe.remove()
+      // Hand the pixels back now rather than whenever the collector gets to
+      // them: iOS caps the memory all canvases on a page may hold together.
+      canvas.width = 0
+      canvas.height = 0
     }
   }, [reducedMotion])
 

@@ -96,6 +96,9 @@ export interface BreathingRuntime {
   active: boolean
 }
 
+/** The custom properties a frame is written as, in `BreathFrame` order. */
+const FRAME_PROPERTIES = ['--e', '--p', '--m', '--e-mid', '--e-far'] as const
+
 /** Anything else that should receive the breath on the very same frame. */
 type Mirrors = ReadonlyArray<React.RefObject<HTMLElement | null>>
 
@@ -126,20 +129,32 @@ function useWriter(
   const mirrorsRef = useRef(mirrors)
   mirrorsRef.current = mirrors
 
+  /*
+   * What each element was last handed. Every property written invalidates the
+   * style of everything underneath it, and through a hold most of them are not
+   * changing at all — `--e` sits still at the top of a held breath for four
+   * seconds while only `--p` moves. So a value is written only when it is
+   * different from the one already there.
+   */
+  const written = useRef(new WeakMap<HTMLElement, string[]>())
+
   return useCallback(
     (frame: BreathFrame, mirror = true) => {
-      const e = frame.e.toFixed(4)
-      const p = frame.p.toFixed(4)
-      const m = frame.m.toFixed(4)
-      const mid = frame.mid.toFixed(4)
-      const far = frame.far.toFixed(4)
+      const values = [
+        frame.e.toFixed(4),
+        frame.p.toFixed(4),
+        frame.m.toFixed(4),
+        frame.mid.toFixed(4),
+        frame.far.toFixed(4),
+      ]
 
       const apply = (node: HTMLElement) => {
-        node.style.setProperty('--e', e)
-        node.style.setProperty('--p', p)
-        node.style.setProperty('--m', m)
-        node.style.setProperty('--e-mid', mid)
-        node.style.setProperty('--e-far', far)
+        const last = written.current.get(node)
+        for (let i = 0; i < FRAME_PROPERTIES.length; i += 1) {
+          if (last && last[i] === values[i]) continue
+          node.style.setProperty(FRAME_PROPERTIES[i], values[i])
+        }
+        written.current.set(node, values)
       }
 
       const stage = stageRef.current

@@ -70,10 +70,12 @@ function travel(
   // trusted to carry it smoothly.
   if (prefersReducedMotion() || isLowPowerDevice()) {
     onComplete?.()
+    settled(stage)
     return
   }
 
   const to = stage.getBoundingClientRect()
+  stage.dataset.travelling = ''
   gsap.set(stage, { position: 'fixed', zIndex: 42, margin: 0 })
   gsap.fromTo(
     stage,
@@ -89,9 +91,30 @@ function travel(
       // thrown open.
       ease: 'power2.inOut',
       clearProps: TWEENED,
-      onComplete,
+      onComplete: () => {
+        onComplete?.()
+        settled(stage)
+      },
     },
   )
+}
+
+/**
+ * Marks the stage as travelling, and announces when it has landed.
+ *
+ * The spoken line inside the stage is fitted to its box (`useFittedLine`), and
+ * the box changes width on every frame of the trip. Fitted each frame, the
+ * words stepped through a dozen slightly different sizes on the way — the
+ * affirmation visibly wobbling while the stage moved. So the fit holds still
+ * while `data-travelling` is on the stage and is done once, on this event,
+ * when the stage has arrived. One measurement instead of forty, and the words
+ * change size at most once.
+ */
+export const STAGE_SETTLED = 'manifester:stage-settled'
+
+function settled(stage: HTMLElement) {
+  delete stage.dataset.travelling
+  stage.dispatchEvent(new CustomEvent(STAGE_SETTLED, { bubbles: true }))
 }
 
 interface StageExpansionOptions {
