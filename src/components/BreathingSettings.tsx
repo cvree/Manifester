@@ -566,7 +566,7 @@ function VoiceRow({
           <span className="flex items-baseline gap-2">
             <span className="text-[0.95rem] font-medium text-ink">{name}</span>
             {badge && (
-              <span className="text-[0.7rem] tracking-[0.06em] text-ink-faint uppercase">
+              <span className="text-[0.75rem] tracking-[0.06em] text-ink-faint uppercase">
                 {badge}
               </span>
             )}

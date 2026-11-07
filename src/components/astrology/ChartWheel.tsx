@@ -427,7 +427,7 @@ export function ChartWheel({ chart, overlay, className, title }: ChartWheelProps
 
       <ul className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1">
         {ASPECTS.filter((kind) => kind.id !== 'quincunx').map((kind) => (
-          <li key={kind.id} className="type-meta text-[0.7rem]">
+          <li key={kind.id} className="type-meta text-[0.75rem]">
             <span
               aria-hidden="true"
               className={cx(

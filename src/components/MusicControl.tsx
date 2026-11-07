@@ -125,7 +125,7 @@ export function MusicControl({ className }: { className?: string }) {
           // carried by the icon as well as by the colour.
           on
             ? 'text-ink-muted hover:text-ink'
-            : 'text-ink-faint opacity-70 hover:opacity-100',
+            : 'text-ink-faint hover:text-ink-muted',
           className,
         )}
       >

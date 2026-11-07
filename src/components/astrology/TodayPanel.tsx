@@ -136,7 +136,7 @@ export function TodayPanel({ horoscope }: TodayPanelProps) {
                 className="size-[64px] sm:size-[108px]"
                 label={`${sky.phase.name}, ${Math.round(sky.phase.illumination * 100)}% lit`}
               />
-              <p className="text-center text-[0.72rem] leading-tight text-ink-faint">
+              <p className="text-center text-[0.75rem] leading-tight text-ink-faint">
                 {sky.phase.name}
                 <br />
                 {Math.round(sky.phase.illumination * 100)}% lit

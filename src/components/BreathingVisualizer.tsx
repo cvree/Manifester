@@ -107,9 +107,16 @@ export function BreathingVisualizer({
       )}
       style={{ '--size': SIZES[size] } as CSSProperties}
       role="img"
+      /*
+       * The phase, not the countdown. The name used to carry the seconds left,
+       * which changed it every second — and a screen reader resting on the orb
+       * reads a changed name out, so VoiceOver counted down aloud over the
+       * whole session. The phase changes a few times a minute, which is the
+       * pace at which a person following by ear wants to be told anything.
+       */
       aria-label={
         runtime.active
-          ? `Breathing guide: ${runtime.label}, ${runtime.remaining} seconds left.${
+          ? `Breathing guide: ${runtime.label}.${
               rateLabel ? ` ${rateLabel} breaths a minute.` : ''
             }`
           : 'Breathing guide, resting.'
@@ -145,7 +152,7 @@ export function BreathingVisualizer({
             </span>
           )}
           {runtime.active && rateLabel && (
-            <span className="mt-0.5 text-[0.68rem] tracking-[0.09em] text-ink-faint uppercase opacity-70">
+            <span className="mt-0.5 text-[0.75rem] tracking-[0.09em] text-ink-faint uppercase">
               {rateLabel} breaths a minute
             </span>
           )}
@@ -339,17 +346,20 @@ export function BreathingCaption({
   if (!runtime.active) return null
 
   return (
-    <div
-      className={cx('flex flex-col items-center gap-1', className)}
-      aria-live="polite"
-    >
-      <span
-        key={runtime.phase}
-        className="animate-phase-in font-display text-[1.35rem] leading-none text-ink"
-      >
-        {runtime.label}
+    <div className={cx('flex flex-col items-center gap-1', className)}>
+      {/*
+        Only the phase is live. The count beside it changes every second, and
+        inside a live region that is a screen reader announcing a number every
+        second for as long as the session runs.
+      */}
+      <span aria-live="polite" className="font-display text-[1.35rem] leading-none text-ink">
+        {/* The region stays put and only its words change — a live region
+            that is itself re-mounted at each turn is often not read at all. */}
+        <span key={runtime.phase} className="animate-phase-in inline-block">
+          {runtime.label}
+        </span>
       </span>
-      <span className="type-numeral text-[0.85rem] text-ink-muted">
+      <span aria-hidden="true" className="type-numeral text-[0.85rem] text-ink-muted">
         {runtime.remaining}s
         {runtime.breaths > 0 &&
           ` · ${runtime.breaths} ${runtime.breaths === 1 ? 'breath' : 'breaths'}`}

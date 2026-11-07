@@ -72,8 +72,8 @@ const STYLES = `
   --border: rgb(58 50 44 / 0.1);
   --ink: #2f2823;
   --ink-muted: #5f544b;
-  --ink-faint: #8a7c71;
-  --rose: #9d5a65;
+  --ink-faint: #6e6359;
+  --rose: #8f4f5a;
   --shadow: 0 1px 2px rgb(58 50 44 / 0.05), 0 18px 40px -28px rgb(58 50 44 / 0.5);
   --display: ui-serif, 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
   --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;

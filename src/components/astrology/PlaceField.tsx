@@ -277,7 +277,7 @@ export function PlaceField({ id, place, onChange }: PlaceFieldProps) {
                 onChange={(event) => setZoneQuery(event.target.value)}
                 className={cx(
                   'min-h-11 w-full rounded-[1rem] border border-[var(--border)] bg-[var(--surface-strong)] px-3.5',
-                  'text-[0.92rem] text-ink placeholder:text-ink-faint',
+                  'text-[1rem] text-ink placeholder:text-ink-faint',
                   'transition-colors duration-200 focus:border-[var(--border-strong)]',
                 )}
               />

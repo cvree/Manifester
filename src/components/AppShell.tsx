@@ -167,15 +167,22 @@ export function AppShell() {
         inert={chromeHidden}
         aria-hidden={chromeHidden || undefined}
       >
-        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-4">
+        {/*
+          The smallest phones (320px — an iPhone SE in Display Zoom) cannot
+          fit the wordmark, its gaps and three round controls at full size;
+          the last control ran 5px off the screen and the whole page could be
+          nudged sideways under a thumb. Below 360px the gaps close and the
+          wordmark comes down a step. Nothing is hidden.
+        */}
+        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-2 min-[360px]:gap-4">
           <NavLink
             to="/create"
-            className="group flex shrink-0 items-center gap-2.5 rounded-2xl py-1 pr-2"
+            className="group flex shrink-0 items-center gap-2 rounded-2xl py-1 min-[360px]:gap-2.5 min-[360px]:pr-2"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--panel-border)] bg-[var(--panel)] text-[1.05rem] text-[var(--rose-deep)]">
               <SparkIcon />
             </span>
-            <span className="shimmer-ink font-display text-[1.45rem] tracking-tight">
+            <span className="shimmer-ink font-display text-[1.3rem] tracking-tight min-[360px]:text-[1.45rem]">
               Manifester
             </span>
           </NavLink>

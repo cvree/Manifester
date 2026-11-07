@@ -351,6 +351,8 @@ export function SoundsSection() {
             type="file"
             accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac,.flac"
             multiple
+            aria-label="Choose audio files to add"
+            tabIndex={-1}
             className="sr-only"
             onChange={(event) => void handleFiles(event.target.files)}
           />
@@ -593,7 +595,7 @@ function AmbienceCard({
               {track.name}
             </span>
             {selected && (
-              <span className="inline-flex shrink-0 items-center gap-1 text-[0.72rem] font-medium tracking-[0.06em] text-[var(--rose-deep)] uppercase">
+              <span className="inline-flex shrink-0 items-center gap-1 text-[0.75rem] font-medium tracking-[0.06em] text-[var(--rose-deep)] uppercase">
                 <CheckIcon className="text-[0.7rem]" />
                 Selected
               </span>
@@ -602,7 +604,7 @@ function AmbienceCard({
           <span className="mt-0.5 block text-[0.85rem] leading-snug text-ink-muted">
             {track.description}
           </span>
-          <span className="mt-1.5 inline-block rounded-pill bg-[var(--quiet)] px-2 py-0.5 text-[0.72rem] text-ink-faint">
+          <span className="mt-1.5 inline-block rounded-pill bg-[var(--quiet)] px-2 py-0.5 text-[0.75rem] text-ink-faint">
             Generated on this device
           </span>
         </button>
@@ -701,7 +703,7 @@ function TrackRow({
             {track.name}
           </span>
           {selected && (
-            <span className="shrink-0 text-[0.72rem] font-medium tracking-[0.06em] text-[var(--rose-deep)] uppercase">
+            <span className="shrink-0 text-[0.75rem] font-medium tracking-[0.06em] text-[var(--rose-deep)] uppercase">
               Selected
             </span>
           )}

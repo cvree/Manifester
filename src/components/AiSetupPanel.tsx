@@ -327,7 +327,7 @@ function SetupForm({
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !testing && key) void connect()
           }}
-          className="min-h-12 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-sunken)] px-4 font-mono text-[0.95rem] text-ink transition-colors focus:border-[var(--border-strong)]"
+          className="min-h-12 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-sunken)] px-4 font-mono text-[1rem] text-ink transition-colors focus:border-[var(--border-strong)]"
         />
 
         <div id="ai-key-help" className="space-y-2">

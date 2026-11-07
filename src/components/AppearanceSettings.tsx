@@ -10,6 +10,8 @@ import {
   nightLightName,
   supportsHueShift,
 } from '../lib/hue'
+import { useSystemReducedMotion } from '../lib/motion'
+import { usePreferences } from '../state/PreferencesProvider'
 import { useTheme } from '../state/ThemeProvider'
 import { FieldLabel } from './Card'
 import { DragBar } from './DragBar'
@@ -51,6 +53,12 @@ export function AppearanceSettings() {
    * honest under tests that stub `CSS.supports`.
    */
   const [canShiftHue] = useState(supportsHueShift)
+  const { preferences, update } = usePreferences()
+  /*
+   * The device's Reduce Motion is not the app's to override, so while it is
+   * on the control shows Still and says why rather than pretending.
+   */
+  const deviceReduced = useSystemReducedMotion()
   const exact = huePreset(hue, chroma)
 
   /*
@@ -220,6 +228,30 @@ export function AppearanceSettings() {
           does as the evening goes on. It warms the light rather than laying a
           colour over it, so every word on the page stays exactly as legible at
           a hundred as it is at nought.
+        </p>
+      </div>
+
+      <div>
+        <FieldLabel hint={deviceReduced ? 'Your device asks for less' : undefined}>
+          Motion
+        </FieldLabel>
+        <SegmentedControl
+          label="How much the app moves"
+          value={deviceReduced ? 'still' : preferences.motion}
+          onChange={(next) => {
+            cue('select')
+            update({ motion: next })
+          }}
+          segments={[
+            { value: 'full' as const, label: 'Full' },
+            { value: 'gentle' as const, label: 'Gentle' },
+            { value: 'still' as const, label: 'Still' },
+          ]}
+        />
+        <p className="type-meta mt-3 text-ink-faint">
+          {deviceReduced
+            ? 'Reduce Motion is on in your device settings, so everything is held still. Turn it off there to choose here.'
+            : 'Gentle keeps the breath moving at half the swing and holds the room behind it still. Still stops everything that travels; the words and the ring that times each breath stay.'}
         </p>
       </div>
 

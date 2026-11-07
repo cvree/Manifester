@@ -19,6 +19,7 @@ import { Button } from '../components/Button'
 import { AppearanceSettings } from '../components/AppearanceSettings'
 import { Card } from '../components/Card'
 import { DeleteAllDataPanel } from '../components/DeleteAllDataPanel'
+import { DiagnosticsPanel } from '../components/DiagnosticsPanel'
 import {
   ArrowUpIcon,
   HeadphonesIcon,
@@ -597,6 +598,16 @@ export function AboutRoute() {
                 </div>
               ))}
             </dl>
+          </Card>
+
+          <Card
+            data-rise
+            id="problems"
+            className="scroll-mt-6"
+            title="If something goes wrong"
+            description="The app keeps a short note of any error it runs into, on this device only."
+          >
+            <DiagnosticsPanel />
           </Card>
 
           {/*

@@ -423,7 +423,7 @@ function FailureDetail({
         different answers, and the difference is invisible from the final
         message alone.
       */}
-      <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[0.72rem] leading-relaxed">
+      <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[0.75rem] leading-relaxed">
         {report}
       </pre>
       <button

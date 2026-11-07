@@ -2,31 +2,110 @@
  * Motion preferences.
  *
  * Everything animated in Manifester asks here first. When someone has reduced
- * motion turned on, or their device looks low-powered, the app renders the same
- * layout with the movement removed rather than falling back to a lesser design.
+ * motion turned on — on the device, or with the app's own Motion setting — or
+ * their device looks low-powered, the app renders the same layout with the
+ * movement removed rather than falling back to a lesser design.
  */
 
 import { useEffect, useState } from 'react'
 
 const QUERY = '(prefers-reduced-motion: reduce)'
 
-export function prefersReducedMotion(): boolean {
+/**
+ * How much the app moves, as chosen inside the app.
+ *
+ * The operating system's Reduce Motion is a setting most people have never
+ * found, and it is all-or-nothing. So the app has its own, in Appearance:
+ *
+ *  - **Full** — everything, unless the device asks for less. The device's
+ *    Reduce Motion always wins; nothing here can turn motion back *on*.
+ *  - **Gentle** — the breath still moves the orb, at half the swing, and the
+ *    full-screen room behind it holds still. The title's letters arrive with a
+ *    fade rather than out of blur. For people who like the guide alive but
+ *    find a whole breathing screen too much.
+ *  - **Still** — exactly what the device's Reduce Motion gives, through the
+ *    same code paths: a phase ring, words that change, and nothing travelling.
+ *
+ * Set from `PreferencesProvider`, and written onto `<html>` as `data-motion`
+ * so the stylesheet can answer it as well.
+ */
+export type MotionLevel = 'full' | 'gentle' | 'still'
+
+let appLevel: MotionLevel = 'full'
+const levelListeners = new Set<() => void>()
+
+export function setAppMotion(level: MotionLevel): void {
+  if (typeof document !== 'undefined') {
+    document.documentElement.dataset.motion = level
+  }
+  if (level === appLevel) return
+  appLevel = level
+  for (const listener of levelListeners) listener()
+}
+
+function systemReduced(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false
   return window.matchMedia(QUERY).matches
+}
+
+export function prefersReducedMotion(): boolean {
+  return appLevel === 'still' || systemReduced()
+}
+
+/** The level in force: the device's Reduce Motion counts as Still. */
+export function motionLevel(): MotionLevel {
+  return prefersReducedMotion() ? 'still' : appLevel
+}
+
+/** Calls back when either the device's setting or the app's changes. */
+function subscribeMotion(onChange: () => void): () => void {
+  levelListeners.add(onChange)
+  let media: MediaQueryList | null = null
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    media = window.matchMedia(QUERY)
+    media.addEventListener('change', onChange)
+  }
+  return () => {
+    levelListeners.delete(onChange)
+    media?.removeEventListener('change', onChange)
+  }
 }
 
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(prefersReducedMotion)
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return
-    const media = window.matchMedia(QUERY)
-    const onChange = () => setReduced(media.matches)
-    media.addEventListener('change', onChange)
-    return () => media.removeEventListener('change', onChange)
+    const onChange = () => setReduced(prefersReducedMotion())
+    onChange()
+    return subscribeMotion(onChange)
   }, [])
 
   return reduced
+}
+
+/** The device's own Reduce Motion alone, for the control that explains it. */
+export function useSystemReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(systemReduced)
+
+  useEffect(() => {
+    const onChange = () => setReduced(systemReduced())
+    onChange()
+    return subscribeMotion(onChange)
+  }, [])
+
+  return reduced
+}
+
+export function useMotionLevel(): MotionLevel {
+  const [level, setLevel] = useState(motionLevel)
+
+  useEffect(() => {
+    const onChange = () => setLevel(motionLevel())
+    onChange()
+    return subscribeMotion(onChange)
+  }, [])
+
+  return level
 }
 
 /**

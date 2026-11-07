@@ -12,6 +12,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -40,7 +41,10 @@ import {
   prefersReducedData,
   soundtrack,
 } from '../lib/soundtrack'
+import { setAppMotion, type MotionLevel } from '../lib/motion'
 import { readLocal, writeLocal } from '../lib/storage'
+
+const MOTION_LEVELS: readonly MotionLevel[] = ['full', 'gentle', 'still']
 
 export interface Preferences {
   breathingEnabled: boolean
@@ -126,6 +130,11 @@ export interface Preferences {
    * nothing reaches a provider, and the app stops offering to connect one.
    */
   aiEnabled: boolean
+  /**
+   * How much the app moves: Full, Gentle or Still. See `MotionLevel` in
+   * `lib/motion.ts`. The device's own Reduce Motion always wins over Full.
+   */
+  motion: MotionLevel
 }
 
 const DEFAULTS: Preferences = {
@@ -146,6 +155,7 @@ const DEFAULTS: Preferences = {
   uiSoundsChosen: false,
   uiHaptics: true,
   aiEnabled: true,
+  motion: 'full',
 }
 
 const KEY = 'preferences'
@@ -211,6 +221,8 @@ function load(): Preferences {
     )
     merged.musicVolume = Math.min(1, Math.max(0, merged.musicVolume))
 
+    if (!MOTION_LEVELS.includes(merged.motion)) merged.motion = DEFAULTS.motion
+
     /*
      * A phone on a metered connection, or with Data Saver on, does not get
      * eleven megabytes of atmosphere it never asked for. The switch is still
@@ -248,6 +260,14 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     soundtrack.setLevel(preferences.musicVolume)
   }, [preferences.musicVolume])
+
+  /*
+   * Before paint, so a person who chose Still never sees one frame of the
+   * full-motion page on load.
+   */
+  useLayoutEffect(() => {
+    setAppMotion(preferences.motion)
+  }, [preferences.motion])
 
   const update = useCallback((patch: Partial<Preferences>) => {
     setPreferences((current) => ({

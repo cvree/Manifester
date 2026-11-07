@@ -448,7 +448,7 @@ function SummaryTile({
         {icon}
       </span>
       <span className="min-w-0 grow">
-        <span className="block text-[0.7rem] font-semibold uppercase tracking-[0.09em] text-ink-faint">
+        <span className="block text-[0.75rem] font-semibold uppercase tracking-[0.09em] text-ink-faint">
           {label}
         </span>
         <span className="block truncate text-[0.85rem] text-ink">{value}</span>

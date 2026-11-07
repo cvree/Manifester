@@ -133,7 +133,7 @@ export function CyclesPanel({ natal, where, day }: CyclesPanelProps) {
                   : 'border-[var(--border)] bg-[var(--quiet)]',
               )}
             >
-              <span className="text-[0.7rem] font-semibold text-ink-faint">
+              <span className="text-[0.75rem] font-semibold text-ink-faint">
                 {index === 0 ? 'Today' : entry.weekday}
               </span>
               <MoonDisc
@@ -148,7 +148,7 @@ export function CyclesPanel({ natal, where, day }: CyclesPanelProps) {
                 className="h-1.5 w-full rounded-pill"
                 style={{ background: WORD_TINT[entry.word] ?? 'var(--ink-faint)' }}
               />
-              <span className="text-[0.68rem] leading-tight text-ink-muted">
+              <span className="text-[0.75rem] leading-tight text-ink-muted">
                 {entry.word}
               </span>
             </div>

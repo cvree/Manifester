@@ -112,11 +112,20 @@
   /* ── Ink ── */
   --ink: #2f2823;
   --ink-muted: #5f544b;
-  --ink-faint: #8a7c71;
+  /*
+   * The quietest ink still has to be readable. It was #8a7c71, which comes to
+   * 3.2–4.0:1 against the cream grounds — under the 4.5:1 that small text
+   * needs (WCAG 1.4.3), on exactly the labels set smallest. This is the same
+   * warm grey-brown taken down until it clears 4.5:1 on every light ground
+   * the app has, the deepest lilac included.
+   */
+  --ink-faint: #6e6359;
 
   /* ── Accents ── */
   --rose-base: #c07a84;
-  --rose-deep-base: #9d5a65;
+  /* Deep enough to set small type in: 4.8:1 or better on every cream and
+     lilac ground. It was #9d5a65, which fell to 4.0:1 on the deeper ones. */
+  --rose-deep-base: #8f4f5a;
   --rose-soft-base: rgb(192 122 132 / 0.13);
   --sage-base: #6f9073;
   --sage-soft-base: rgb(111 144 115 / 0.14);
@@ -2691,15 +2700,48 @@ html:not(.dark) .breath-aurora__veil {
   .cinema__glow {
     transform: none;
   }
+}
 
-  @keyframes cinema-fade {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+/* Outside the query, so the app's own Still and Gentle settings can use it. */
+@keyframes cinema-fade {
+  from {
+    opacity: 0;
   }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * The app's own Motion setting (`data-motion` on `<html>`, see `lib/motion.ts`).
+ * Gentle keeps the type opening with the breath — that is driven by `--e`,
+ * which is already halved — and swaps the resolve out of blur for a fade.
+ * Still answers exactly as the device's Reduce Motion does above.
+ */
+:root[data-motion='gentle'] .cinema__glyph,
+:root[data-motion='gentle'] .cinema__whisper {
+  animation-name: cinema-fade;
+  animation-duration: 420ms;
+}
+
+:root[data-motion='still'] .cinema__word {
+  will-change: auto;
+}
+
+:root[data-motion='still'] .cinema__glyph {
+  translate: none;
+  will-change: auto;
+  animation: cinema-fade 260ms var(--ease-calm) both;
+  animation-delay: 0ms !important;
+}
+
+:root[data-motion='still'] .cinema__whisper {
+  animation: cinema-fade 260ms var(--ease-calm) both;
+  animation-delay: 0ms;
+}
+
+:root[data-motion='still'] .cinema__glow {
+  transform: none;
 }
 
 /* ── The player's atmosphere ────────────────────────────────── */
@@ -5101,7 +5143,7 @@ html:not(.dark) .breath-aurora__veil {
    */
   --stage-orb: clamp(
     11rem,
-    min(78vw, var(--stage-room) - 21.75rem - var(--stage-line)),
+    min(78vw, var(--stage-room) - 21.75rem - var(--stage-line) - var(--stage-clear, 0rem)),
     44rem
   );
   --stage-gap: 1rem;
@@ -5180,7 +5222,7 @@ html:not(.dark) .breath-aurora__veil {
   .stage--immersive {
     --stage-orb: clamp(
       11rem,
-      min(74vw, var(--stage-room) - 20.5rem - var(--stage-line)),
+      min(74vw, var(--stage-room) - 20.5rem - var(--stage-line) - var(--stage-clear, 0rem)),
       30rem
     );
     --stage-gap: 0.8rem;
@@ -5195,7 +5237,7 @@ html:not(.dark) .breath-aurora__veil {
   .stage--immersive {
     --stage-orb: clamp(
       8rem,
-      min(56vw, var(--stage-room) - 16rem - var(--stage-line)),
+      min(56vw, var(--stage-room) - 16rem - var(--stage-line) - var(--stage-clear, 0rem)),
       22rem
     );
     --stage-gap: 0.55rem;
@@ -5285,7 +5327,37 @@ html:not(.dark) .breath-aurora__veil {
  * two would meet, so the block gives way instead of the control moving.
  */
 .stage__top {
-  transition-property: padding-inline, opacity;
+  transition-property: padding-inline, padding-top, opacity;
+}
+
+/*
+ * …until the mixer joined the sound in the left-hand corner. Two controls on
+ * that side take 6.65rem of a phone's card, and the wide-set state line —
+ * "READY WHEN YOU ARE" is about eleven rem of it — ran underneath them on
+ * every phone. Narrow cards have no room for the inscription *beside* the
+ * corners, so there it sits just below them instead.
+ */
+@media (max-width: 639px) {
+  .stage:not(.stage--immersive) .stage__top {
+    padding-top: 2rem;
+  }
+}
+
+/*
+ * Expanded, the same thing happens on every phone held upright — up to the
+ * largest iPhone's 430px. The block drops below the corner row there too, and the orb is
+ * told about the height it gave up — `--stage-clear` comes off the orb's
+ * share in the expanded size formula — so the composition still fits the
+ * screen without scrolling.
+ */
+@media (max-width: 440px) {
+  .stage--immersive {
+    --stage-clear: 3.25rem;
+  }
+
+  .stage--immersive .stage__top {
+    padding-top: var(--stage-clear);
+  }
 }
 
 /* ── The state line ───────────────────────────────────────────────────────
@@ -5307,7 +5379,7 @@ html:not(.dark) .breath-aurora__veil {
   gap: 0.7em;
   min-height: 1rem;
   font-family: var(--font-sans);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.3em;
   text-indent: 0.3em;
@@ -6647,6 +6719,32 @@ html.tuning {
   }
 }
 
+/* ── More contrast ──────────────────────────────────────────── */
+
+/*
+ * For people who have turned on Increase Contrast. Every quiet ink steps up
+ * one rung — the faint labels read as the muted ones do, the muted as the
+ * main — and the focus ring thickens, so nothing that matters is carried by a
+ * difference in tone that someone has told their device they cannot see.
+ * Nothing changes colour or position; it is the same page, firmer.
+ */
+@media (prefers-contrast: more) {
+  :root {
+    --ink-faint: #5f544b;
+    --ink-muted: #3f362f;
+  }
+
+  .dark {
+    --ink-faint: #c2b8c3;
+    --ink-muted: #e6ddd9;
+  }
+
+  :focus-visible,
+  .interactive:focus-visible {
+    outline-width: 3px;
+  }
+}
+
 /* ── Reduced motion ─────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
@@ -6674,6 +6772,32 @@ html.tuning {
     color: var(--ink);
     -webkit-text-fill-color: currentColor;
   }
+}
+
+/*
+ * The app's own Still setting, answered the same way. Kept as one block that
+ * mirrors the one above rather than threaded through every component's own
+ * reduced-motion rules: the per-frame breath is already held by the script
+ * (`useBreathing` reads the same setting), and this stops everything the
+ * stylesheet runs on a clock of its own.
+ */
+:root[data-motion='still'] *,
+:root[data-motion='still'] *::before,
+:root[data-motion='still'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+:root[data-motion='still'] .pressable:hover:not(:disabled):not([aria-disabled='true']) {
+  transform: none;
+}
+
+:root[data-motion='still'] .shimmer-ink {
+  background-image: none;
+  color: var(--ink);
+  -webkit-text-fill-color: currentColor;
 }
 
 /* ── The astrology room ─────────────────────────────────────── */

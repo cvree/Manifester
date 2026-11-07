@@ -40,7 +40,7 @@ import { cue } from '../lib/feedback'
 import { countWords, formatClock } from '../lib/format'
 import { listeningSentence } from '../lib/listening'
 import { autoTitle } from '../lib/loops'
-import { useReducedMotion } from '../lib/motion'
+import { useMotionLevel, useReducedMotion } from '../lib/motion'
 import { affirmationLines, soundName } from '../lib/summaries'
 import { useBackgroundMix } from '../lib/useBackgroundMix'
 import { useSessionBreathing } from '../lib/useBreathing'
@@ -75,6 +75,7 @@ export function PlayerRoute() {
   const { expanded, setExpanded } = useStage()
   const [sheet, setSheet] = useState<PanelKey | 'adjust' | 'mixer' | null>(null)
   const reducedMotion = useReducedMotion()
+  const motion = useMotionLevel()
 
   const hasText = countWords(draft.text) > 0
   /*
@@ -139,8 +140,13 @@ export function PlayerRoute() {
     : null
 
   const backgroundOn = preferences.backgroundVisualizer
+  /*
+   * Gentle motion keeps the orb breathing and holds the room still: the field
+   * is the one thing on this screen that moves across the whole viewport, and
+   * whole-screen movement is what unsettles people who are sensitive to it.
+   */
   const fieldAmplitude =
-    preferences.breathingEnabled && playing && !reducedMotion ? 1 : 0
+    preferences.breathingEnabled && playing && motion === 'full' ? 1 : 0
 
   const mixTargets = useMemo<Array<RefObject<HTMLElement | null>>>(
     () => [fieldRef, stageRef],
@@ -557,10 +563,13 @@ export function PlayerRoute() {
                   </button>
 
                   <div className="flex items-center gap-3">
-                    <span
-                      className="type-numeral text-[1.05rem] text-ink"
-                      aria-live="polite"
-                    >
+                    {/*
+                      A timer, not a live region. As `aria-live="polite"` it
+                      changed every second and a screen reader read the clock
+                      aloud once a second for the whole session; `timer` is
+                      there to be asked, and stays quiet otherwise.
+                    */}
+                    <span className="type-numeral text-[1.05rem] text-ink" role="timer">
                       {timeLabel}
                     </span>
                     <span className="type-meta">{timeCaption}</span>

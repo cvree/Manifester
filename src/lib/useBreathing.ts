@@ -9,7 +9,7 @@ import {
 } from './breathing'
 import { breathElapsed, subscribeBreath } from './breathEngine'
 import { BREATH_LAG_SECONDS } from './environment'
-import { useReducedMotion } from './motion'
+import { useMotionLevel, useReducedMotion } from './motion'
 
 /** What one frame of breath looks like, in the numbers the stylesheet reads. */
 interface BreathFrame {
@@ -95,6 +95,10 @@ export interface BreathingRuntime {
   breaths: number
   active: boolean
 }
+
+const identity = (value: number) => value
+const softened = (value: number) =>
+  REDUCED_POSE.e + (value - REDUCED_POSE.e) * 0.5
 
 /** The custom properties a frame is written as, in `BreathFrame` order. */
 const FRAME_PROPERTIES = ['--e', '--p', '--m', '--e-mid', '--e-far'] as const
@@ -182,6 +186,8 @@ interface DrawOptions {
   pattern: BreathPattern
   active: boolean
   reducedMotion: boolean
+  /** Gentle motion: the same breath at half the swing. */
+  gentle: boolean
   elapsed: () => number
   write: (frame: BreathFrame, mirror?: boolean) => void
   /** Receives the same frame as numbers, for the canvas-drawn forms. */
@@ -202,6 +208,7 @@ function useDraw({
   pattern,
   active,
   reducedMotion,
+  gentle,
   elapsed,
   write,
   live,
@@ -253,12 +260,19 @@ function useDraw({
          * curve, read a fraction of a second earlier, so an in-breath appears
          * to travel outward from the orb rather than land everywhere at once.
          */
+        /*
+         * Gentle motion is the same breath at half the swing, centred on the
+         * half-open pose Still holds — so the three settings are one family:
+         * the full breath, a quieter one, and that breath held at rest. The
+         * timing, the ring and the words are untouched.
+         */
+        const swing = gentle ? softened : identity
         write({
-          e: state.expansion,
+          e: swing(state.expansion),
           p: state.phaseProgress,
           m: state.motion,
-          mid: frame.mid,
-          far: frame.far,
+          mid: swing(frame.mid),
+          far: swing(frame.far),
         })
       }
 
@@ -287,7 +301,7 @@ function useDraw({
     }
     frameRef.current = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(frameRef.current)
-  }, [active, live, pattern, reducedMotion, valid, write])
+  }, [active, gentle, live, pattern, reducedMotion, valid, write])
 
   // Settle the orb to a resting half-open pose when the guide is switched off,
   // rather than collapsing it to nothing — a closed orb reads as broken.
@@ -318,6 +332,7 @@ export function useSessionBreathing({
   const stageRef = useRef<HTMLDivElement | null>(null)
   const live = useRef<LiveBreath>(restingBreath())
   const reducedMotion = useReducedMotion()
+  const gentle = useMotionLevel() === 'gentle'
   const write = useWriter(stageRef, mirrors)
 
   /*
@@ -355,6 +370,7 @@ export function useSessionBreathing({
     pattern,
     active: running,
     reducedMotion,
+    gentle,
     elapsed: breathElapsed,
     write,
     live,
@@ -415,6 +431,7 @@ export function useBreathing({
   const stageRef = useRef<HTMLDivElement | null>(null)
   const live = useRef<LiveBreath>(restingBreath())
   const reducedMotion = useReducedMotion()
+  const gentle = useMotionLevel() === 'gentle'
   const write = useWriter(stageRef, mirrors)
 
   // Its own clock, banked exactly like the engine's so that pausing a preview
@@ -471,6 +488,7 @@ export function useBreathing({
     pattern,
     active,
     reducedMotion,
+    gentle,
     elapsed,
     write,
     live,

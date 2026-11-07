@@ -89,7 +89,7 @@ export function DayArc({ hours, power, quiet, now = new Date() }: DayArcProps) {
               */}
               <span
                 className={cx(
-                  'w-full truncate text-center text-[0.72rem] leading-none',
+                  'w-full truncate text-center text-[0.75rem] leading-none',
                   isNow ? 'font-semibold text-ink' : 'text-ink-faint',
                 )}
               >

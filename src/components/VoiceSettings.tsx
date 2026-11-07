@@ -150,7 +150,7 @@ export function VoiceSettings({
                 </span>
                 <span
                   className={cx(
-                    'mt-auto rounded-pill border px-2 py-0.5 text-[0.7rem] font-medium',
+                    'mt-auto rounded-pill border px-2 py-0.5 text-[0.75rem] font-medium',
                     badge.tone,
                   )}
                 >

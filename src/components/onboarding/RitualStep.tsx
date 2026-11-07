@@ -133,7 +133,7 @@ export function RitualStep({
               key={label}
               className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-left"
             >
-              <dt className="flex items-center gap-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.09em] text-ink-faint">
+              <dt className="flex items-center gap-1.5 text-[0.75rem] font-semibold uppercase tracking-[0.09em] text-ink-faint">
                 <Icon aria-hidden="true" className="text-[0.85rem]" />
                 {label}
               </dt>
