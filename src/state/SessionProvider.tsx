@@ -5,6 +5,7 @@
  * tab edits, and the live state the Player tab renders.
  */
 
+import { setSessionBusy } from '../lib/appUpdate'
 import {
   createContext,
   useCallback,
@@ -667,6 +668,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    */
   useEffect(() => {
     soundtrack.setListening(session.status === 'playing')
+    // And the app's updater, which must not reload a page someone is using.
+    setSessionBusy(session.status === 'playing' || session.status === 'paused')
   }, [session.status])
 
   /* ── Screen wake lock: speech stops when a phone sleeps ── */
@@ -721,13 +724,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const tickAt = Date.now()
         const elapsedSeconds = Math.floor(state.clock.elapsedSeconds(tickAt))
         const remaining = speechRef.current?.delayRemainingSeconds ?? null
+        const delayRemaining = remaining == null ? null : Math.ceil(remaining)
+        /*
+         * Four ticks a second, and three of them change nothing a person can
+         * see. Handing React a new object anyway re-rendered every screen
+         * that reads the session four times a second — on the same main
+         * thread that draws the breath — so the same state is handed back
+         * whenever the numbers on screen have not moved.
+         */
         setSession((current) =>
-          current.status === 'playing'
-            ? {
-                ...current,
-                elapsedSeconds,
-                delayRemaining: remaining == null ? null : Math.ceil(remaining),
-              }
+          current.status === 'playing' &&
+          (current.elapsedSeconds !== elapsedSeconds ||
+            current.delayRemaining !== delayRemaining)
+            ? { ...current, elapsedSeconds, delayRemaining }
             : current,
         )
         if (elapsedSeconds - listeningRef.current.recordedSeconds >= 5) {
@@ -1523,7 +1532,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
        */
       if (session.status === 'playing') busRef.current?.resume()
       musicRef.current?.resumeIfSuspended()
-      if (wakeLockRef.current === null && session.status === 'playing') {
+      /*
+       * The browser releases a wake lock by itself whenever the page is
+       * hidden, and the sentinel it hands back stays in the ref, marked
+       * `released`. Checking for `null` alone therefore never re-asked after
+       * a person switched apps and came back, and the screen dimmed in the
+       * middle of the session.
+       */
+      if (
+        (wakeLockRef.current === null || wakeLockRef.current.released) &&
+        session.status === 'playing'
+      ) {
         void requestWakeLock()
       }
       /*

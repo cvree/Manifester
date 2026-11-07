@@ -2,6 +2,7 @@ import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
+import { ErrorBoundary } from './ErrorBoundary'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
 import { useIsCompact, useReducedMotion } from '../lib/motion'
@@ -262,7 +263,9 @@ export function AppShell() {
               : 'pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-16',
         )}
       >
-        <Outlet />
+        <ErrorBoundary scope="route" resetKey={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       {showMiniPlayer && (
