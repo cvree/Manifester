@@ -67,6 +67,39 @@ export async function renderTimeline(
   channelCount = 1,
   sampleRate = TEST_SAMPLE_RATE,
 ): Promise<RenderedAudio> {
+  /*
+   * Under load the native renderer occasionally rejects a suspend point
+   * (`InvalidStateError`) instead of stopping at it. That step's `act` then
+   * never runs, so the buffer is not the timeline the test described — and
+   * the rejection used to surface as an unhandled error that failed an
+   * otherwise passing run. A render that skipped a step is thrown away and
+   * done again; one that keeps skipping is a real failure, and says so.
+   */
+  const ATTEMPTS = 4
+  for (let attempt = 1; ; attempt += 1) {
+    const { audio, skipped } = await renderTimelineOnce(
+      seconds,
+      build,
+      steps,
+      channelCount,
+      sampleRate,
+    )
+    if (skipped === 0) return audio
+    if (attempt >= ATTEMPTS) {
+      throw new Error(
+        `renderTimeline: the renderer skipped ${skipped} step(s) on ${ATTEMPTS} attempts in a row`,
+      )
+    }
+  }
+}
+
+async function renderTimelineOnce(
+  seconds: number,
+  build: (ctx: BaseAudioContext) => void,
+  steps: TimelineStep[],
+  channelCount: number,
+  sampleRate: number,
+): Promise<{ audio: RenderedAudio; skipped: number }> {
   const ctx = new OfflineAudioContext(
     channelCount,
     Math.ceil(seconds * sampleRate),
@@ -74,28 +107,38 @@ export async function renderTimeline(
   )
   build(ctx as unknown as BaseAudioContext)
 
+  let skipped = 0
   for (const step of [...steps].sort((a, b) => a.at - b.at)) {
-    void ctx.suspend(step.at).then(() => {
-      step.act()
-      /*
-       * The native renderer runs on its own thread, and under load it can have
-       * finished the whole render by the time this callback is scheduled — at
-       * which point `resume()` rejects with `InvalidStateError` because there
-       * is nothing left to resume. Left unhandled, that surfaced as a stray
-       * error in an otherwise passing run, now and then, depending on how busy
-       * the machine was. What the test measures is the rendered buffer, which
-       * is complete either way.
-       */
-      ctx.resume().catch(() => undefined)
-    })
+    ctx.suspend(step.at).then(
+      () => {
+        step.act()
+        /*
+         * The native renderer runs on its own thread, and under load it can
+         * have finished the whole render by the time this callback is
+         * scheduled — at which point `resume()` rejects with
+         * `InvalidStateError` because there is nothing left to resume. What
+         * the test measures is the rendered buffer, which is complete either
+         * way.
+         */
+        ctx.resume().catch(() => undefined)
+      },
+      () => {
+        skipped += 1
+      },
+    )
   }
 
   const buffer = await ctx.startRendering()
+  // Let any suspend settlements still queued behind the render land first.
+  await new Promise((resolve) => setTimeout(resolve, 0))
   const channels: Float32Array[] = []
   for (let i = 0; i < buffer.numberOfChannels; i += 1) {
     channels.push(Float32Array.from(buffer.getChannelData(i)))
   }
-  return { channels, sampleRate, duration: buffer.length / sampleRate }
+  return {
+    audio: { channels, sampleRate, duration: buffer.length / sampleRate },
+    skipped,
+  }
 }
 
 /** A steady 1.0, for measuring a modulation envelope on its own. */
