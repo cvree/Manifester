@@ -72,6 +72,9 @@ const INSTALLED_KEY = 'tts.studioVoice'
 /** Which copy of the engine actually worked here last time. */
 const RUNTIME_KEY = 'tts.studioRuntime'
 
+/** Present only while a resume on load is in flight. See `resume()`. */
+const RESUMING_KEY = 'tts.studioResuming'
+
 /**
  * What the download actually costs, for the sentence on the install card.
  *
@@ -312,7 +315,31 @@ export class BrowserKokoroEngine implements TTSEngine {
     if (this.snapshot.state === 'unsupported') return false
     if (this.snapshot.state === 'ready') return true
     if (!this.everInstalled) return false
-    return this.sequence('resume')
+
+    /*
+     * A resume that never came back.
+     *
+     * Bringing an 86 MB model up inside a phone's browser is the single most
+     * memory-hungry thing this app does, and a browser out of memory does not
+     * throw — it kills the page. If that happens during the resume on load,
+     * the next launch tries the same resume, dies the same way, and the app
+     * can never be opened again. So the attempt is written down before it
+     * starts and crossed out when it finishes either way; finding it still
+     * written at launch means the last one took the page down with it, and
+     * this launch leaves the model alone. The voice falls back to the
+     * pre-made clips and the device voice, and Install is still there for a
+     * person who wants to try again on purpose.
+     */
+    if (readLocal(RESUMING_KEY)) {
+      removeLocal(RESUMING_KEY)
+      return false
+    }
+    writeLocal(RESUMING_KEY, String(Date.now()))
+    try {
+      return await this.sequence('resume')
+    } finally {
+      removeLocal(RESUMING_KEY)
+    }
   }
 
   /** Download and start the model. Only ever from a deliberate press. */

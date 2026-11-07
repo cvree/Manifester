@@ -166,6 +166,34 @@ describe('installing Studio Voice', () => {
     expect(restarted.engine.everInstalled).toBe(false)
   })
 
+  it('does not resume on a launch after a resume that never came back', async () => {
+    /*
+     * A browser out of memory kills the page rather than throwing, so the
+     * only sign that the last resume took the page down is its marker still
+     * being there. That launch must leave the model alone — otherwise an
+     * out-of-memory phone could never open the app again.
+     */
+    store.set('manifester:tts.studioVoice', 'installed')
+    store.set('manifester:tts.studioResuming', '1')
+    const crashed = build()
+
+    expect(await crashed.engine.resume()).toBe(false)
+    expect(crashed.created).toBe(0)
+    // Crossed out, so the launch after this one tries again.
+    expect(store.has('manifester:tts.studioResuming')).toBe(false)
+    // And the install is still there for a deliberate press.
+    expect(crashed.engine.everInstalled).toBe(true)
+
+    const next = build()
+    const resuming = next.engine.resume()
+    await settle()
+    expect(next.fake.sent[0]).toMatchObject({ type: 'resume' })
+    expect(store.has('manifester:tts.studioResuming')).toBe(true)
+    next.fake.reply({ type: 'failed', reason: 'not-cached', message: 'gone' })
+    await resuming
+    expect(store.has('manifester:tts.studioResuming')).toBe(false)
+  })
+
   it('keeps a real failure on screen, with a way back', async () => {
     const built = build()
     const { engine, fake } = built

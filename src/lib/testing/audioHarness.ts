@@ -77,7 +77,16 @@ export async function renderTimeline(
   for (const step of [...steps].sort((a, b) => a.at - b.at)) {
     void ctx.suspend(step.at).then(() => {
       step.act()
-      void ctx.resume()
+      /*
+       * The native renderer runs on its own thread, and under load it can have
+       * finished the whole render by the time this callback is scheduled — at
+       * which point `resume()` rejects with `InvalidStateError` because there
+       * is nothing left to resume. Left unhandled, that surfaced as a stray
+       * error in an otherwise passing run, now and then, depending on how busy
+       * the machine was. What the test measures is the rendered buffer, which
+       * is complete either way.
+       */
+      ctx.resume().catch(() => undefined)
     })
   }
 

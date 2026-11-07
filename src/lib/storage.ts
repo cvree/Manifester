@@ -51,7 +51,25 @@ function openDb(): Promise<IDBDatabase> {
         db.createObjectStore(STORE_RECORDINGS, { keyPath: 'id' })
       }
     }
-    request.onsuccess = () => resolve(request.result)
+    request.onsuccess = () => {
+      const db = request.result
+      /*
+       * iOS closes an IndexedDB connection on its own after an app has spent
+       * a while in the background, and a newer tab of this app upgrading the
+       * schema asks every older connection to step aside. Either way the
+       * connection cached here is dead, and every save after it would fail
+       * until the app was relaunched. So a closed connection forgets itself
+       * and the next request opens a fresh one.
+       */
+      db.onclose = () => {
+        if (dbPromise) dbPromise = null
+      }
+      db.onversionchange = () => {
+        db.close()
+        dbPromise = null
+      }
+      resolve(db)
+    }
     request.onerror = () =>
       reject(request.error ?? new Error('Could not open the local database.'))
   })
@@ -66,15 +84,37 @@ function runRequest<T>(
   mode: IDBTransactionMode,
   work: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T> {
-  return openDb().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const tx = db.transaction(storeName, mode)
-        const request = work(tx.objectStore(storeName))
-        request.onsuccess = () => resolve(request.result)
-        request.onerror = () =>
-          reject(request.error ?? new Error('Local storage request failed.'))
-      }),
+  const attempt = () =>
+    openDb().then(
+      (db) =>
+        new Promise<T>((resolve, reject) => {
+          const tx = db.transaction(storeName, mode)
+          const request = work(tx.objectStore(storeName))
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () =>
+            reject(request.error ?? new Error('Local storage request failed.'))
+        }),
+    )
+
+  /*
+   * A connection the system closed without telling us — Safari does not
+   * always fire `close` — fails here with `InvalidStateError` on the first
+   * transaction. That is not a failed save, it is a stale handle: drop it and
+   * try once more on a fresh one.
+   */
+  return attempt().catch((error: unknown) => {
+    if (!isStaleConnection(error)) throw error
+    dbPromise = null
+    return attempt()
+  })
+}
+
+function isStaleConnection(error: unknown): boolean {
+  const name = (error as { name?: string } | null)?.name
+  const message = String((error as { message?: string } | null)?.message ?? '')
+  return (
+    name === 'InvalidStateError' ||
+    /connection.*(closing|closed|lost)/i.test(message)
   )
 }
 
@@ -85,6 +125,31 @@ export async function listLoops(): Promise<SavedLoop[]> {
 
 export async function putLoop(loop: SavedLoop): Promise<void> {
   await runRequest(STORE_LOOPS, 'readwrite', (s) => s.put(loop))
+  requestPersistence()
+}
+
+let persistenceAsked = false
+
+/**
+ * Ask the browser to keep this app's storage rather than clear it when space
+ * runs low — once there is something worth keeping, which is the first saved
+ * loop. Browsers decide for themselves (installed apps and frequently-used
+ * sites are usually granted it) and say nothing either way; there is nothing
+ * to show anybody about the answer.
+ */
+function requestPersistence(): void {
+  if (persistenceAsked) return
+  persistenceAsked = true
+  try {
+    const storage = typeof navigator !== 'undefined' ? navigator.storage : undefined
+    if (!storage?.persist || !storage.persisted) return
+    void storage
+      .persisted()
+      .then((already) => (already ? true : storage.persist()))
+      .catch(() => undefined)
+  } catch {
+    // Not offered here. Nothing to do.
+  }
 }
 
 export async function deleteLoop(id: string): Promise<void> {

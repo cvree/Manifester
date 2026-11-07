@@ -67,20 +67,43 @@ export function useIsCompact(): boolean {
  * question: a powerful desktop with acceleration disabled in `chrome://settings`
  * reports here exactly like a phone with no GPU at all. The context is thrown
  * away immediately either way — this never keeps a WebGL context open.
+ *
+ * "Thrown away" has to be said out loud. Dropping the reference is not enough:
+ * a context lives until the collector gets round to it, browsers cap how many
+ * may be alive at once (Safari quietly kills the oldest), and this used to run
+ * on every call — several per session start, and again on every expansion of
+ * the stage. So it runs once per page, and the context is released explicitly
+ * the moment the renderer string has been read.
  */
+let softwareAnswer: boolean | null = null
+
 function hasSoftwareRendering(): boolean {
+  if (softwareAnswer !== null) return softwareAnswer
   if (typeof document === 'undefined') return false
+  let gl: WebGLRenderingContext | null = null
   try {
     const canvas = document.createElement('canvas')
-    const gl = (canvas.getContext('webgl') ??
+    gl = (canvas.getContext('webgl') ??
       canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null
-    if (!gl) return true
+    if (!gl) {
+      softwareAnswer = true
+      return true
+    }
     const info = gl.getExtension('WEBGL_debug_renderer_info')
     const renderer = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : ''
-    return /swiftshader|llvmpipe|software|basic render|angle \(software/i.test(renderer)
+    softwareAnswer = /swiftshader|llvmpipe|software|basic render|angle \(software/i.test(
+      renderer,
+    )
   } catch {
-    return false
+    softwareAnswer = false
+  } finally {
+    try {
+      gl?.getExtension('WEBGL_lose_context')?.loseContext()
+    } catch {
+      // Nothing to release, or already gone. Either way, done with it.
+    }
   }
+  return softwareAnswer
 }
 
 /**
