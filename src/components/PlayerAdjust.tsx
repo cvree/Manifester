@@ -8,7 +8,6 @@ interface PlayerAdjustProps {
   onClose: () => void
   onOpenPanel: (key: PanelKey) => void
   onEditWords: () => void
-  onOpenMixer: () => void
 }
 
 /**
@@ -26,7 +25,6 @@ export function PlayerAdjust({
   onClose,
   onOpenPanel,
   onEditWords,
-  onOpenMixer,
 }: PlayerAdjustProps) {
   const { session } = useSession()
 
@@ -44,7 +42,6 @@ export function PlayerAdjust({
       <PlayerControls
         onOpenPanel={onOpenPanel}
         onEditWords={onEditWords}
-        onOpenMixer={onOpenMixer}
       />
     </Sheet>
   )

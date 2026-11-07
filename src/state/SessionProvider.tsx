@@ -237,6 +237,17 @@ const SessionContext = createContext<SessionContextValue | null>(null)
  */
 const VOICE_WAIT_VISIBLE_AFTER_MS = 900
 
+/**
+ * How long something switched off or on by a tap takes to leave or arrive.
+ *
+ * The long fades in the audio engines are for a session beginning and ending,
+ * where a sound arriving as weather is the point. A person pressing a switch
+ * is asking a question, and an answer that takes two seconds to be audible
+ * reads as the switch not working. A third of a second is still a fade — no
+ * click, no cut — but it is heard as the press.
+ */
+const QUICK_FADE_SECONDS = 0.35
+
 const EMPTY_SESSION: SessionSnapshot = {
   status: 'idle',
   title: '',
@@ -792,7 +803,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Only the main sound. Anything stacked underneath keeps playing —
       // "no background sound" is a choice about one row of the mixer, not a
       // switch that silently empties the others.
-      music.stopPrimary()
+      music.stopPrimary(QUICK_FADE_SECONDS * 1000)
       return
     }
 
@@ -808,7 +819,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // The queue was just rebuilt, so the primary gain is new: put the
         // stored level back on it before the ambience finishes fading in.
         music.setPrimaryLevel(primaryLevelFor(settings.sound))
-      } else music.stopPrimary()
+      } else music.stopPrimary(QUICK_FADE_SECONDS * 1000)
     })
   }, [])
 
@@ -1188,6 +1199,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const setBrainwave = useCallback<SessionContextValue['setBrainwave']>(
     (patch) => {
+      /*
+       * The audio first, in the same tick as the tap, and from the latest
+       * draft this provider knows about rather than from inside the state
+       * updater. An updater runs whenever React gets round to rendering —
+       * which on a busy screen is a visible beat after the finger — so a
+       * switch that only reached the engine from in there felt slow even
+       * though the engine itself is instant. A tap is answered with a short
+       * fade; the long arrival fade is for the start of a session.
+       */
+      const latest = draftRef.current
+      const next = normaliseBrainwave({ ...latest.settings.brainwave, ...patch })
+      draftRef.current = {
+        ...latest,
+        settings: { ...latest.settings, brainwave: next },
+      }
+      // Only a running session touches the audio graph; editing while idle is
+      // just editing.
+      if (liveRef.current) {
+        brainwaveRef.current?.apply(next, { fadeSeconds: QUICK_FADE_SECONDS })
+      }
+
       setDraft((current) => {
         const brainwave = normaliseBrainwave({
           ...current.settings.brainwave,
@@ -1195,9 +1227,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         })
         const settings = { ...current.settings, brainwave }
         void storage.saveLastSettings(settings)
-        // Only a running session touches the audio graph; editing while idle is
-        // just editing.
-        if (liveRef.current) brainwaveRef.current?.apply(brainwave)
         return { ...current, settings }
       })
     },
@@ -1246,6 +1275,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   )
 
   /**
+   * Apply an edit to the newest sound configuration this provider knows of,
+   * and remember the result until React catches up.
+   *
+   * The mixer's handlers tell the engine first and React second. Reading
+   * `draft` from the closure would be a render behind; reading it inside the
+   * updater would be whenever React next renders. This is neither: it is the
+   * draft as of the last edit, so two moves inside one frame compound rather
+   * than the second forgetting the first.
+   */
+  const predictSound = useCallback((edit: (sound: SoundConfig) => SoundConfig) => {
+    const latest = draftRef.current
+    const sound = edit(latest.settings.sound)
+    draftRef.current = { ...latest, settings: { ...latest.settings, sound } }
+    return sound
+  }, [])
+
+  /**
    * Move one fader.
    *
    * The engine is told first and the settings second. That order is the reason
@@ -1255,32 +1301,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    */
   const setLayerLevel = useCallback<SessionContextValue['setLayerLevel']>(
     (id, level) => {
+      // The ramp is scheduled here, in the input event, not in the updater.
+      // See `setBrainwave` for why that distinction is the whole difference.
+      if (liveRef.current) applyMixLevels(predictSound((sound) => withLevel(sound, id, level)))
       setDraft((current) => {
         const sound = withLevel(current.settings.sound, id, level)
         const settings = { ...current.settings, sound }
-        if (liveRef.current) applyMixLevels(sound)
         void storage.saveLastSettings(settings)
         return { ...current, settings }
       })
       draftTouchedRef.current = true
     },
-    [applyMixLevels],
+    [applyMixLevels, predictSound],
   )
 
   const setLayerMuted = useCallback<SessionContextValue['setLayerMuted']>(
     (id, muted) => {
+      // The level itself is untouched, so unmuting returns to the balance
+      // somebody had rather than to full. See `soundMixer.effectiveLevel`.
+      if (liveRef.current) applyMixLevels(predictSound((sound) => withMuted(sound, id, muted)))
       setDraft((current) => {
         const sound = withMuted(current.settings.sound, id, muted)
         const settings = { ...current.settings, sound }
-        // The level itself is untouched, so unmuting returns to the balance
-        // somebody had rather than to full. See `soundMixer.effectiveLevel`.
-        if (liveRef.current) applyMixLevels(sound)
         void storage.saveLastSettings(settings)
         return { ...current, settings }
       })
       draftTouchedRef.current = true
     },
-    [applyMixLevels],
+    [applyMixLevels, predictSound],
   )
 
   /**
@@ -1293,24 +1341,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    */
   const setLayerEnabled = useCallback<SessionContextValue['setLayerEnabled']>(
     (id, enabled) => {
+      const edit = (previous: SoundConfig) =>
+        enabled ? withLayer(previous, id) : withoutLayer(previous, id)
+
+      const before = draftRef.current.settings.sound
+      const predicted = predictSound(edit)
+      if (liveRef.current && layersChanged(before, predicted)) {
+        // Synchronously, inside the tap: iOS will not open audio outside one.
+        musicRef.current?.unlock()
+        musicRef.current?.setLayers(predicted.layers, (layerId) =>
+          effectiveLevel(predicted, layerId),
+        )
+      }
+
       setDraft((current) => {
         const previous = current.settings.sound
-        const sound = enabled ? withLayer(previous, id) : withoutLayer(previous, id)
+        const sound = edit(previous)
         if (!layersChanged(previous, sound)) return current
-
         const settings = { ...current.settings, sound }
-        if (liveRef.current) {
-          musicRef.current?.unlock()
-          musicRef.current?.setLayers(sound.layers, (layerId) =>
-            effectiveLevel(sound, layerId),
-          )
-        }
         void storage.saveLastSettings(settings)
         return { ...current, settings }
       })
       draftTouchedRef.current = true
     },
-    [],
+    [predictSound],
   )
 
   /**

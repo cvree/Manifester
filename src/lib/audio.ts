@@ -47,12 +47,13 @@ export interface AmbienceOptions {
 const LEVEL_RAMP_SECONDS = 0.14
 
 /**
- * How long a layer takes to arrive or leave.
+ * How long a layer takes to leave.
  *
- * Longer than a level change and shorter than a soundscape swap. Adding rain
- * under a fire should be the rain fading up, not the rain starting.
+ * Longer than a level change and much shorter than a soundscape swap. Removing
+ * a layer is a tap, and a tap should be heard to land: the old 0.9 s was long
+ * enough that people pressed remove twice.
  */
-const LAYER_FADE_SECONDS = 0.9
+const LAYER_FADE_SECONDS = 0.45
 
 /** A valid, zero-sample WAV — used only to unlock playback on iOS. */
 const SILENT_WAV =

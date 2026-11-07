@@ -5669,8 +5669,7 @@ html:not(.dark) .breath-aurora__veil {
  */
 .stage__play,
 .stage__toggle,
-.stage__sound,
-.stage__mixer {
+.stage__sound {
   transition:
     width var(--stage-travel) var(--ease-breath),
     height var(--stage-travel) var(--ease-breath),
@@ -5693,7 +5692,7 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 /*
- * The sound, in the corner opposite Expand.
+ * Volume, in the corner opposite Expand.
  *
  * Two corner controls rather than one, and they are the same size, the same
  * distance in and on the same clock — so the top of the stage reads as a
@@ -5706,22 +5705,6 @@ html:not(.dark) .breath-aurora__veil {
   position: absolute;
   top: 0.75rem;
   left: 0.75rem;
-  z-index: 6;
-}
-
-/*
- * The mixer, tucked in beside the sound.
- *
- * Deliberately in the corner rather than in Adjust. Balancing what you are
- * hearing is the thing people reach for *while* they are listening, and a
- * control for that which lives two sheets deep is a control nobody finds. It
- * shares the sound button's clock and travel so the pair reads as one corner
- * rather than as a button that turned up next to another one.
- */
-.stage__mixer {
-  position: absolute;
-  top: 0.75rem;
-  left: 3.9rem;
   z-index: 6;
 }
 
@@ -5796,11 +5779,6 @@ html:not(.dark) .breath-aurora__veil {
   left: calc(env(safe-area-inset-left) + 0.9rem);
 }
 
-.stage--immersive .stage__mixer {
-  top: calc(env(safe-area-inset-top) + 0.9rem);
-  left: calc(env(safe-area-inset-left) + 4.05rem);
-}
-
 @media (min-width: 640px) {
   .stage--immersive .stage__toggle {
     top: 1.1rem;
@@ -5810,11 +5788,6 @@ html:not(.dark) .breath-aurora__veil {
   .stage--immersive .stage__sound {
     top: 1.1rem;
     left: 1.1rem;
-  }
-
-  .stage--immersive .stage__mixer {
-    top: 1.1rem;
-    left: 4.25rem;
   }
 }
 

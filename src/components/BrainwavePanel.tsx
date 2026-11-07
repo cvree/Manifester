@@ -144,7 +144,7 @@ export function BrainwavePanel({
             max={1}
             step={0.05}
             value={settings.volume}
-            display={`${Math.round(settings.volume * 100)}%`}
+            display={(value) => `${Math.round(value * 100)}%`}
             hint="Sits under your master sound volume. Start low."
             onChange={(volume) => onChange({ volume })}
           />
@@ -155,7 +155,7 @@ export function BrainwavePanel({
             max={BRAINWAVE_DEPTH_LIMITS.max}
             step={0.05}
             value={settings.depth}
-            display={`${Math.round(settings.depth * 100)}%`}
+            display={(value) => `${Math.round(value * 100)}%`}
             disabled={binaural}
             hint={
               binaural

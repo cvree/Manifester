@@ -314,7 +314,7 @@ export function VoiceSettings({
         max={1.6}
         step={0.05}
         value={settings.rate}
-        display={`${settings.rate.toFixed(2)}×`}
+        display={(value) => `${value.toFixed(2)}×`}
         hint="Slower speech tends to feel calmer."
         onChange={(rate) => onChange({ rate })}
       />
@@ -371,7 +371,7 @@ export function VoiceSettings({
         max={MAX_VOICE_VOLUME}
         step={0.05}
         value={settings.voiceVolume}
-        display={`${Math.round(settings.voiceVolume * 100)}%`}
+        display={(value) => `${Math.round(value * 100)}%`}
         hint={
           usingStudio
             ? 'The studio voice plays through Manifester’s own mix, so this balances it against the sound underneath.'

@@ -25,6 +25,7 @@ import { cx } from '../lib/cx'
 import { BACKGROUND_MODES } from '../lib/environment'
 import { cue, hapticsSupported } from '../lib/feedback'
 import { revealSection } from '../lib/scroll'
+import { configureBreath } from '../lib/breathEngine'
 import { useBreathing } from '../lib/useBreathing'
 import type { Preferences } from '../state/PreferencesProvider'
 import { BackgroundSceneThumbnail } from './BackgroundScene'
@@ -404,16 +405,19 @@ export function BreathingSettings({
             {preferences.breathSound !== 'off' && (
               <div className="mt-5">
                 <Slider
-                  label="Breath sound level"
+                  label="Breath sound volume"
                   min={0}
                   max={MAX_BREATH_VOLUME}
                   step={0.05}
                   value={preferences.breathSoundVolume}
-                  display={`${Math.round(
-                    (preferences.breathSoundVolume / MAX_BREATH_VOLUME) * 100,
-                  )}%`}
+                  display={(value) =>
+                    `${Math.round((value / MAX_BREATH_VOLUME) * 100)}%`
+                  }
                   hint="Independent of the loop's own voice and sound levels."
                   onChange={(breathSoundVolume) => {
+                    // The running guide first, so the level moves with the
+                    // finger rather than a render behind it.
+                    configureBreath({ volume: breathSoundVolume })
                     onChange({ breathSoundVolume })
                   }}
                 />

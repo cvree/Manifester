@@ -23,15 +23,14 @@ import { PlayerAtmosphere } from '../components/PlayerAtmosphere'
 import {
   CollapseIcon,
   ExpandIcon,
-  MixerIcon,
-  MuteIcon,
   PauseIcon,
   PlayIcon,
   SeedIcon,
   SparkIcon,
+  SpeakerIcon,
+  SpeakerOffIcon,
   StopIcon,
   TuneIcon,
-  WaveIcon,
 } from '../components/Icons'
 import { cx } from '../lib/cx'
 import { primeBreathAudio } from '../lib/breathAudio'
@@ -91,7 +90,13 @@ export function PlayerRoute() {
   const breathReady =
     preferences.breathingEnabled && isPatternValid(preferences.breathPattern)
   const canPlay = hasText || breathReady
-  const soundOn = draft.settings.sound.mode !== 'off'
+  /** Whether anything in this session can make a sound at all, for the corner icon. */
+  const audible =
+    draft.settings.voiceVolume > 0 ||
+    (draft.settings.musicVolume > 0 &&
+      (draft.settings.sound.mode !== 'off' || draft.settings.sound.layers.length > 0)) ||
+    draft.settings.brainwave.enabled ||
+    preferences.music
   const idle = session.status === 'idle'
   const playing = session.status === 'playing'
   const paused = session.status === 'paused'
@@ -416,25 +421,14 @@ export function PlayerRoute() {
               >
                 <span aria-hidden="true" className="stage__aura" />
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    cue('tap')
-                    setSheet('sound')
-                  }}
-                  aria-label={`Background sound: ${soundName(draft.settings, allTracks)}. Change it.`}
-                  title="Background sound"
-                  className="stage__sound interactive flex h-11 w-11 items-center justify-center rounded-full border border-[var(--panel-border)] bg-[var(--panel)] text-[1.05rem] text-ink-faint hover:text-ink"
-                >
-                  {soundOn ? <WaveIcon /> : <MuteIcon />}
-                </button>
-
                 {/*
-                  The mixer, one tap from the stage and never more than one.
-                  It sits in the stage's own corner beside the sound button
-                  rather than inside Adjust, because the whole point of it is
-                  that balancing what you are hearing should not mean opening a
-                  settings sheet and finding a row in it.
+                  Volume — every level in the app — one tap from the stage.
+
+                  There used to be two buttons in this corner, a wave that
+                  opened the sound picker and a mixer beside it, and nothing on
+                  either said which one turned things down. Now there is one,
+                  it is a speaker, and it opens the one panel where every level
+                  lives. Choosing *what* plays is a link from inside it.
                 */}
                 <button
                   type="button"
@@ -442,11 +436,11 @@ export function PlayerRoute() {
                     cue('tap')
                     setSheet('mixer')
                   }}
-                  aria-label="Open the audio mixer: a level for every layer"
-                  title="Mixer"
-                  className="stage__mixer interactive flex h-11 w-11 items-center justify-center rounded-full border border-[var(--panel-border)] bg-[var(--panel)] text-[1.05rem] text-ink-faint hover:text-ink"
+                  aria-label={`Volume. ${soundName(draft.settings, allTracks)}. Open every level.`}
+                  title="Volume"
+                  className="stage__sound interactive flex h-11 w-11 items-center justify-center rounded-full border border-[var(--panel-border)] bg-[var(--panel)] text-[1.05rem] text-ink-faint hover:text-ink"
                 >
-                  <MixerIcon />
+                  {audible ? <SpeakerIcon /> : <SpeakerOffIcon />}
                 </button>
 
                 <button
@@ -652,7 +646,6 @@ export function PlayerRoute() {
           <DesktopPlayerPanel
             onOpenPanel={setSheet}
             onEditWords={editWords}
-            onOpenMixer={() => setSheet('mixer')}
           />
         )}
       </div>
@@ -662,9 +655,12 @@ export function PlayerRoute() {
         onClose={() => setSheet(null)}
         onOpenPanel={setSheet}
         onEditWords={editWords}
-        onOpenMixer={() => setSheet('mixer')}
       />
-      <AmbienceMixer open={sheet === 'mixer'} onClose={() => setSheet(null)} />
+      <AmbienceMixer
+        open={sheet === 'mixer'}
+        onClose={() => setSheet(null)}
+        onOpenPanel={setSheet}
+      />
       <SettingsSheets
         open={sheet === 'adjust' || sheet === 'mixer' ? null : sheet}
         onOpenChange={setSheet}

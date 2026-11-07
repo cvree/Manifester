@@ -164,13 +164,13 @@ export function SoundSettings({
 
       {sound.mode !== 'off' && (
         <Slider
-          label="Sound level"
+          label="Background volume"
           min={0}
           max={MAX_MUSIC_VOLUME}
           step={0.05}
           value={settings.musicVolume}
-          display={`${Math.round(settings.musicVolume * 100)}%`}
-          hint="The master level for the whole bed. The Mixer, in the player's corner, gives each layer its own."
+          display={(value) => `${Math.round(value * 100)}%`}
+          hint="The level for the whole bed. The player’s Volume panel (the speaker in its corner) has every level, including each layer."
           onChange={onVolumeChange}
         />
       )}

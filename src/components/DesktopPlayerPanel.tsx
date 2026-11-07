@@ -4,7 +4,6 @@ import { PlayerControls } from './PlayerControls'
 interface DesktopPlayerPanelProps {
   onOpenPanel: (key: PanelKey) => void
   onEditWords: () => void
-  onOpenMixer: () => void
 }
 
 /**
@@ -17,7 +16,6 @@ interface DesktopPlayerPanelProps {
 export function DesktopPlayerPanel({
   onOpenPanel,
   onEditWords,
-  onOpenMixer,
 }: DesktopPlayerPanelProps) {
   return (
     <aside
@@ -31,7 +29,6 @@ export function DesktopPlayerPanel({
       <PlayerControls
         onOpenPanel={onOpenPanel}
         onEditWords={onEditWords}
-        onOpenMixer={onOpenMixer}
       />
     </aside>
   )

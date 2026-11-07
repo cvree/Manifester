@@ -23,6 +23,39 @@ export function useSoundtrackStatus(): SoundtrackStatus {
   return status
 }
 
+type UpdatePreferences = ReturnType<typeof usePreferences>['update']
+
+/**
+ * Turn the soundtrack on or off.
+ *
+ * Told to the audio layer here, synchronously, and only then stored.
+ *
+ * Both halves matter. A browser will not open audio a beat after the press — a
+ * React effect reacting to the stored preference is a beat later — so
+ * switching the music on has to reach `begin()` from inside the handler or the
+ * first time somebody turns it on nothing happens. And saying it twice is
+ * free: the effect in `PreferencesProvider` finds the value already set and
+ * does nothing, which is what keeps a preference restored from storage and one
+ * just chosen on the same path.
+ */
+export function switchMusic(
+  music: boolean,
+  update: UpdatePreferences,
+  withCue = true,
+): void {
+  soundtrack.setEnabled(music, true)
+  if (music) soundtrack.begin()
+  update({ music })
+  // Answered by hearing it, the way the interface cues are.
+  if (withCue) cue(music ? 'select' : 'tap')
+}
+
+/** The soundtrack's level: the gain first, in the input event, then the setting. */
+export function setMusicLevel(musicVolume: number, update: UpdatePreferences): void {
+  soundtrack.setLevel(musicVolume)
+  update({ musicVolume })
+}
+
 /**
  * The whole of the music's controls: whether there is any, and how loud.
  *
@@ -42,37 +75,19 @@ export function MusicSettings() {
         label="Music"
         description="A quiet piece under the app that changes with where you are. It sits far below your words, and steps back while they are spoken."
         checked={preferences.music}
-        onChange={(music) => {
-          /*
-           * Told to the audio layer here, synchronously, and only then stored.
-           *
-           * Both halves matter. A browser will not open audio a beat after the
-           * press — a React effect reacting to the stored preference is a beat
-           * later — so switching the music on has to reach `begin()` from
-           * inside this handler or the first time somebody turns it on
-           * nothing happens. And saying it twice is free: the effect in
-           * `PreferencesProvider` finds the value already set and does
-           * nothing, which is what keeps a preference restored from storage
-           * and one just chosen on the same path.
-           */
-          soundtrack.setEnabled(music, true)
-          if (music) soundtrack.begin()
-          update({ music })
-          // Answered by hearing it, the way the interface cues are.
-          cue(music ? 'select' : 'tap')
-        }}
+        onChange={(music) => switchMusic(music, update)}
       />
 
       <Slider
-        label="Music level"
+        label="Music volume"
         min={0}
         max={1}
         step={0.05}
         value={preferences.musicVolume}
-        display={`${Math.round(preferences.musicVolume * 100)}%`}
+        display={(value) => `${Math.round(value * 100)}%`}
         disabled={!preferences.music}
-        hint="Its own level, separate from the background sound and from the voice."
-        onChange={(musicVolume) => update({ musicVolume })}
+        hint="Its own level, separate from the background sound and from the voice. Every level is also in the player’s Volume panel."
+        onChange={(musicVolume) => setMusicLevel(musicVolume, update)}
       />
 
       {/*

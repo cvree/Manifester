@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { startTransition, useOptimistic, type ReactNode } from 'react'
 import { cx } from '../lib/cx'
 
 export interface Segment<T extends string> {
@@ -24,6 +24,13 @@ export function SegmentedControl<T extends string>({
   onChange,
   className,
 }: SegmentedControlProps<T>) {
+  /*
+   * The choice lands on this control first, in an urgent render of its own,
+   * and the setting follows in a transition — so the highlight moves on the
+   * frame of the tap rather than after the whole screen has re-rendered with
+   * the new value. See `Toggle`.
+   */
+  const [shown, setShown] = useOptimistic(value)
   return (
     <div
       role="radiogroup"
@@ -34,7 +41,7 @@ export function SegmentedControl<T extends string>({
       )}
     >
       {segments.map((segment) => {
-        const selected = segment.value === value
+        const selected = segment.value === shown
         return (
           <button
             key={segment.value}
@@ -42,10 +49,15 @@ export function SegmentedControl<T extends string>({
             role="radio"
             aria-checked={selected}
             aria-label={segment.ariaLabel}
-            onClick={() => onChange(segment.value)}
+            onClick={() =>
+              startTransition(() => {
+                setShown(segment.value)
+                onChange(segment.value)
+              })
+            }
             className={cx(
-              'min-h-11 flex-1 rounded-[0.85rem] px-3 text-[0.92rem] font-medium',
-              'transition-[background-color,color,box-shadow] duration-200 ease-[var(--ease-calm)]',
+              'min-h-11 flex-1 cursor-pointer touch-manipulation rounded-[0.85rem] px-3 text-[0.92rem] font-medium',
+              'transition-[background-color,color,box-shadow,transform] duration-[120ms] ease-out active:scale-[0.97]',
               selected
                 ? 'bg-[var(--surface-strong)] text-ink shadow-[0_1px_3px_rgb(0_0_0/0.08)]'
                 : 'text-ink-muted hover:text-ink',
@@ -75,8 +87,8 @@ export function Chip({ selected, onClick, children, className }: ChipProps) {
       aria-checked={selected}
       onClick={onClick}
       className={cx(
-        'min-h-11 rounded-pill border px-4 text-[0.95rem] font-medium',
-        'transition-[background-color,border-color,color] duration-200 ease-[var(--ease-calm)]',
+        'min-h-11 cursor-pointer touch-manipulation rounded-pill border px-4 text-[0.95rem] font-medium',
+        'transition-[background-color,border-color,color,transform] duration-[120ms] ease-out active:scale-[0.97]',
         selected
           ? 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]'
           : 'border-[var(--border)] bg-surface text-ink-muted hover:text-ink',

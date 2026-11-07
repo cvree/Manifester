@@ -566,11 +566,22 @@ export class BrainwaveVoice {
    * or depth is a scheduled ramp on the running one. Either way there is no
    * click and no second copy of the same oscillators.
    */
-  apply(settings: BrainwaveSettings): void {
+  apply(
+    settings: BrainwaveSettings,
+    options: {
+      /**
+       * How long the rhythm takes to arrive or leave. Defaults to the long
+       * arrival fade a session begins with; a switch flipped by hand passes
+       * something much shorter, so the press is heard as the press.
+       */
+      fadeSeconds?: number
+    } = {},
+  ): void {
     const wanted = normaliseBrainwave(settings)
+    const fade = options.fadeSeconds ?? BRAINWAVE_FADE_SECONDS
 
     if (!wanted.enabled) {
-      this.stop()
+      this.stop(fade)
       return
     }
 
@@ -585,14 +596,14 @@ export class BrainwaveVoice {
       !this.graph || this.graph.mode !== mode || this.graph.targetHz !== targetHz
 
     if (needsRebuild) {
-      if (this.graph) this.retire(this.graph)
+      if (this.graph) this.retire(this.graph, fade)
       const graph = createBrainwaveGraph(ctx, {
         targetHz,
         mode,
         depth: wanted.depth,
       })
       graph.out.connect(destination)
-      graph.setLevel(wanted.volume)
+      graph.setLevel(wanted.volume, fade)
       this.graph = graph
     } else if (this.graph) {
       this.graph.setDepth(wanted.depth)

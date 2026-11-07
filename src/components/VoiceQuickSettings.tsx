@@ -182,7 +182,7 @@ export function VoiceQuickSettings({
         max={1.6}
         step={0.05}
         value={settings.rate}
-        display={`${settings.rate.toFixed(2)}×`}
+        display={(value) => `${value.toFixed(2)}×`}
         onChange={onRateChange}
       />
 
@@ -199,7 +199,7 @@ export function VoiceQuickSettings({
           max={usingStudio ? STUDIO_PITCH.max : 1.5}
           step={0.05}
           value={pitch}
-          display={pitch.toFixed(2)}
+          display={(value) => value.toFixed(2)}
           onChange={onPitchChange}
         />
       )}
