@@ -14,6 +14,8 @@ import { FirstLoopNudge } from '../components/FirstLoopNudge'
 import { Card } from '../components/Card'
 import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
 import { SleepSheet } from '../components/SleepMode'
+import { DailyNudge, RhythmWeek, useRhythm } from '../components/Rhythm'
+import { rhythmSentence } from '../lib/rhythm'
 import { DesktopPlayerPanel } from '../components/DesktopPlayerPanel'
 import { EmptyState } from '../components/EmptyState'
 import { Notice } from '../components/Notice'
@@ -120,6 +122,7 @@ export function PlayerRoute() {
    */
   const wordless = idle ? !hasText : session.breathOnly
   const lifetime = listeningSentence(listeningStats)
+  const rhythm = useRhythm()
 
   const { stageRef, slotRef, toggle, instant } = useStageExpansion({
     expanded,
@@ -304,6 +307,15 @@ export function PlayerRoute() {
         )}
       >
         <div className="min-w-0">
+          {/*
+            Once a day at most, only before anything has started, and only
+            when there is a run to keep or a reminder somebody asked for.
+          */}
+          {idle && !expanded && (
+            <div data-rise>
+              <DailyNudge onPlay={primaryAction} className="mb-6" />
+            </div>
+          )}
           {session.notice && (
             <div data-rise inert={expanded}>
               <Notice
@@ -345,7 +357,16 @@ export function PlayerRoute() {
                       </>
                     )}
                   </p>
-                  {lifetime && <p className="type-meta mt-3">{lifetime}</p>}
+                  {/*
+                    The week, at the moment it has just grown by a day. The one
+                    place a dot lighting up is news rather than a chart.
+                  */}
+                  <div className="mt-6 w-full max-w-xs">
+                    <RhythmWeek rhythm={rhythm} />
+                  </div>
+                  <p className="type-meta mt-4 max-w-[36ch]">
+                    {[rhythmSentence(rhythm), lifetime].filter(Boolean).join(' ')}
+                  </p>
                   <div className="mt-7 flex flex-wrap justify-center gap-3">
                     <Button variant="primary" size="lg" onClick={() => start()}>
                       {wordless ? 'Breathe again' : 'Listen again'}

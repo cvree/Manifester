@@ -88,6 +88,57 @@ export function createWindowEvent(event: {
   ].join('\r\n')
 }
 
+/**
+ * A daily reminder to listen, as one repeating calendar event.
+ *
+ * A web app cannot wake a phone at nine o'clock — there is no notification it
+ * can schedule that survives the browser being closed, and a push server
+ * would mean an account and a third party for the sake of a reminder. The
+ * calendar the person already uses can, on every phone, offline, for free. So
+ * this is one event that repeats every day with an alarm on it, at a *floating*
+ * local time (no `Z`): nine in the evening stays nine in the evening through a
+ * clock change, rather than drifting an hour because it was pinned to UTC.
+ */
+export function createDailyReminder(
+  time: string,
+  now: Date = new Date(),
+  durationMinutes = 10,
+): string {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time)
+  if (!match) throw new Error('Choose a time first.')
+  const starts = new Date(now)
+  starts.setHours(Number(match[1]), Number(match[2]), 0, 0)
+  // Today, if the time is still ahead; otherwise tomorrow.
+  if (starts.getTime() <= now.getTime()) starts.setDate(starts.getDate() + 1)
+  const ends = new Date(starts.getTime() + durationMinutes * 60_000)
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Manifester//Daily reminder//EN',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${escapeIcs(`daily-${time.replace(':', '')}@manifester.local`)}`,
+    `DTSTAMP:${formatUtc(new Date())}`,
+    `DTSTART:${formatFloating(starts)}`,
+    `DTEND:${formatFloating(ends)}`,
+    'RRULE:FREQ=DAILY',
+    `SUMMARY:${escapeIcs('Manifester · a few minutes for yourself')}`,
+    `DESCRIPTION:${escapeIcs('Open Manifester and press play. Even five minutes counts.')}`,
+    'BEGIN:VALARM',
+    'TRIGGER:PT0M',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${escapeIcs('A few minutes for yourself')}`,
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+    '',
+  ].join('\r\n')
+}
+
+export function downloadDailyReminder(time: string): void {
+  offerFile(createDailyReminder(time), 'manifester-daily-reminder.ics')
+}
+
 /** The same, handed to whatever the device opens `.ics` files with. */
 export function downloadWindow(event: {
   title: string
@@ -122,6 +173,14 @@ function slug(title: string): string {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'manifester'
   )
+}
+
+/** Local wall-clock time with no zone: `20261107T210000`. */
+function formatFloating(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}${pad(date.getMinutes())}00`
 }
 
 function formatUtc(date: Date): string {

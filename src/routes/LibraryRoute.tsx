@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { LibraryBackupPanel } from '../components/LibraryBackupPanel'
+import { RhythmCard } from '../components/Rhythm'
 import { SegmentedControl } from '../components/SegmentedControl'
 import { readAstrology } from '../lib/astrology/profile'
 import { cue } from '../lib/feedback'
@@ -81,6 +82,12 @@ export function LibraryRoute() {
           {total ?? 'Everything here stays on this device.'}
         </p>
       </header>
+
+      {/*
+        The rhythm before the shelves: which days you came back, kept kindly,
+        and the one reminder that helps you keep coming. See `lib/rhythm`.
+      */}
+      <RhythmCard />
 
       <div data-rise>
         <SegmentedControl

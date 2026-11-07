@@ -42,6 +42,7 @@ import {
   soundtrack,
 } from '../lib/soundtrack'
 import { setAppMotion, type MotionLevel } from '../lib/motion'
+import { isReminderTime } from '../lib/rhythm'
 import { readLocal, writeLocal } from '../lib/storage'
 
 const MOTION_LEVELS: readonly MotionLevel[] = ['full', 'gentle', 'still']
@@ -135,6 +136,17 @@ export interface Preferences {
    * `lib/motion.ts`. The device's own Reduce Motion always wins over Full.
    */
   motion: MotionLevel
+  /**
+   * The time of day somebody asked to be reminded, as `"21:00"`, or `null`.
+   *
+   * Drives the in-app nudge and says what the calendar reminder was set for.
+   * The reminder itself lives in the person's own calendar — see
+   * `createDailyReminder` — because that is the only thing that can wake a
+   * phone for a web app without an account and a push server.
+   */
+  dailyReminder: string | null
+  /** The day (`YYYY-MM-DD`) the nudge was last waved away, so it stays away. */
+  nudgeDismissedOn: string | null
 }
 
 const DEFAULTS: Preferences = {
@@ -156,6 +168,8 @@ const DEFAULTS: Preferences = {
   uiHaptics: true,
   aiEnabled: true,
   motion: 'full',
+  dailyReminder: null,
+  nudgeDismissedOn: null,
 }
 
 const KEY = 'preferences'
@@ -222,6 +236,13 @@ function load(): Preferences {
     merged.musicVolume = Math.min(1, Math.max(0, merged.musicVolume))
 
     if (!MOTION_LEVELS.includes(merged.motion)) merged.motion = DEFAULTS.motion
+    if (!isReminderTime(merged.dailyReminder)) merged.dailyReminder = null
+    if (
+      typeof merged.nudgeDismissedOn !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(merged.nudgeDismissedOn)
+    ) {
+      merged.nudgeDismissedOn = null
+    }
 
     /*
      * A phone on a metered connection, or with Data Saver on, does not get

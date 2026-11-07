@@ -36,7 +36,7 @@ describe('library backup', () => {
         },
       ],
       recordings: [],
-      listening: { totalSeconds: 90, sessionCount: 2, firstListenedAt: 5 },
+      listening: { totalSeconds: 90, sessionCount: 2, firstListenedAt: 5, days: {} },
     })
     const parsed = parseLibraryBackup(json)
     expect(parsed.loops[0].title).toBe('Evening')
@@ -62,7 +62,7 @@ describe('library backup', () => {
         loops: [loop],
         customTracks: [],
         recordings: [],
-        listening: { totalSeconds: 0, sessionCount: 0, firstListenedAt: null },
+        listening: { totalSeconds: 0, sessionCount: 0, firstListenedAt: null, days: {} },
       }),
     )
     const restored = prepareRestore(incoming, {
@@ -75,7 +75,7 @@ describe('library backup', () => {
   })
 
   it('skips an identical backup restored twice', () => {
-    const incoming = { loops: [loop], customTracks: [], recordings: [], listening: { totalSeconds: 0, sessionCount: 0, firstListenedAt: null } }
+    const incoming = { loops: [loop], customTracks: [], recordings: [], listening: { totalSeconds: 0, sessionCount: 0, firstListenedAt: null, days: {} } }
     const restored = prepareRestore(incoming, {
       loops: [loop],
       customTracks: [],
