@@ -14,6 +14,7 @@ import { FirstLoopNudge } from '../components/FirstLoopNudge'
 import { Card } from '../components/Card'
 import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
 import { SleepSheet } from '../components/SleepMode'
+import { PackGallery } from '../components/PackGallery'
 import { DailyNudge, RhythmWeek, useRhythm } from '../components/Rhythm'
 import { rhythmSentence } from '../lib/rhythm'
 import { DesktopPlayerPanel } from '../components/DesktopPlayerPanel'
@@ -248,6 +249,10 @@ export function PlayerRoute() {
             }
           />
         </Card>
+        <PackGallery
+          className="mx-auto mt-8 max-w-xl"
+          title="Or press play on one of these"
+        />
         {/*
           The sheets have to come with the empty state, not only with the
           stage. The second button above is the way out of this screen for

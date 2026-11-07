@@ -239,7 +239,7 @@ interface SessionContextValue {
    * nobody notices, then the session ends itself. Starts a session if none is
    * running. See `lib/sleep`.
    */
-  startSleep: (minutes: number) => void
+  startSleep: (minutes: number, source?: SavedLoop) => void
   /** Add time to the sleep timer. Anything already faded comes back gently. */
   extendSleep: (minutes: number) => void
   /** Stay awake: the session carries on, open-ended, at full level. */
@@ -1316,9 +1316,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   )
 
   const startSleep = useCallback<SessionContextValue['startSleep']>(
-    (minutes) => {
+    (minutes, source) => {
       const totalMs = Math.max(1, minutes) * 60_000
-      if (!liveRef.current) start()
+      if (source) start(source)
+      else if (!liveRef.current) start()
       if (!liveRef.current) return
       if (statusRef.current === 'paused') resume()
       // The sleep timer is the session's end now; two clocks racing to end

@@ -20,6 +20,7 @@ import { countWords } from '../lib/format'
 import { draftToLoop } from '../lib/loops'
 import { useReducedMotion } from '../lib/motion'
 import { SmoothScroll } from '../lib/smoothScroll'
+import { PackGallery } from '../components/PackGallery'
 import { STARTER_LINES } from '../lib/tts/knownPhrases'
 import { useStudioAvailable } from '../lib/tts/useTTSStatus'
 import {
@@ -370,6 +371,18 @@ export function CreateRoute() {
           </p>
         </header>
 
+        {/*
+          Ready-made sessions, above the editor while it is empty — the moment
+          a blank page is a question somebody may not have the energy to
+          answer — and below everything once they have started writing, where
+          they are an alternative rather than an interruption.
+        */}
+        {!draft.text.trim() && (
+          <div data-rise className="lg:col-start-1">
+            <PackGallery description="Or let someone else write it tonight. Each one is a whole session: words, sound, breath and length." />
+          </div>
+        )}
+
         {(!speechSupported || storageError || session.notice) && (
           <div data-rise className="space-y-3 lg:col-start-1">
             {!speechSupported && (
@@ -625,6 +638,12 @@ export function CreateRoute() {
         <div data-rise className="lg:col-start-1">
           <CustomizePanel open={panel} onOpenChange={setPanel} />
         </div>
+
+        {draft.text.trim() && (
+          <div data-rise className="lg:col-start-1">
+            <PackGallery />
+          </div>
+        )}
 
         {/*
           One sentence. The full account of what is stored and what is sent is

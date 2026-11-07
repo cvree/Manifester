@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { LibraryBackupPanel } from '../components/LibraryBackupPanel'
 import { RhythmCard } from '../components/Rhythm'
+import { PackGallery } from '../components/PackGallery'
 import { SegmentedControl } from '../components/SegmentedControl'
 import { readAstrology } from '../lib/astrology/profile'
 import { cue } from '../lib/feedback'
@@ -108,7 +109,12 @@ export function LibraryRoute() {
         />
       </div>
 
-      {section === 'loops' && <LoopsSection />}
+      {section === 'loops' && (
+        <>
+          <LoopsSection />
+          <PackGallery layout="grid" />
+        </>
+      )}
       {section === 'sounds' && <SoundsSection />}
       {section === 'astrology' && (
         <Suspense
