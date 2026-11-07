@@ -26,6 +26,7 @@ import {
 } from './Icons'
 import { InstallPrompt } from './InstallPrompt'
 import { MusicControl } from './MusicControl'
+import { SleepVeil } from './SleepMode'
 
 /**
  * Three tabs, in the order the app is used: write it, play it, keep it.
@@ -414,6 +415,12 @@ export function AppShell() {
         viewport-sized blended layer is not free to composite, and the great
         majority of people will never turn this on.
       */}
+      {/*
+        Sleep mode's dark, here rather than on the player: somebody can set a
+        sleep timer and wander to the library, and the screen should still go
+        dark over whatever they left it on.
+      */}
+      <SleepVeil />
       {nightLight > 0 && <div aria-hidden="true" className="night-light" />}
     </div>
   )

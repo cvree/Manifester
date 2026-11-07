@@ -7014,3 +7014,148 @@ html.tuning {
 .astro-rows > * + * {
   border-top: 1px solid var(--quiet-border);
 }
+
+/* ── Sleep mode ─────────────────────────────────────────────── */
+
+/*
+ * The dark over everything while a sleep timer runs.
+ *
+ * Above the sheets and the dock (anything a person might otherwise tap in the
+ * dark), below the night-light filter, so a warm night light still warms it.
+ * It arrives over most of a minute — pressing "sleep" should not feel like a
+ * light switch — and lifts to a readable dim, not to the full page, when the
+ * controls are called up: somebody half asleep reaching for "+15" does not
+ * want the room lit by the phone.
+ */
+.sleep-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482000;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1.5rem, env(safe-area-inset-top)) 1rem
+    max(1.5rem, env(safe-area-inset-bottom));
+  color: #fff;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/*
+ * The dark itself, on its own layer so its long arrival can be an animation
+ * without the revealed state having to fight it for the same property.
+ */
+.sleep-veil::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: rgb(3 2 6);
+  opacity: 0.97;
+  animation: sleep-veil-in 45s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/*
+ * Called up, the controls get a backdrop of their own — the page underneath
+ * blurred and pushed down — so they are never read across a line of the
+ * affirmation that happens to sit behind them while the dark is still arriving.
+ */
+.sleep-veil[data-revealed]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgb(3 2 6 / 0.72);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  animation: sleep-veil-reveal 300ms ease both;
+}
+
+@keyframes sleep-veil-in {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0.97;
+  }
+}
+
+@keyframes sleep-veil-reveal {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Barely there: enough to find in the dark, not enough to light a room. */
+.sleep-veil__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 3rem;
+  padding: 0 1.25rem;
+  border-radius: 999px;
+  color: rgb(255 255 255 / 0.2);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 400ms ease;
+}
+
+.sleep-veil__hint:hover,
+.sleep-veil__hint:focus-visible {
+  color: rgb(255 255 255 / 0.45);
+  outline: none;
+}
+
+.sleep-veil__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: rise-in 420ms var(--ease-calm, ease) both;
+}
+
+.sleep-veil__action {
+  min-height: 3rem;
+  padding: 0 1.4rem;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  color: rgb(255 255 255 / 0.85);
+  font-size: 0.98rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    transform 120ms ease;
+}
+
+.sleep-veil__action:hover {
+  background: rgb(255 255 255 / 0.08);
+}
+
+.sleep-veil__action:active {
+  transform: scale(0.96);
+}
+
+.sleep-veil__action:focus-visible {
+  outline: 2px solid rgb(255 255 255 / 0.6);
+  outline-offset: 3px;
+}
+
+.sleep-veil__action--quiet {
+  border-color: transparent;
+  color: rgb(255 255 255 / 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sleep-veil::before {
+    animation-duration: 3s;
+  }
+  .sleep-veil__panel {
+    animation: none;
+  }
+}

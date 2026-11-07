@@ -13,6 +13,7 @@ import { CinematicBreathType } from '../components/CinematicBreathType'
 import { FirstLoopNudge } from '../components/FirstLoopNudge'
 import { Card } from '../components/Card'
 import { SettingsSheets, type PanelKey } from '../components/CustomizePanel'
+import { SleepSheet } from '../components/SleepMode'
 import { DesktopPlayerPanel } from '../components/DesktopPlayerPanel'
 import { EmptyState } from '../components/EmptyState'
 import { Notice } from '../components/Notice'
@@ -27,6 +28,7 @@ import { PlayerAtmosphere } from '../components/PlayerAtmosphere'
 import {
   CollapseIcon,
   ExpandIcon,
+  MoonIcon,
   PauseIcon,
   PlayIcon,
   SeedIcon,
@@ -76,7 +78,9 @@ export function PlayerRoute() {
   const { preferences } = usePreferences()
   const { allTracks, listeningStats } = useLibrary()
   const { expanded, setExpanded } = useStage()
-  const [sheet, setSheet] = useState<PanelKey | 'adjust' | 'mixer' | null>(null)
+  const [sheet, setSheet] = useState<
+    PanelKey | 'adjust' | 'mixer' | 'sleep' | null
+  >(null)
   const reducedMotion = useReducedMotion()
   const motion = useMotionLevel()
 
@@ -248,7 +252,7 @@ export function PlayerRoute() {
           this it sets a piece of state that nothing is mounted to read.
         */}
         <SettingsSheets
-          open={sheet === 'adjust' || sheet === 'mixer' ? null : sheet}
+          open={sheet === 'adjust' || sheet === 'mixer' || sheet === 'sleep' ? null : sheet}
           onOpenChange={setSheet}
         />
       </>
@@ -425,6 +429,7 @@ export function PlayerRoute() {
                     status={session.status}
                     wordless={wordless}
                     voicePreparing={session.voicePreparing}
+                    override={session.sleep ? 'Drifting off' : null}
                   />
                   <h1 className="stage__title mt-2 max-w-full truncate text-center font-display text-[1.75rem] leading-tight text-ink sm:text-[2rem]">
                     {session.title ||
@@ -533,6 +538,30 @@ export function PlayerRoute() {
                       <TuneIcon className="text-[0.9rem]" />
                       Adjust
                     </button>
+                    {/*
+                      Sleep, in the row with the other two things you do to a
+                      session rather than to its sound. It is offered idle as
+                      well — "start this and let me fall asleep" is one press,
+                      not two — and once set it says so, in the rose of
+                      something switched on.
+                    */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        cue('tap')
+                        setSheet('sleep')
+                      }}
+                      aria-pressed={session.sleep != null}
+                      className={cx(
+                        'stage__leave interactive inline-flex min-h-11 items-center gap-2 rounded-pill border px-5 text-[0.92rem] font-medium',
+                        session.sleep
+                          ? 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]'
+                          : 'border-[var(--control-border)] text-ink-muted hover:bg-[var(--quiet)] hover:text-ink',
+                      )}
+                    >
+                      <MoonIcon className="text-[0.9rem]" />
+                      {session.sleep ? 'Sleeping' : 'Sleep'}
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -614,9 +643,14 @@ export function PlayerRoute() {
         onOpenPanel={setSheet}
       />
       <SettingsSheets
-        open={sheet === 'adjust' || sheet === 'mixer' ? null : sheet}
+        open={
+          sheet === 'adjust' || sheet === 'mixer' || sheet === 'sleep'
+            ? null
+            : sheet
+        }
         onOpenChange={setSheet}
       />
+      <SleepSheet open={sheet === 'sleep'} onClose={() => setSheet(null)} />
     </>
   )
 }

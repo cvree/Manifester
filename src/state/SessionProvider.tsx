@@ -21,6 +21,8 @@ import { findAmbientPreset } from '../lib/ambient'
 import { MusicEngine, type TrackSource } from '../lib/audio'
 import { AudioBus } from '../lib/audioBus'
 import { configureBreath, setBreathActive } from '../lib/breathEngine'
+import { liveBreathVoice } from '../lib/breathAudio'
+import { sleepLevel } from '../lib/sleep'
 import { setCueDucking } from '../lib/feedback'
 import { beat } from '../lib/heartbeat'
 import {
@@ -140,6 +142,11 @@ interface SessionSnapshot {
    * one they started, and it still has no voice in it.
    */
   breathOnly: boolean
+  /**
+   * Sleep mode, while it is on: how long the sleep timer was set for. The time
+   * left is on the clock, as `remainingSeconds`, like any other timer.
+   */
+  sleep: { totalMs: number } | null
 }
 
 interface SessionContextValue {
@@ -224,6 +231,19 @@ interface SessionContextValue {
   setLayerMuted: (id: string, muted: boolean) => void
   /** Stack a generated ambience under the main sound, or take it back out. */
   setLayerEnabled: (id: string, enabled: boolean) => void
+
+  /* ── Sleep ── */
+
+  /**
+   * Fall asleep to this: everything plays for a while, then fades so slowly
+   * nobody notices, then the session ends itself. Starts a session if none is
+   * running. See `lib/sleep`.
+   */
+  startSleep: (minutes: number) => void
+  /** Add time to the sleep timer. Anything already faded comes back gently. */
+  extendSleep: (minutes: number) => void
+  /** Stay awake: the session carries on, open-ended, at full level. */
+  cancelSleep: () => void
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null)
@@ -256,6 +276,9 @@ const VOICE_WAIT_VISIBLE_AFTER_MS = 900
  */
 const QUICK_FADE_SECONDS = 0.35
 
+/** How fast a faded sleep level comes back up, in full-scale per second. */
+const SLEEP_RISE_PER_SECOND = 0.15
+
 const EMPTY_SESSION: SessionSnapshot = {
   status: 'idle',
   title: '',
@@ -268,6 +291,7 @@ const EMPTY_SESSION: SessionSnapshot = {
   timerSeconds: null,
   voicePreparing: false,
   breathOnly: false,
+  sleep: null,
 }
 
 /**
@@ -327,6 +351,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    */
   const draftRef = useRef(draft)
   draftRef.current = draft
+  const preferencesRef = useRef(preferences)
+  preferencesRef.current = preferences
   const [ready, setReady] = useState(false)
   const [voices, setVoices] = useState<RankedVoice[]>([])
   const [voicesReady, setVoicesReady] = useState(false)
@@ -340,6 +366,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const musicRef = useRef<MusicEngine | null>(null)
   const brainwaveRef = useRef<BrainwaveVoice | null>(null)
   const timerRef = useRef<SessionTimer | null>(null)
+  const sleepTimerRef = useRef<SessionTimer | null>(null)
+  /**
+   * The sleep fade, as the level everything is multiplied by.
+   *
+   * `target` is where the curve says it should be; `applied` is where it is.
+   * Going down they are the same thing — the curve is already slower than
+   * anybody can hear. Coming back up, after "+15 min" or "stay awake", the
+   * applied level climbs at a fixed gentle rate rather than jumping, so the
+   * room returns over several seconds rather than all at once.
+   */
+  const sleepScaleRef = useRef({ target: 1, applied: 1, driver: null as number | null })
   const elapsedRef = useRef<{ clock: ActiveTimeClock; interval: number | null }>({
     clock: new ActiveTimeClock(),
     interval: null,
@@ -397,6 +434,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   if (!musicRef.current) musicRef.current = new MusicEngine(busRef.current)
   if (!brainwaveRef.current) brainwaveRef.current = new BrainwaveVoice(busRef.current)
   if (!timerRef.current) timerRef.current = new SessionTimer()
+  if (!sleepTimerRef.current) sleepTimerRef.current = new SessionTimer()
 
   /* ── Voices ── */
 
@@ -839,6 +877,84 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /* ── Sleep: the level everything is multiplied by ── */
+
+  /** Whether a sleep timer is set, as a ref for the callbacks that ask. */
+  const sleepTotalRef = useRef(0)
+  /** True only inside the sleep timer's own ending. See `finish`. */
+  const sleepEndingRef = useRef(false)
+
+  /**
+   * Put one sleep level onto every sound this app makes.
+   *
+   * Through the same setters the faders use, so nothing is rebuilt: the voice
+   * is re-optioned, the generated mix and the soundtrack are ramped, the
+   * breath sound is re-levelled. The stored settings are never touched — this
+   * multiplies what the engines are told, and putting it back to 1 restores
+   * exactly the balance somebody chose.
+   */
+  const pushSleepScale = useCallback((scale: number) => {
+    const settings = draftRef.current.settings
+    const prefs = preferencesRef.current
+    speechRef.current?.updateOptions({
+      volume: clampVoiceVolume(settings.voiceVolume) * scale,
+    })
+    musicRef.current?.setVolume(settings.musicVolume * scale)
+    soundtrack.setLevel(prefs.musicVolume * scale)
+    liveBreathVoice()?.setVolume(prefs.breathSoundVolume * scale)
+  }, [])
+
+  /**
+   * Move the sleep level towards `target`.
+   *
+   * Down: at once, because the curve asking for it is already slower than
+   * hearing. Up: never at once. A level coming back after "+15 min" or "stay
+   * awake" climbs at `SLEEP_RISE_PER_SECOND`, so a person who has half woken
+   * to add time is not then woken the rest of the way by the room jumping.
+   */
+  const stepSleepScale = useCallback(
+    (target: number) => {
+      const state = sleepScaleRef.current
+      state.target = target
+      if (target <= state.applied) {
+        if (state.applied - target > 0.0005 || (target === 0 && state.applied !== 0)) {
+          state.applied = target
+          pushSleepScale(target)
+        }
+        return
+      }
+      if (state.driver != null) return
+      let last = performance.now()
+      state.driver = window.setInterval(() => {
+        const now = performance.now()
+        const seconds = Math.max(0, (now - last) / 1000)
+        last = now
+        const next = Math.min(
+          state.target,
+          state.applied + SLEEP_RISE_PER_SECOND * seconds,
+        )
+        state.applied = next
+        pushSleepScale(next)
+        if (next >= state.target && state.driver != null) {
+          window.clearInterval(state.driver)
+          state.driver = null
+        }
+      }, 100)
+    },
+    [pushSleepScale],
+  )
+
+  /** Straight back to full, for a session that has ended or is starting. */
+  const resetSleepScale = useCallback(() => {
+    const state = sleepScaleRef.current
+    if (state.driver != null) window.clearInterval(state.driver)
+    state.driver = null
+    const wasDimmed = state.applied !== 1
+    state.target = 1
+    state.applied = 1
+    if (wasDimmed) pushSleepScale(1)
+  }, [pushSleepScale])
+
   /* ── Stop ── */
 
   const finish = useCallback(
@@ -848,6 +964,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       musicRef.current?.stop()
       brainwaveRef.current?.stop()
       timerRef.current?.stop()
+      sleepTimerRef.current?.stop()
+      sleepTotalRef.current = 0
+      /*
+       * A session ended any way but by falling asleep goes back to full. One
+       * that ended *by* falling asleep keeps the soundtrack at the silence it
+       * faded to — the music outlives sessions, and the one thing it must not
+       * do is come back up in a dark room the moment the words stop. The next
+       * session, or the music's own controls, put it back.
+       */
+      if (!sleepEndingRef.current) resetSleepScale()
       /*
        * And let the audio route go with the session that was using it.
        *
@@ -880,9 +1006,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         status,
         trackName: null,
         notice,
+        sleep: null,
+        timerSeconds: current.sleep ? null : current.timerSeconds,
       }))
     },
-    [clock, releaseWakeLock, stopElapsed],
+    [clock, releaseWakeLock, resetSleepScale, stopElapsed],
   )
 
   const stop = useCallback(() => finish('idle', null), [finish])
@@ -942,6 +1070,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const title =
         (source ? source.title : current.title).trim() ||
         (breathOnly ? 'Breathwork' : autoTitle(text))
+
+      resetSleepScale()
 
       // Reach for audio permission while we are still inside the tap.
       bus.ensure()
@@ -1094,7 +1224,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         })
       }
     },
-    [clock, finish, loops, recordPlay, requestWakeLock, startElapsed, voices],
+    [
+      clock,
+      finish,
+      loops,
+      recordPlay,
+      requestWakeLock,
+      resetSleepScale,
+      startElapsed,
+      voices,
+    ],
   )
 
   const pause = useCallback(() => {
@@ -1104,6 +1243,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     musicRef.current?.suspend()
     busRef.current?.suspend()
     timerRef.current?.pause()
+    sleepTimerRef.current?.pause()
     pauseElapsed()
     releaseWakeLock()
     const remaining = speechRef.current?.delayRemainingSeconds ?? null
@@ -1126,9 +1266,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     speechRef.current?.resume()
     timerRef.current?.resume()
+    sleepTimerRef.current?.resume()
     setSession((current) => ({ ...current, status: 'playing' }))
     startElapsed(false)
-    void requestWakeLock()
+    // Asleep, the screen is allowed to go dark on its own. See `startSleep`.
+    if (!sleepTotalRef.current) void requestWakeLock()
   }, [applyLiveSound, draft.settings, requestWakeLock, startElapsed])
 
   const dismissNotice = useCallback(
@@ -1136,13 +1278,95 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  /* ── Sleep ── */
+
+  const endSleep = useCallback(() => {
+    sleepEndingRef.current = true
+    const state = sleepScaleRef.current
+    if (state.driver != null) window.clearInterval(state.driver)
+    state.driver = null
+    state.target = 0
+    state.applied = 0
+    pushSleepScale(0)
+    finish('idle', null)
+    sleepEndingRef.current = false
+  }, [finish, pushSleepScale])
+
+  /** (Re)arm the sleep timer with `remainingMs` left of `sleepTotalRef`. */
+  const armSleep = useCallback(
+    (remainingMs: number) => {
+      const timer = sleepTimerRef.current
+      if (!timer) return
+      timer.start(remainingMs, {
+        onTick: (remainingSeconds) => {
+          if (statusRef.current === 'playing') clock.set({ remainingSeconds })
+          stepSleepScale(sleepLevel(remainingSeconds * 1000, sleepTotalRef.current))
+        },
+        onComplete: endSleep,
+      })
+      if (statusRef.current === 'paused') timer.pause()
+      const totalMs = sleepTotalRef.current
+      setSession((current) => ({
+        ...current,
+        sleep: { totalMs },
+        timerSeconds: Math.round(totalMs / 1000),
+      }))
+    },
+    [clock, endSleep, stepSleepScale],
+  )
+
+  const startSleep = useCallback<SessionContextValue['startSleep']>(
+    (minutes) => {
+      const totalMs = Math.max(1, minutes) * 60_000
+      if (!liveRef.current) start()
+      if (!liveRef.current) return
+      if (statusRef.current === 'paused') resume()
+      // The sleep timer is the session's end now; two clocks racing to end
+      // one session is how it would stop half way through its own fade.
+      timerRef.current?.stop()
+      sleepTotalRef.current = totalMs
+      armSleep(totalMs)
+      /*
+       * And let the screen go. A session normally holds the screen on, which
+       * is right for somebody watching the breath and wrong for somebody
+       * trying to sleep next to a lit phone. The veil dims it in the meantime.
+       */
+      releaseWakeLock()
+    },
+    [armSleep, releaseWakeLock, resume, start],
+  )
+
+  const extendSleep = useCallback<SessionContextValue['extendSleep']>(
+    (minutes) => {
+      const timer = sleepTimerRef.current
+      if (!timer || !sleepTotalRef.current) return
+      const addMs = Math.max(1, minutes) * 60_000
+      const remainingMs = timer.remainingSeconds * 1000
+      sleepTotalRef.current += addMs
+      armSleep(remainingMs + addMs)
+    },
+    [armSleep],
+  )
+
+  const cancelSleep = useCallback(() => {
+    if (!sleepTotalRef.current) return
+    sleepTimerRef.current?.stop()
+    sleepTotalRef.current = 0
+    stepSleepScale(1)
+    clock.set({ remainingSeconds: null })
+    setSession((current) => ({ ...current, sleep: null, timerSeconds: null }))
+    if (statusRef.current === 'playing') void requestWakeLock()
+  }, [clock, requestWakeLock, stepSleepScale])
+
   /* ── Live adjustments ── */
 
   const setLiveVoiceVolume = useCallback(
     (value: number) => {
       const level = clampVoiceVolume(value)
       updateSettings({ voiceVolume: level })
-      speechRef.current?.updateOptions({ volume: level })
+      speechRef.current?.updateOptions({
+        volume: level * sleepScaleRef.current.applied,
+      })
     },
     [updateSettings],
   )
@@ -1150,7 +1374,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const setLiveMusicVolume = useCallback(
     (value: number) => {
       updateSettings({ musicVolume: value })
-      musicRef.current?.setVolume(value)
+      musicRef.current?.setVolume(value * sleepScaleRef.current.applied)
     },
     [updateSettings],
   )
@@ -1598,7 +1822,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
        */
       if (
         (wakeLockRef.current === null || wakeLockRef.current.released) &&
-        session.status === 'playing'
+        session.status === 'playing' &&
+        !sleepTotalRef.current
       ) {
         void requestWakeLock()
       }
@@ -1676,6 +1901,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLayerLevel,
       setLayerMuted,
       setLayerEnabled,
+      startSleep,
+      extendSleep,
+      cancelSleep,
     }),
     [
       ready,
@@ -1709,6 +1937,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLayerLevel,
       setLayerMuted,
       setLayerEnabled,
+      startSleep,
+      extendSleep,
+      cancelSleep,
     ],
   )
 

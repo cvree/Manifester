@@ -20,7 +20,7 @@ import {
   type AmbientHandle,
   type RainCharacter,
 } from './ambient'
-import type { AudioBus } from './audioBus'
+import { MAX_MUSIC_VOLUME, type AudioBus } from './audioBus'
 import { rampParam } from './audioParams'
 import { clampLevel } from './soundMixer'
 import { onHeartbeat, scheduleIn } from './heartbeat'
@@ -179,7 +179,14 @@ export class MusicEngine {
   }
 
   setVolume(value: number): void {
-    this.volume = Math.min(1, Math.max(0, value))
+    /*
+     * Up to the bus's own maximum, not to 1. The generated mix is entirely
+     * inside this app's graph and the bus is built to take it past full —
+     * clamping here to 1 is how the top half of the Background slider used to
+     * do nothing at all. An imported file still stops at 1, because a media
+     * element cannot go further; see `elementVolume`.
+     */
+    this.volume = Math.min(MAX_MUSIC_VOLUME, Math.max(0, value))
     this.bus.setMusicVolume(this.volume)
     // Only take over the element's volume when it is not mid-fade.
     if (this.element && this.fadeTimer == null && this.active) {
