@@ -2399,11 +2399,21 @@ html:not(.dark) .breath-aurora__veil {
  * between them, which on a narrow screen stacks the phrase into two lines and
  * reads, if anything, more like a film title than the single line does.
  *
- * The tracking is where the breath enters the type. `--e` adds up to `--swell`
- * of extra letter-spacing, so an in-breath physically opens the words out and
- * an out-breath draws them back in. The trailing negative margin cancels the
- * space CSS letter-spacing adds after the *last* glyph, which is what keeps a
- * tracked line optically centred instead of sitting a fraction to the left.
+ * The tracking is where the breath enters the type — but not *as* tracking.
+ * The line is laid out once at `--cinema-track`, and what the breath adds on
+ * top is a `translate` on each glyph (see `.cinema__glyph`), so an in-breath
+ * still opens the words out and an out-breath draws them back in without the
+ * phrase being re-laid out on every frame. Letter-spacing animated per frame
+ * was the crawl in the title: each glyph rounding to whole pixels on its own,
+ * sixty times a second, and on a narrow phone the phrase re-wrapping mid-breath.
+ * The trailing negative margin cancels the space CSS letter-spacing adds after
+ * the *last* glyph, which keeps the tracked line optically centred.
+ *
+ * No `scale()` on the text and no per-frame `text-shadow` either. A scaled
+ * text layer is rasterised once and stretched as a bitmap — soft, then a
+ * visible "pop" when the browser re-rasterises it — and a shadow whose radius
+ * follows the breath repaints every glyph every frame. The brightening with
+ * the breath is opacity here and the glow layer behind, both composited.
  */
 .cinema__word {
   position: relative;
@@ -2420,16 +2430,12 @@ html:not(.dark) .breath-aurora__veil {
   line-height: 1.12;
   text-align: center;
   text-transform: uppercase;
-  letter-spacing: calc(var(--cinema-track) + var(--e) * var(--cinema-swell));
-  margin-right: calc(-1 * (var(--cinema-track) + var(--e) * var(--cinema-swell)));
+  letter-spacing: var(--cinema-track);
+  margin-right: calc(-1 * var(--cinema-track));
   color: var(--ink);
   opacity: calc(0.74 + var(--e) * 0.26);
-  transform: scale(calc(0.985 + var(--e) * 0.035));
-  text-shadow: 0 0 calc(0.5rem + var(--e) * 1.4rem)
-    color-mix(in oklab, var(--glow) calc(30% + var(--e) * 45%), transparent);
-  /* Not `letter-spacing`: hinting a layout property buys nothing and costs a
-     promotion. See `contain` on `.cinema`. */
-  will-change: transform, opacity;
+  text-shadow: 0 0 1.2rem color-mix(in oklab, var(--glow) 52%, transparent);
+  will-change: opacity;
 }
 
 .cinema__word-part {
@@ -2453,6 +2459,16 @@ html:not(.dark) .breath-aurora__veil {
  */
 .cinema__glyph {
   display: inline-block;
+  /*
+   * The breath's share of the tracking: `--c` is this glyph's distance, in
+   * glyph slots, from the centre it is set around (written once per phrase by
+   * `CinematicBreathType`), so every gap opens by the same amount and the
+   * phrase stays centred — the picture letter-spacing drew, without the
+   * layout. On `translate`, not `transform`, so it composes with the resolve
+   * below instead of being overwritten by it.
+   */
+  translate: calc(var(--c, 0) * var(--e) * var(--cinema-swell)) 0;
+  will-change: translate;
   animation: cinema-resolve 900ms var(--ease-calm) both;
   /*
    * `animation-delay` is set per letter from `CinematicBreathType`, because it
@@ -2472,12 +2488,20 @@ html:not(.dark) .breath-aurora__veil {
  * opacity at the end of the travel — every turn would blank the phrase for a
  * third of a second before it came back, which reads as a flicker however
  * beautiful the curve is.
+ *
+ * The last frame is exactly the resting style — `filter: none`, not
+ * `blur(0)` — so nothing changes at the moment the animation lets go. A
+ * `blur(0)` that outlived the animation kept each letter on a filter layer of
+ * its own; letting it go later re-rasterised the glyph at a rounded position
+ * and every letter visibly snapped by a pixel as it settled. The blur is also
+ * a quarter of a rem rather than half: eleven filter layers at every turn is
+ * real work for a phone, and the focus reads the same.
  */
 @keyframes cinema-resolve {
   from {
     opacity: 0;
-    transform: translate3d(0, 0.34em, 0) scale(1.06);
-    filter: blur(0.5rem);
+    transform: translate3d(0, 0.3em, 0) scale(1.04);
+    filter: blur(0.25rem);
   }
   28% {
     opacity: 1;
@@ -2485,7 +2509,7 @@ html:not(.dark) .breath-aurora__veil {
   to {
     opacity: 1;
     transform: none;
-    filter: blur(0);
+    filter: none;
   }
 }
 
@@ -2506,6 +2530,7 @@ html:not(.dark) .breath-aurora__veil {
   height: 1px;
   background: color-mix(in oklab, var(--ink) 10%, transparent);
   opacity: calc(0.35 + var(--m) * 0.4);
+  will-change: opacity;
 }
 
 .cinema__rule-fill {
@@ -2560,7 +2585,7 @@ html:not(.dark) .breath-aurora__veil {
     filter: blur(3px);
   }
   to {
-    filter: blur(0);
+    filter: none;
   }
 }
 
@@ -2570,11 +2595,17 @@ html:not(.dark) .breath-aurora__veil {
  * Set as a numeral in the display face, tracked wide and kept quiet: it is
  * there for the one glance a person takes to find out how much of the
  * out-breath is left, and it should cost nothing to ignore for the rest of the
- * session. Keyed by the second it shows, so each new number arrives with its
- * own small settle rather than snapping.
+ * session.
+ *
+ * It does not animate. It used to be re-mounted every second with a small
+ * settle, which played once a second for the whole session — a twitch in the
+ * corner of the eye, on the same frame as the countdown's render. Now the digit
+ * changes inside a box of fixed width, so a 10 turning into a 9 moves nothing.
  */
 .cinema__count {
   margin: 0;
+  min-width: 2.4ch;
+  text-align: center;
   font-family: var(--font-display);
   font-size: clamp(0.85rem, 3.4vw, 1.05rem);
   font-variant-numeric: tabular-nums;
@@ -2582,24 +2613,6 @@ html:not(.dark) .breath-aurora__veil {
   margin-right: -0.34em;
   color: var(--ink-faint);
   opacity: 0.72;
-  animation: cinema-tick 360ms var(--ease-calm) both;
-}
-
-/*
- * A settle, not a blink. The numeral is re-keyed every second, so it plays this
- * once a second for the whole session — and a fade that started from nothing
- * would leave the count genuinely unreadable for a third of every second it is
- * on screen. It starts most of the way lit and travels two pixels.
- */
-@keyframes cinema-tick {
-  from {
-    opacity: 0.3;
-    transform: translate3d(0, 2px, 0);
-  }
-  to {
-    opacity: 0.72;
-    transform: none;
-  }
 }
 
 /*
@@ -2615,12 +2628,12 @@ html:not(.dark) .breath-aurora__veil {
  * behind the words rather than at the edges of the screen.
  */
 .cinema--immersive {
-  --cinema-size: clamp(2rem, min(9.5vw, 9vh), 5.2rem);
+  --cinema-size: clamp(2rem, min(9.5vw, 9svh), 5.2rem);
   gap: 0.9rem;
 }
 
 .cinema--immersive[data-moving='false'] {
-  --cinema-size: clamp(1.35rem, min(6vw, 5.6vh), 3.2rem);
+  --cinema-size: clamp(1.35rem, min(6vw, 5.6svh), 3.2rem);
 }
 
 /*
@@ -2638,7 +2651,7 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 .cinema--wordless.cinema--immersive {
-  --cinema-size: clamp(2.2rem, min(10.5vw, 10vh), 6rem);
+  --cinema-size: clamp(2.2rem, min(10.5vw, 10svh), 6rem);
 }
 
 .cinema--wordless .cinema__glow {
@@ -2660,22 +2673,19 @@ html:not(.dark) .breath-aurora__veil {
  */
 @media (prefers-reduced-motion: reduce) {
   .cinema__word {
-    transform: none;
     will-change: auto;
   }
 
   .cinema__glyph {
+    translate: none;
+    will-change: auto;
     animation: cinema-fade 260ms var(--ease-calm) both;
-    animation-delay: 0ms;
+    animation-delay: 0ms !important;
   }
 
   .cinema__whisper {
     animation: cinema-fade 260ms var(--ease-calm) both;
     animation-delay: 0ms;
-  }
-
-  .cinema__count {
-    animation: none;
   }
 
   .cinema__glow {
@@ -2849,7 +2859,7 @@ html:not(.dark) .breath-aurora__veil {
     #000 100%
   );
   /* How far the motes may travel from it. */
-  --reach: min(34vw, 30vh);
+  --reach: min(34vw, 30svh);
   /*
    * The unit every room sizes itself in: the short side of the screen. Rings,
    * curtains and starfields are drawn against this rather than against the
@@ -2857,7 +2867,7 @@ html:not(.dark) .breath-aurora__veil {
    * and so the picker's thumbnails can render the *same* markup by overriding
    * this one number.
    */
-  --span: min(100vw, 100vh);
+  --span: min(100vw, 100lvh);
   /* How far the horizon opens on a full in-breath. */
   --swell: 9px;
 
@@ -2880,7 +2890,7 @@ html:not(.dark) .breath-aurora__veil {
 .player-field--immersive {
   --heart-x: 50%;
   --heart-y: 46%;
-  --reach: min(42vw, 38vh);
+  --reach: min(42vw, 38svh);
   --swell: 14px;
 }
 
@@ -4875,7 +4885,7 @@ html:not(.dark) .breath-aurora__veil {
    * Three limits, and each of them is doing something:
    *
    *   - `64vw` keeps it from crowding a narrow window;
-   *   - `44vh` keeps it from pushing the words it is meant to be introducing
+   *   - `44svh` keeps it from pushing the words it is meant to be introducing
    *     off the bottom of a shallow one, and keeps it under what the expanded
    *     stage can offer at the same height — expanding should not hand the orb
    *     less room than it already had. That holds from about 780px of viewport
@@ -4890,7 +4900,7 @@ html:not(.dark) .breath-aurora__veil {
    * The floor is itself a `min()` so the smallest phones — where 16rem is
    * wider than the card it has to sit in — get a floor they can actually hold.
    */
-  --stage-orb: clamp(min(16rem, 74vw), min(64vw, 44vh), 27rem);
+  --stage-orb: clamp(min(16rem, 74vw), min(64vw, 44svh), 27rem);
 
   /*
    * ── The line the voice is speaking ──
@@ -4960,9 +4970,9 @@ html:not(.dark) .breath-aurora__veil {
  *
  * The reason is the rule the expanded stage is already held to: expanding must
  * never hand the orb *less* room than the card just had. What the expanded
- * stage can offer is `95dvh` minus the measured height of everything else in
+ * stage can offer is `95svh` minus the measured height of everything else in
  * the composition, and on an ordinary 900px laptop window that is a shade
- * under 400px — which is what `44vh` already comes to. So on that window there
+ * under 400px — which is what `44svh` already comes to. So on that window there
  * is genuinely no spare height to give the card, and taking some anyway would
  * have bought a bigger orb in the card at the cost of *shrinking* it on
  * Expand. Raising the ceiling instead does nothing at all on the laptop and a
@@ -4980,7 +4990,7 @@ html:not(.dark) .breath-aurora__veil {
  * everything else travels on.
  */
 .stage--roomy:not(.stage--immersive) {
-  --stage-orb: clamp(min(17rem, 76vw), min(68vw, 44vh), 34rem);
+  --stage-orb: clamp(min(17rem, 76vw), min(68vw, 44svh), 34rem);
   --aura: 0.55;
   background-color: color-mix(in srgb, var(--panel) 82%, transparent);
   border-color: color-mix(in srgb, var(--panel-border) 70%, transparent);
@@ -5067,8 +5077,15 @@ html:not(.dark) .breath-aurora__veil {
    * keeping that way: too large and the orb gives up room it could have had,
    * too small and the stage quietly starts to scroll — which is the one thing
    * the safety valve above is there to make survivable rather than normal.
+   *
+   * In `svh`, not `dvh`. The dynamic viewport changes height while a phone's
+   * URL bar slides in and out and while the keyboard opens — and the orb is
+   * sized from this, through a registered `--size` that *transitions*. Measured
+   * in `dvh`, every scroll on a phone grew and shrank the orb over 620ms and
+   * moved everything underneath it, which is the room breathing on its own.
+   * The small viewport is the one that never changes under a person's thumb.
    */
-  --stage-room: 100dvh;
+  --stage-room: 100svh;
   /*
    * 21.75rem is the rest of the composition — the title block, the transport
    * and the spacing between them — and `--stage-line` is the words' own box,
@@ -5150,7 +5167,7 @@ html:not(.dark) .breath-aurora__veil {
       var(--panel-shadow-lift);
     padding: clamp(1rem, 1.8vh, 1.6rem) clamp(1.75rem, 4vw, 3.5rem);
     /* Which leaves the orb 95% of the viewport to be measured against. */
-    --stage-room: 95dvh;
+    --stage-room: 95svh;
   }
 }
 
@@ -5851,7 +5868,7 @@ html:not(.dark) .breath-aurora__veil {
     align-content: center;
     align-items: center;
     column-gap: clamp(1.25rem, 4vw, 3rem);
-    --stage-orb: min(46vw, 100dvh - 4rem, 24rem);
+    --stage-orb: min(46vw, 100svh - 4rem, 24rem);
     --stage-play: 3.5rem;
     --stage-stack: 0.4rem;
     --stage-gap: 0.5rem;
