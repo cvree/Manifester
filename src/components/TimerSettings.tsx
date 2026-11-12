@@ -2,15 +2,24 @@ import { useEffect, useState } from 'react'
 import { TIMER_PRESETS } from '../lib/types'
 import { Chip } from './SegmentedControl'
 import { TextField } from './TextArea'
+import { Toggle } from './Toggle'
 
 interface TimerSettingsProps {
   minutes: number | null
   onChange: (minutes: number | null) => void
+  /** Whether the words begin again at the end. Length only applies when they do. */
+  repeat: boolean
+  onRepeatChange: (repeat: boolean) => void
 }
 
 const PRESET_VALUES = TIMER_PRESETS.map((preset) => preset.minutes)
 
-export function TimerSettings({ minutes, onChange }: TimerSettingsProps) {
+export function TimerSettings({
+  minutes,
+  onChange,
+  repeat,
+  onRepeatChange,
+}: TimerSettingsProps) {
   const isPreset = PRESET_VALUES.includes(minutes)
   const [custom, setCustom] = useState(isPreset ? '' : String(minutes ?? ''))
   const [showCustom, setShowCustom] = useState(!isPreset)
@@ -29,6 +38,23 @@ export function TimerSettings({ minutes, onChange }: TimerSettingsProps) {
 
   return (
     <div>
+      <div className="mb-5">
+        <Toggle
+          label="Repeat"
+          description={
+            repeat
+              ? 'Your words begin again after each pass, for as long as you choose below.'
+              : 'Off: your words are read through once, then the session ends by itself.'
+          }
+          checked={repeat}
+          onChange={onRepeatChange}
+        />
+      </div>
+
+      <div
+        inert={!repeat}
+        className={repeat ? undefined : 'opacity-45'}
+      >
       <div role="radiogroup" aria-label="Session length" className="flex flex-wrap gap-2">
         {TIMER_PRESETS.map((preset) => (
           <Chip
@@ -70,8 +96,12 @@ export function TimerSettings({ minutes, onChange }: TimerSettingsProps) {
         </div>
       )}
 
+      </div>
+
       <p className="mt-3 text-[0.85rem] leading-snug text-ink-faint">
-        {minutes == null
+        {!repeat
+          ? 'Turn Repeat on to choose a length.'
+          : minutes == null
           ? 'The loop will keep going until you end the session.'
           : `The voice and sound fade out after ${minutes} minutes.`}
       </p>

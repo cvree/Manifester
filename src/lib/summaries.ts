@@ -144,7 +144,8 @@ export function delaySummary(seconds: number): string {
   return `${seconds}-second delay`
 }
 
-export function timerSummary(minutes: number | null): string {
+export function timerSummary(minutes: number | null, repeat = true): string {
+  if (!repeat) return 'Once through'
   return minutes == null ? 'Until I stop it' : `${minutes} minutes`
 }
 

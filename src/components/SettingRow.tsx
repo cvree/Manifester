@@ -13,7 +13,7 @@ interface SettingRowProps {
 }
 
 /**
- * One line of the "Customize your ritual" list.
+ * One line of a settings list.
  *
  * The summary is the whole idea: you should be able to read the state of every
  * advanced setting without opening anything, which is what turns a settings

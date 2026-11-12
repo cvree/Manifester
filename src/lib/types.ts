@@ -112,7 +112,18 @@ export interface LoopSettings {
   musicVolume: number
   /** Silence between repetitions, in seconds. */
   repeatPauseSeconds: number
-  /** `null` means "keep going until I stop it". */
+  /**
+   * Whether the words begin again when they reach the end.
+   *
+   * Off means "read this to me": one pass, then the session completes by
+   * itself, and `timerMinutes` is not consulted. On is the loop Manifester has
+   * always been. A blank page in the editor starts with it off, because
+   * reading something once is what a Read aloud button promises; everything
+   * saved before this field existed was a loop and stays one — see
+   * `normaliseSettings`, which reads a missing value as `true`.
+   */
+  repeat: boolean
+  /** `null` means "keep going until I stop it". Only used when `repeat`. */
   timerMinutes: number | null
   sound: SoundConfig
   /**
@@ -185,6 +196,7 @@ export const DEFAULT_SETTINGS: LoopSettings = {
   // Present without arriving loudly in a dark room.
   musicVolume: 0.4,
   repeatPauseSeconds: 3,
+  repeat: true,
   timerMinutes: 10,
   sound: DEFAULT_SOUND,
   brainwave: DEFAULT_BRAINWAVE,

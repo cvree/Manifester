@@ -10,6 +10,8 @@ export type LaunchDestination = '/player' | '/create' | '/welcome'
  * Three answers, in order of how much this device already knows about the
  * person opening it:
  *
+ *  - Unsaved words restored from the last visit mean the editor, where they
+ *    are.
  *  - A loop worth resuming means the Player, which is where somebody who has
  *    used this before almost always wants to be.
  *  - Nothing saved and nothing seen means the introduction: an empty editor is
@@ -18,7 +20,14 @@ export type LaunchDestination = '/player' | '/create' | '/welcome'
  *  - Anything else — they have been introduced, they simply have no loops
  *    right now — is the editor, as it always was.
  */
-export function launchDestination(loops: SavedLoop[]): LaunchDestination {
+export function launchDestination(
+  loops: SavedLoop[],
+  unsavedDraft = false,
+): LaunchDestination {
+  // Words that were being written and are not in the library yet: back to the
+  // page they are on, not to a player showing something else. Somebody who
+  // left halfway through the introduction is still shown the introduction.
+  if (unsavedDraft && !shouldOnboard(loops)) return '/create'
   if (pickLaunchLoop(loops)) return '/player'
   if (shouldOnboard(loops)) return '/welcome'
   return '/create'

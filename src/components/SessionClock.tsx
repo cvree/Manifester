@@ -68,7 +68,10 @@ export function LiveStageStatus({
   wordless,
   voicePreparing,
   override,
+  once = false,
 }: {
+  /** A single read-through rather than a loop. */
+  once?: boolean
   status: SessionStatus
   wordless: boolean
   voicePreparing: boolean
@@ -102,7 +105,9 @@ export function LiveStageStatus({
                 ? `Resting · ${delay}s`
                 : waiting
                   ? 'Finding the voice'
-                  : 'Now looping'))
+                  : once
+                    ? 'Reading aloud'
+                    : 'Now looping'))
           : 'Ready when you are'
 
   return <StageStatus label={label} waiting={waiting && !override} />

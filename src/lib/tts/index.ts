@@ -218,6 +218,8 @@ class TTS {
    * change is measured against — see `setLiveRate`.
    */
   private liveSynthesisSpeed = 0
+  /** Gamer mode: never synthesise on this device. See `setLightweight`. */
+  private lightweight = false
 
   constructor() {
     this.normalizer = createNormalizer({
@@ -249,7 +251,9 @@ class TTS {
    */
   private engines(): TTSEngine[] {
     const list: TTSEngine[] = []
-    if (browserKokoro.getSnapshot().state === 'ready') list.push(browserKokoro)
+    if (!this.lightweight && browserKokoro.getSnapshot().state === 'ready') {
+      list.push(browserKokoro)
+    }
     if (this.remote) list.push(this.remote)
     return list
   }
@@ -308,7 +312,11 @@ class TTS {
     void this.repairCache()
     const unsubscribe = browserKokoro.subscribe((snapshot) => {
       this.refreshEngines()
-      const ready = snapshot.state === 'ready'
+      const up = snapshot.state === 'ready'
+      // A resume that was already under way when gamer mode came on lands
+      // here; put the model straight back down rather than keep it in memory.
+      if (up && this.lightweight) queueMicrotask(() => browserKokoro.rest())
+      const ready = up && !this.lightweight
       this.publish({
         unlimited: ready,
         // A model on the device settles the question for everything, including
@@ -319,11 +327,36 @@ class TTS {
       // a failure should not leave a stale "resting" flag suppressing it.
       if (ready) this.engineFailedAt = 0
     })
-    void browserKokoro.resume()
+    if (!this.lightweight) void browserKokoro.resume()
     return unsubscribe
   }
 
   /** Download and start the on-device model. From a deliberate press only. */
+  /**
+   * Gamer mode's voice: everything that is cheap, and nothing that is not.
+   *
+   * A line this device has already heard is a file in a cache, and a line that
+   * shipped with the app is a small download — both stay. What goes is the
+   * neural model running in the page: it is the one part of the voice that
+   * competes with a game for memory and a core. With it resting, a line
+   * nothing has ever spoken is read by the device's own voice, which the
+   * operating system runs outside the page altogether.
+   *
+   * The cache keys do not move, because the on-device model shares its
+   * version with the shipped clips — see `browserKokoro.descriptor`.
+   */
+  setLightweight(on: boolean): void {
+    if (on === this.lightweight) return
+    this.lightweight = on
+    if (on) browserKokoro.rest()
+    else void browserKokoro.resume()
+    this.refreshEngines()
+  }
+
+  get isLightweight(): boolean {
+    return this.lightweight
+  }
+
   installStudioVoice(): Promise<boolean> {
     return browserKokoro.install()
   }

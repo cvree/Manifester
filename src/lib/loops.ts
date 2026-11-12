@@ -289,6 +289,9 @@ export function normaliseSettings(settings: Partial<LoopSettings>): LoopSettings
     voiceVolume: clampVoiceVolume(
       settings.voiceVolume ?? DEFAULT_SETTINGS.voiceVolume,
     ),
+    // Anything saved before `repeat` existed was a loop. Only an explicit
+    // `false` means "once".
+    repeat: settings.repeat !== false,
     sound: normaliseSound(sound),
     brainwave: normaliseBrainwave(settings.brainwave),
   }

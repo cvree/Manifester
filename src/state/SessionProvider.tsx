@@ -46,6 +46,7 @@ import {
   pickLaunchLoop,
   type Draft,
 } from '../lib/loops'
+import { loadStoredDraft, saveStoredDraft } from '../lib/draftStore'
 import { ActiveTimeClock } from '../lib/sessionClock'
 import { ClockStore, type ClockReading } from '../lib/clockStore'
 import { soundPlaybackChanged } from '../lib/soundChoice'
@@ -316,6 +317,8 @@ function newDraft(): Draft {
     text: '',
     settings: {
       ...DEFAULT_SETTINGS,
+      // A blank page is read once unless somebody asks for more. See `repeat`.
+      repeat: false,
       sound: { ...DEFAULT_SETTINGS.sound, mode: 'off' },
       brainwave: { ...DEFAULT_SETTINGS.brainwave },
     },
@@ -506,8 +509,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void storage.loadLastSettings().then((saved) => {
       if (cancelled) return
       const last = pickLaunchLoop(loops)
+      // Words that were on the page when it last closed come first: they are
+      // the one thing here that exists nowhere else. See `draftStore`.
+      const kept = loadStoredDraft()
       setDraft((current) => {
         if (draftTouchedRef.current) return current
+        if (kept) return kept
         if (last) return loopToDraft(last)
         return saved
           ? {
@@ -524,6 +531,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [libraryReady, loops, ready])
 
   /* ── Draft editing ── */
+
+  /*
+   * Keep the page through a refresh.
+   *
+   * A moment after each change rather than on every keystroke, and once more —
+   * synchronously — as the page is hidden, which is the write that survives a
+   * phone reclaiming the tab. Nothing is written until the stored draft has
+   * been read back, or the blank page of a fresh load would overwrite it.
+   */
+  useEffect(() => {
+    if (!ready) return
+    const flush = () => saveStoredDraft(draftRef.current)
+    const timeout = window.setTimeout(flush, 400)
+    return () => window.clearTimeout(timeout)
+  }, [draft, ready])
+
+  useEffect(() => {
+    if (!ready) return
+    const flush = () => saveStoredDraft(draftRef.current)
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [ready])
 
   const updateDraft = useCallback<SessionContextValue['updateDraft']>((patch) => {
     draftTouchedRef.current = true
@@ -730,6 +766,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /* ── Screen wake lock: speech stops when a phone sleeps ── */
 
   const requestWakeLock = useCallback(async () => {
+    // Gamer mode: the game is what is keeping the screen on, not this tab.
+    if (preferencesRef.current.gamerMode) return
     try {
       if ('wakeLock' in navigator) {
         wakeLockRef.current = await navigator.wakeLock.request('screen')
@@ -1071,6 +1109,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         (source ? source.title : current.title).trim() ||
         (breathOnly ? 'Breathwork' : autoTitle(text))
 
+      /*
+       * Read once, or loop. Without words there is nothing to reach the end
+       * of, so a breath-only session is always the timed kind.
+       */
+      const repeat = settings.repeat || breathOnly
+      const timerMinutes = repeat ? settings.timerMinutes : null
+
       resetSleepScale()
 
       // Reach for audio permission while we are still inside the tap.
@@ -1097,7 +1142,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             volume: settings.voiceVolume,
             repeatPauseMs: settings.repeatPauseSeconds * 1000,
             initialDelayMs: 420,
-            loop: true,
+            loop: repeat,
           },
           {
             onChunk: (chunkIndex, chunkTotal, chunkText) =>
@@ -1110,7 +1155,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             onCycle: (cycles) => setSession((current) => ({ ...current, cycles })),
             onError: (message) =>
               setSession((current) => ({ ...current, notice: message })),
-            onFinish: () => finish('idle', null),
+            // A single read-through ends as a finished session, not a stop.
+            onFinish: () => finish(repeat ? 'idle' : 'complete', null),
           },
         )
 
@@ -1177,12 +1223,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         breathOnly,
         chunkTotal: breathOnly ? 0 : speech.chunkCount,
         timerSeconds:
-          settings.timerMinutes != null ? settings.timerMinutes * 60 : null,
+          timerMinutes != null ? timerMinutes * 60 : null,
       })
       clock.reset()
       clock.set({
         remainingSeconds:
-          settings.timerMinutes != null ? settings.timerMinutes * 60 : null,
+          timerMinutes != null ? timerMinutes * 60 : null,
       })
       startElapsed(true)
       void requestWakeLock()
@@ -1215,8 +1261,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // its own whether or not a soundscape was chosen.
       brainwaveRef.current?.apply(settings.brainwave)
 
-      if (settings.timerMinutes != null) {
-        timer.start(settings.timerMinutes * 60_000, {
+      if (timerMinutes != null) {
+        timer.start(timerMinutes * 60_000, {
           onTick: (remainingSeconds) => {
             if (statusRef.current === 'playing') clock.set({ remainingSeconds })
           },

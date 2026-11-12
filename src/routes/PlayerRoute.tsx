@@ -28,6 +28,7 @@ import {
 import { AmbienceMixer } from '../components/AmbienceMixer'
 import { PlayerAdjust } from '../components/PlayerAdjust'
 import { PlayerAtmosphere } from '../components/PlayerAtmosphere'
+import { ReadAlong } from '../components/ReadAlong'
 import {
   CollapseIcon,
   ExpandIcon,
@@ -122,6 +123,7 @@ export function PlayerRoute() {
    * says. One of the two is always the honest answer; neither is on its own.
    */
   const wordless = idle ? !hasText : session.breathOnly
+  const readOnce = !wordless && !draft.settings.repeat
   const lifetime = listeningSentence(listeningStats)
   const rhythm = useRhythm()
 
@@ -346,7 +348,11 @@ export function PlayerRoute() {
                     <SparkIcon />
                   </span>
                   <h1 className="type-title">
-                    {wordless ? 'That is the practice.' : 'Your loop is complete.'}
+                    {wordless
+                      ? 'That is the practice.'
+                      : readOnce
+                        ? 'That is your words, read.'
+                        : 'Your loop is complete.'}
                   </h1>
                   <p className="type-body mt-3 max-w-[34ch] text-center">
                     {wordless ? (
@@ -356,9 +362,14 @@ export function PlayerRoute() {
                       </>
                     ) : (
                       <>
-                        You listened for <ElapsedText /> across{' '}
-                        {session.cycles} {session.cycles === 1 ? 'pass' : 'passes'}.
-                        Take a breath before you move on.
+                        You listened for <ElapsedText />
+                        {readOnce ? null : (
+                          <>
+                            {' '}across {session.cycles}{' '}
+                            {session.cycles === 1 ? 'pass' : 'passes'}
+                          </>
+                        )}
+                        . Take a breath before you move on.
                       </>
                     )}
                   </p>
@@ -455,6 +466,7 @@ export function PlayerRoute() {
                     status={session.status}
                     wordless={wordless}
                     voicePreparing={session.voicePreparing}
+                    once={readOnce}
                     override={session.sleep ? 'Drifting off' : null}
                   />
                   <h1 className="stage__title mt-2 max-w-full truncate text-center font-display text-[1.75rem] leading-tight text-ink sm:text-[2rem]">
@@ -530,10 +542,10 @@ export function PlayerRoute() {
                             ? 'Resume the breathing session'
                             : 'Start a breathing session'
                         : playing
-                          ? 'Pause the loop'
+                          ? 'Pause reading'
                           : paused
-                            ? 'Resume the loop'
-                            : 'Start the loop'
+                            ? 'Resume reading'
+                            : 'Read aloud'
                     }
                     className={cx(
                       'stage__play interactive relative flex h-[5.5rem] w-[5.5rem] items-center justify-center rounded-full',
@@ -598,7 +610,7 @@ export function PlayerRoute() {
                       className="stage__leave interactive inline-flex min-h-11 items-center gap-2 rounded-pill border border-[var(--control-border)] px-5 text-[0.92rem] font-medium text-ink-muted hover:bg-[var(--quiet)] hover:text-ink disabled:opacity-35"
                     >
                       <StopIcon className="text-[0.85rem]" />
-                      End session
+                      Stop
                     </button>
                   </div>
                 </div>
@@ -647,6 +659,21 @@ export function PlayerRoute() {
               </section>
             )}
           </div>
+
+          {/*
+            The whole text, under the stage, with the line being read marked.
+            Away while the stage has the screen and once the session is over.
+          */}
+          {!expanded && !complete && !wordless && (
+            <ReadAlong
+              className="mt-6"
+              text={draft.text}
+              status={session.status}
+              index={session.chunkIndex}
+              spoken={session.chunkText}
+              onEdit={editWords}
+            />
+          )}
         </div>
 
         {!expanded && !complete && (

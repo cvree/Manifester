@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
 import { formatApproxDuration, estimateSpokenSeconds } from '../lib/format'
@@ -10,89 +10,22 @@ import type { BreathingRuntime } from '../lib/useBreathing'
 import type { LoopSettings, PreviewState } from '../lib/types'
 import { BreathingVisualizer } from './BreathingVisualizer'
 import { BusyStrip, Spinner } from './Button'
-import {
-  CheckIcon,
-  ChevronIcon,
-  ClockIcon,
-  PauseIcon,
-  PlayIcon,
-  PulseIcon,
-  SeedIcon,
-  VoiceIcon,
-  WaveIcon,
-} from './Icons'
-
-/** The five things the summary tiles stand for, in the order they are shown. */
-export type RitualSetting = 'voice' | 'sound' | 'timer' | 'delay' | 'rhythm'
+import { PauseIcon, VoiceIcon } from './Icons'
 
 interface RitualPreviewProps {
   title: string
   text: string
   settings: LoopSettings
   breathing: BreathingRuntime
-  /** Which of the six forms the guide is drawn as. */
   breathStyle: BreathStyleId
-  voice: string
-  sound: string
-  /** The brainwave rhythm summary, or `null` when it is off. */
-  rhythm: string | null
-  timer: string
-  delay: string
-  /** Name of the chosen ambience, used to tint the scene. */
+  /** Drives the ambient wash: one of the built-in sound ids, `off`, or `custom`. */
   sceneKey: string
   onPreview: () => void
   onStopPreview: () => void
-  /**
-   * Idle, getting the voice ready, or speaking.
-   *
-   * The whole state rather than a `playing` flag, because the gap between
-   * the press and the first word is real — a studio line the device has not
-   * heard before is synthesised on the spot — and a button that says nothing
-   * during it is a button that looks broken.
-   */
   previewState: PreviewState
   canPreview: boolean
-  /**
-   * Begin the loop from here.
-   *
-   * The preview is the picture of the finished thing, and on a desktop it is
-   * the right-hand column — which meant the one button that acts on what you
-   * are looking at was in the other column, below the fold. Hearing a line and
-   * starting the loop are the same question at two sizes, so they are the same
-   * pair of buttons in the same place.
-   */
-  onStart: () => void
-  canStart: boolean
-  starting: boolean
-  /**
-   * Keep this loop.
-   *
-   * Save lives here, beside Start, because the preview is the picture of the
-   * thing being saved. It used to be one of a second pair of buttons further
-   * down the page, which meant the screen had two places that both claimed to
-   * act on the ritual and neither of which was obviously the one.
-   */
-  onSave: () => void
-  saved: boolean
-  /** Set while the loop is being written to the device. */
-  saving: boolean
-  /**
-   * Take me to the control behind this tile. The preview does not know
-   * whether that means opening a sheet or scrolling the page — Create owns
-   * both the sheet state and the layout, so it decides.
-   */
-  onOpenSetting: (setting: RitualSetting) => void
   className?: string
 }
-
-/**
- * A live picture of the finished ritual.
- *
- * This is the thing the old Create screen was missing: instead of reading a
- * list of settings and imagining the result, you watch it. The orb breathes,
- * your lines cycle through the way they will when spoken, and the scene takes
- * its colour from the ambience you picked.
- */
 
 /** Each ambience gets its own light, so the scene changes when you change it. */
 const SCENES: Record<string, { wash: string; name: string }> = {
@@ -135,39 +68,35 @@ const SCENES: Record<string, { wash: string; name: string }> = {
 
 const ROTATE_MS = 5200
 
+/**
+ * A quiet picture of the reading, beside the words on a wide screen.
+ *
+ * It used to be the control centre of Create: Start, Save and five setting
+ * tiles lived here, in a column apart from the words they acted on, and on a
+ * phone it was a second stage a full screen below the editor. The actions now
+ * sit directly under the words and the settings are rows beneath them, which
+ * leaves this to do the one thing nothing else on the page can — show the
+ * lines the way they will be read, one at a time, in the room they will be
+ * read in — and to let somebody hear a single line before committing.
+ */
 export function RitualPreview({
   title,
   text,
   settings,
   breathing,
   breathStyle,
-  voice,
-  sound,
-  rhythm,
-  timer,
-  delay,
   sceneKey,
   onPreview,
   onStopPreview,
   previewState,
   canPreview,
-  onStart,
-  canStart,
-  starting,
-  onSave,
-  saved,
-  saving,
-  onOpenSetting,
   className,
 }: RitualPreviewProps) {
   const reducedMotion = useReducedMotion()
   const lines = useMemo(() => affirmationLines(text), [text])
-  /** Pressed, and now waiting on the voice rather than listening to it. */
   const preparing = previewState === 'loading'
   const [index, setIndex] = useState(0)
 
-  // Cycle the lines the way the loop will read them. Held still when someone
-  // has asked for reduced motion — a line that swaps itself out is motion too.
   useEffect(() => {
     setIndex(0)
     if (reducedMotion || lines.length < 2) return
@@ -197,21 +126,17 @@ export function RitualPreview({
       />
 
       <div className="relative flex w-full flex-col items-center">
-        <p className="type-label">Your ritual</p>
+        <p className="type-label">How it will sound</p>
 
         <h2 className="mt-2 max-w-full truncate text-center font-display text-[1.4rem] leading-tight text-ink">
           {title.trim() || autoTitle(text)}
         </h2>
 
         <div className="my-6">
-          <BreathingVisualizer
-            runtime={breathing}
-            style={breathStyle}
-            size="md"
-          />
+          <BreathingVisualizer runtime={breathing} style={breathStyle} size="md" />
         </div>
 
-        {/* The affirmation excerpt, rotating slowly through the lines. */}
+        {/* The words, rotating slowly through the lines. */}
         <p
           key={line}
           aria-live="off"
@@ -224,244 +149,55 @@ export function RitualPreview({
           {line}
         </p>
 
-        {lines.length > 1 && (
-          <div
-            aria-hidden="true"
-            className="mt-1 flex items-center gap-1.5"
-            role="presentation"
-          >
-            {lines.slice(0, 8).map((_, dot) => (
-              <span
-                key={dot}
-                className={cx(
-                  'h-1 rounded-pill transition-all duration-500 ease-[var(--ease-calm)]',
-                  dot === index % 8
-                    ? 'w-4 bg-[var(--rose)]'
-                    : 'w-1 bg-[var(--control-border)]',
-                )}
-              />
-            ))}
-          </div>
-        )}
-
         {/*
-          The only place on this screen that acts on the ritual.
-
-          Start, hearing one line of it, and keeping it were three buttons in
-          two places — a pair here and a second pair further down the page, both
-          claiming to be the thing you press when you have finished writing.
-          They are one group now, with a single filled button in it: a preview
-          is a step on the way to starting, and saving is what you do to a loop
-          you have already decided about, so neither competes for the eye.
+          Pressing this can be answered instantly — the line is already on the
+          device — or after a second or two of synthesis. Both are normal, so
+          the wait is a state of the button rather than an exception.
         */}
-        <div className="mt-6 flex w-full flex-col items-center gap-2.5">
-          <button
-            type="button"
-            onClick={onStart}
-            disabled={!canStart || starting}
-            aria-busy={starting || undefined}
-            className={cx(
-              'interactive pressable relative inline-flex min-h-13 w-full max-w-[19rem] items-center justify-center gap-2.5 rounded-pill border border-transparent px-6 text-[1rem] font-medium',
-              'bg-[linear-gradient(175deg,color-mix(in_oklab,var(--rose-deep)_86%,white)_0%,var(--rose-deep)_62%)] text-[var(--bg-0)]',
-              'shadow-[0_1px_0_rgb(255_255_255/0.28)_inset,0_8px_24px_-10px_var(--glow)]',
-              'hover:brightness-[1.05]',
-              // Faded only when it is genuinely unavailable. A busy button is
-              // disabled too, and must not borrow that look — see `.busy-strip`.
-              !starting && 'disabled:cursor-not-allowed disabled:opacity-45',
-            )}
-          >
-            {starting ? <Spinner /> : <PlayIcon className="text-[0.85rem]" />}
-            {starting ? 'Beginning…' : 'Start loop'}
-            {starting && <BusyStrip />}
-          </button>
-
-          <div className="flex flex-wrap items-center justify-center gap-2.5">
-            {/*
-              Pressing this can be answered instantly — the line is already on
-              the device — or after a second or two of synthesis. Both are
-              normal, so the wait is a state of the button rather than an
-              exception: it tints, it spins, it runs the strip, and it says
-              what it is doing in the four words somebody would use.
-            */}
-            <button
-              type="button"
-              onClick={() => {
-                cue('tap')
-                if (previewState === 'playing') onStopPreview()
-                else if (previewState === 'idle') onPreview()
-              }}
-              disabled={!canPreview || preparing}
-              aria-busy={preparing || undefined}
-              className={cx(
-                'interactive pressable relative inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
-                previewState === 'idle'
-                  ? 'border-[var(--control-border)] bg-[var(--control)] text-ink'
-                  : 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]',
-                !preparing && 'disabled:cursor-not-allowed disabled:opacity-45',
-              )}
-            >
-              {preparing ? (
-                <Spinner />
-              ) : previewState === 'playing' ? (
-                <PauseIcon className="text-[0.85rem]" />
-              ) : (
-                <VoiceIcon className="text-[0.95rem]" />
-              )}
-              {preparing
-                ? 'Getting the voice ready…'
-                : previewState === 'playing'
-                  ? 'Stop preview'
-                  : 'Hear a line'}
-              {preparing && <BusyStrip />}
-            </button>
-
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={!canStart || saving}
-              aria-busy={saving || undefined}
-              className={cx(
-                'interactive pressable relative inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
-                saved
-                  ? 'border-[var(--sage)] bg-[var(--sage-soft)] text-[var(--sage)]'
-                  : 'border-[var(--control-border)] bg-[var(--control)] text-ink',
-                !saving && 'disabled:cursor-not-allowed disabled:opacity-45',
-              )}
-            >
-              {saving ? (
-                <Spinner />
-              ) : saved ? (
-                <CheckIcon className="text-[0.95rem]" />
-              ) : (
-                <SeedIcon className="text-[0.95rem]" />
-              )}
-              {saving ? 'Saving…' : saved ? 'Saved' : 'Save'}
-              {saving && <BusyStrip />}
-            </button>
-          </div>
-        </div>
-
-        {!canStart && (
-          <p className="type-meta mt-2.5 text-center">
-            Write a line to begin.
-          </p>
-        )}
-
-        {/*
-          The summary of everything the loop is made of — and the shortcut to
-          changing it. These tiles looked exactly like controls and did
-          nothing, which is the worst state for a thing to be in: it taught
-          you that this half of the screen was scenery. Each one now goes
-          straight to the setting it reports.
-
-          It is a grid of buttons rather than a `<dl>` because a button cannot
-          legally contain `<dt>`/`<dd>`, and being an operable control matters
-          more here than the description-list semantics did.
-        */}
-        <div className="mt-7 grid w-full grid-cols-2 gap-2.5">
-          <SummaryTile
-            icon={<VoiceIcon />}
-            label="Voice"
-            value={voice}
-            onClick={() => onOpenSetting('voice')}
-          />
-          <SummaryTile
-            icon={<WaveIcon />}
-            label="Sound"
-            value={sound}
-            onClick={() => onOpenSetting('sound')}
-          />
-          <SummaryTile
-            icon={<ClockIcon />}
-            label="Length"
-            value={timer}
-            onClick={() => onOpenSetting('timer')}
-          />
-          <SummaryTile
-            icon={<PauseIcon />}
-            label="Delay"
-            value={delay}
-            onClick={() => onOpenSetting('delay')}
-          />
-          {/*
-            Always shown, including when the rhythm is off. It used to appear
-            only once enabled, which meant the one setting you could not reach
-            from here was the one you had not turned on yet — exactly backwards
-            for a panel whose job is to be the shortcut.
-          */}
-          <SummaryTile
-            icon={<PulseIcon />}
-            label="Rhythm"
-            value={rhythm ?? 'Off'}
-            onClick={() => onOpenSetting('rhythm')}
-            className="col-span-2"
-          />
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            cue('tap')
+            if (previewState === 'playing') onStopPreview()
+            else if (previewState === 'idle') onPreview()
+          }}
+          disabled={!canPreview || preparing}
+          aria-busy={preparing || undefined}
+          className={cx(
+            'interactive pressable relative mt-5 inline-flex min-h-12 items-center gap-2.5 rounded-pill border px-5 text-[0.95rem] font-medium',
+            previewState === 'idle'
+              ? 'border-[var(--control-border)] bg-[var(--control)] text-ink'
+              : 'border-[var(--rose)] bg-[var(--rose-soft)] text-[var(--rose-deep)]',
+            !preparing && 'disabled:cursor-not-allowed disabled:opacity-45',
+          )}
+        >
+          {preparing ? (
+            <Spinner />
+          ) : previewState === 'playing' ? (
+            <PauseIcon className="text-[0.85rem]" />
+          ) : (
+            <VoiceIcon className="text-[0.95rem]" />
+          )}
+          {preparing
+            ? 'Getting the voice ready…'
+            : previewState === 'playing'
+              ? 'Stop preview'
+              : 'Hear one line'}
+          {preparing && <BusyStrip />}
+        </button>
 
         <p className="type-meta mt-4 text-center">
-          {lines.length > 0
-            ? `${perPass} per pass · begins again after ${
-                settings.repeatPauseSeconds === 0
-                  ? 'no pause'
-                  : `${settings.repeatPauseSeconds}s`
-              }`
-            : 'Write a line to see how long each pass will take.'}
+          {lines.length === 0
+            ? 'Write a line to hear how it sounds.'
+            : settings.repeat
+              ? `${perPass} per pass · begins again after ${
+                  settings.repeatPauseSeconds === 0
+                    ? 'no pause'
+                    : `${settings.repeatPauseSeconds}s`
+                }`
+              : `${perPass}, read once`}
         </p>
       </div>
     </div>
-  )
-}
-
-function SummaryTile({
-  icon,
-  label,
-  value,
-  onClick,
-  className,
-}: {
-  icon: ReactNode
-  label: string
-  value: string
-  onClick: () => void
-  className?: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        cue('tap')
-        onClick()
-      }}
-      // The value is already visible, but a screen reader needs to know the
-      // tile is a way in and not just a readout.
-      aria-label={`${label}: ${value}. Change`}
-      className={cx(
-        'interactive pressable surface-control group flex min-h-[3.5rem] min-w-0 items-center gap-2.5 px-3 py-2.5 text-left',
-        'hover:bg-[var(--surface-strong)]',
-        className,
-      )}
-    >
-      <span
-        aria-hidden="true"
-        className="shrink-0 text-[0.95rem] text-ink-faint transition-colors duration-200 group-hover:text-[var(--rose-deep)]"
-      >
-        {icon}
-      </span>
-      <span className="min-w-0 grow">
-        <span className="block text-[0.75rem] font-semibold uppercase tracking-[0.09em] text-ink-faint">
-          {label}
-        </span>
-        <span className="block truncate text-[0.85rem] text-ink">{value}</span>
-      </span>
-      {/*
-        Always visible, not hover-only. A phone has no hover, and the phone is
-        where this app lives — an affordance that only appears under a cursor
-        would leave the tiles looking exactly as dead as they used to.
-      */}
-      <ChevronIcon
-        aria-hidden="true"
-        className="shrink-0 -rotate-90 text-[0.85rem] text-ink-faint opacity-50 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
-      />
-    </button>
   )
 }

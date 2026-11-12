@@ -19,11 +19,13 @@ import { BrainwavePanel } from './BrainwavePanel'
 import { BreathingSettings } from './BreathingSettings'
 import { DelaySettings } from './DelaySettings'
 import { ExportPanel } from './ExportPanel'
+import { GamerModeToggle } from './GamerModeToggle'
 import {
   BreathIcon,
   DownloadIcon,
   MicIcon,
   NoteIcon,
+  PulseIcon,
   SparkIcon,
   TuneIcon,
 } from './Icons'
@@ -48,6 +50,7 @@ export type PanelKey =
   | 'export'
   | 'feel'
   | 'ai'
+  | 'gamer'
 
 const TITLES: Record<PanelKey, { title: string; description: string }> = {
   voice: {
@@ -71,8 +74,8 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
     description: 'The guide you follow while you listen — how it moves, and how it sounds.',
   },
   timer: {
-    title: 'Session length',
-    description: 'How long the loop keeps going before it fades out.',
+    title: 'Repeat and length',
+    description: 'Read once, or repeat — and for how long.',
   },
   delay: {
     title: 'Delay between loops',
@@ -93,6 +96,10 @@ const TITLES: Record<PanelKey, { title: string; description: string }> = {
   ai: {
     title: 'AI writing help',
     description: 'Optional. Connect Gemini with your own free key.',
+  },
+  gamer: {
+    title: 'Gamer mode',
+    description: 'Listen in the background, using as little of the machine as possible.',
   },
 }
 
@@ -190,6 +197,8 @@ export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
         <TimerSettings
           minutes={settings.timerMinutes}
           onChange={(timerMinutes) => updateSettings({ timerMinutes })}
+          repeat={settings.repeat}
+          onRepeatChange={(repeat) => updateSettings({ repeat })}
         />
       </Sheet>
 
@@ -224,6 +233,10 @@ export function SettingsSheets({ open, onOpenChange }: SheetsProps) {
           enabled={preferences.aiEnabled}
           onEnabledChange={(aiEnabled) => updatePreferences({ aiEnabled })}
         />
+      </Sheet>
+
+      <Sheet open={open === 'gamer'} onClose={close} {...TITLES.gamer}>
+        <GamerModeToggle />
       </Sheet>
 
       <Sheet open={open === 'feel'} onClose={close} {...TITLES.feel}>
@@ -306,9 +319,9 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
     <>
       <div className="surface-panel overflow-hidden">
         <div className="border-b border-[var(--quiet-border)] px-4 py-4 sm:px-5">
-          <h2 className="type-subheading">Everything else</h2>
+          <h2 className="type-subheading">More settings</h2>
           <p className="type-meta mt-0.5">
-            Optional. Everything the ritual tiles do not already cover.
+            Optional. Breathing, music, recording, downloads and performance.
           </p>
         </div>
 
@@ -363,6 +376,17 @@ export function CustomizePanel({ open, onOpenChange }: CustomizePanelProps) {
             title="Feedback"
             summary={feelSummary(preferences.uiSounds, preferences.uiHaptics)}
             onClick={() => openPanel('feel')}
+          />
+          <SettingRow
+            icon={<PulseIcon />}
+            title="Gamer mode"
+            summary={
+              preferences.gamerMode
+                ? 'On · minimum background use'
+                : 'Off · for listening while you play'
+            }
+            onClick={() => openPanel('gamer')}
+            accent={preferences.gamerMode}
           />
         </Group>
       </div>

@@ -43,13 +43,54 @@ export function setAppMotion(level: MotionLevel): void {
   for (const listener of levelListeners) listener()
 }
 
+/**
+ * Gamer mode: the app as a quiet background process.
+ *
+ * Somebody listening while they play something else wants every frame and
+ * every megabyte for the game, so this is Still with nothing left to argue
+ * about — it outranks the Motion setting the same way the device's Reduce
+ * Motion does, and it goes through the same code paths, which is what keeps
+ * it honest: every canvas, clock and tween in the app already asks
+ * `prefersReducedMotion()` before it moves. The stylesheet answers
+ * `data-gamer` on `<html>` for what a script cannot reach — the blurred glass
+ * and the painted room behind it. See `PreferencesProvider` for the rest of
+ * what the mode switches off.
+ */
+let gamer = false
+
+export function setGamerMode(on: boolean): void {
+  if (typeof document !== 'undefined') {
+    if (on) document.documentElement.dataset.gamer = 'on'
+    else delete document.documentElement.dataset.gamer
+  }
+  if (on === gamer) return
+  gamer = on
+  for (const listener of levelListeners) listener()
+}
+
+export function isGamerMode(): boolean {
+  return gamer
+}
+
+export function useGamerMode(): boolean {
+  const [on, setOn] = useState(isGamerMode)
+
+  useEffect(() => {
+    const onChange = () => setOn(isGamerMode())
+    onChange()
+    return subscribeMotion(onChange)
+  }, [])
+
+  return on
+}
+
 function systemReduced(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false
   return window.matchMedia(QUERY).matches
 }
 
 export function prefersReducedMotion(): boolean {
-  return appLevel === 'still' || systemReduced()
+  return gamer || appLevel === 'still' || systemReduced()
 }
 
 /** The level in force: the device's Reduce Motion counts as Still. */

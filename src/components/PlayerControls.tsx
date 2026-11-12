@@ -3,6 +3,7 @@ import {
   brainwaveSummary,
   breathingSummary,
   soundSummary,
+  timerSummary,
 } from '../lib/summaries'
 import { useLibrary } from '../state/LibraryProvider'
 import { usePreferences } from '../state/PreferencesProvider'
@@ -10,7 +11,14 @@ import { useSession } from '../state/SessionProvider'
 import { VolumeMixer } from './AmbienceMixer'
 import { Button } from './Button'
 import type { PanelKey } from './CustomizePanel'
-import { BreathIcon, MuteIcon, PulseIcon, WaveIcon } from './Icons'
+import {
+  BreathIcon,
+  ClockIcon,
+  MuteIcon,
+  PulseIcon,
+  TuneIcon,
+  WaveIcon,
+} from './Icons'
 import { SettingRow } from './SettingRow'
 import { VoiceQuickSettings } from './VoiceQuickSettings'
 
@@ -106,6 +114,17 @@ export function PlayerControls({ onOpenPanel, onEditWords }: PlayerControlsProps
             accent={soundOn}
           />
           <SettingRow
+            icon={<ClockIcon />}
+            title="Repeat and length"
+            summary={
+              idle
+                ? timerSummary(settings.timerMinutes, settings.repeat)
+                : `${timerSummary(settings.timerMinutes, settings.repeat)} · applies next time you start`
+            }
+            onClick={() => go('timer')}
+            accent={settings.repeat}
+          />
+          <SettingRow
             icon={<PulseIcon />}
             title="Brainwave rhythm"
             summary={brainwaveSummary(settings.brainwave)}
@@ -126,6 +145,17 @@ export function PlayerControls({ onOpenPanel, onEditWords }: PlayerControlsProps
             )}
             onClick={() => go('breathing')}
             accent={preferences.breathingEnabled || preferences.backgroundVisualizer}
+          />
+          <SettingRow
+            icon={<TuneIcon />}
+            title="Gamer mode"
+            summary={
+              preferences.gamerMode
+                ? 'On · minimum background use'
+                : 'Off · for listening while you play'
+            }
+            onClick={() => go('gamer')}
+            accent={preferences.gamerMode}
           />
         </div>
       </section>

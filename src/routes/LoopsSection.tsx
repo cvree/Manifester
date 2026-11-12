@@ -104,7 +104,7 @@ export function LoopsSection() {
                   <p className="type-meta mt-1">Yours until you delete them.</p>
                 </header>
               )}
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2">
                 {kept.map((loop) => card(loop, false))}
               </div>
             </section>
@@ -149,7 +149,7 @@ export function LoopsSection() {
                   </Button>
                 )}
               </header>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2">
                 {played.map((loop) => card(loop, true))}
               </div>
             </section>

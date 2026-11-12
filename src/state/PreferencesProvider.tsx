@@ -41,7 +41,8 @@ import {
   prefersReducedData,
   soundtrack,
 } from '../lib/soundtrack'
-import { setAppMotion, type MotionLevel } from '../lib/motion'
+import { setAppMotion, setGamerMode, type MotionLevel } from '../lib/motion'
+import { tts } from '../lib/tts'
 import { isReminderTime } from '../lib/rhythm'
 import { readLocal, writeLocal } from '../lib/storage'
 
@@ -137,6 +138,18 @@ export interface Preferences {
    */
   motion: MotionLevel
   /**
+   * Gamer mode: listen while something else has the machine.
+   *
+   * Off by default. On, the app does the least it can and still be heard:
+   * nothing animates, the painted room and the frosted glass are not drawn,
+   * the on-device voice model is put down (cached and shipped lines still
+   * play; anything new is read by the device's own voice), nothing is prepared
+   * ahead of time, and the screen is not held awake. The words, the voice and
+   * the sound you chose are untouched. See `setGamerMode` and
+   * `tts.setLightweight`.
+   */
+  gamerMode: boolean
+  /**
    * The time of day somebody asked to be reminded, as `"21:00"`, or `null`.
    *
    * Drives the in-app nudge and says what the calendar reminder was set for.
@@ -168,6 +181,7 @@ const DEFAULTS: Preferences = {
   uiHaptics: true,
   aiEnabled: true,
   motion: 'full',
+  gamerMode: false,
   dailyReminder: null,
   nudgeDismissedOn: null,
 }
@@ -236,6 +250,7 @@ function load(): Preferences {
     merged.musicVolume = Math.min(1, Math.max(0, merged.musicVolume))
 
     if (!MOTION_LEVELS.includes(merged.motion)) merged.motion = DEFAULTS.motion
+    merged.gamerMode = merged.gamerMode === true
     if (!isReminderTime(merged.dailyReminder)) merged.dailyReminder = null
     if (
       typeof merged.nudgeDismissedOn !== 'string' ||
@@ -289,6 +304,17 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     setAppMotion(preferences.motion)
   }, [preferences.motion])
+
+  /*
+   * Before paint and before any child effect, for two reasons: nobody who
+   * chose gamer mode should pay for one frame of the full room on load, and
+   * the session provider below starts the voice model in an ordinary effect —
+   * which has to find the answer already here.
+   */
+  useLayoutEffect(() => {
+    setGamerMode(preferences.gamerMode)
+    tts.setLightweight(preferences.gamerMode)
+  }, [preferences.gamerMode])
 
   const update = useCallback((patch: Partial<Preferences>) => {
     setPreferences((current) => ({

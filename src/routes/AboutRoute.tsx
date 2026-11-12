@@ -549,7 +549,7 @@ export function AboutRoute() {
             </p>
             <p className="type-body mt-3">
               The same instructions for Android, Windows and Mac are in the Voice
-              panel, under <em className="not-italic text-ink">Customize your ritual</em>{' '}
+              panel, under <em className="not-italic text-ink">Voice &amp; sound</em>{' '}
               on the Create screen.
             </p>
           </Card>

@@ -47,6 +47,7 @@
  * that survived is emptied on the way rather than left full.
  */
 
+import { suspendDraftStore } from './draftStore'
 import { closeDatabase } from './storage'
 import { tts } from './tts'
 
@@ -71,6 +72,9 @@ export interface ResetReport {
 }
 
 export async function deleteAllData(): Promise<ResetReport> {
+  // Before anything is cleared: the page must not write its draft back as it
+  // reloads. See `draftStore`.
+  suspendDraftStore()
   const report: ResetReport = { databases: 0, caches: 0, incomplete: false }
 
   // Nothing may be writing while this runs, and nothing may be holding a

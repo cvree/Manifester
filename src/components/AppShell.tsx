@@ -5,7 +5,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { ErrorBoundary } from './ErrorBoundary'
 import { cx } from '../lib/cx'
 import { cue } from '../lib/feedback'
-import { useIsCompact, useReducedMotion } from '../lib/motion'
+import { useGamerMode, useIsCompact, useReducedMotion } from '../lib/motion'
 import { sceneFor, soundtrack } from '../lib/soundtrack'
 import { voiceForStyle } from '../lib/tts'
 import { useWarmVoice } from '../lib/tts/useWarmVoice'
@@ -47,6 +47,7 @@ export function AppShell() {
   const { expanded: stageExpanded } = useStage()
   const reducedMotion = useReducedMotion()
   const compact = useIsCompact()
+  const gamer = useGamerMode()
   const mainRef = useRef<HTMLElement>(null)
   const [navRevealed, setNavRevealed] = useState(false)
 
@@ -71,7 +72,8 @@ export function AppShell() {
     rate: draft.settings.rate,
     pitch: draft.settings.pitch,
     preferDevice: draft.settings.voiceSource === 'device',
-    enabled: session.status !== 'playing',
+    // Not in gamer mode, where nothing is done before it is asked for.
+    enabled: session.status !== 'playing' && !gamer,
   })
 
   const hasSession = session.status !== 'idle'
@@ -151,7 +153,7 @@ export function AppShell() {
     <div className="relative flex min-h-dvh flex-col">
       {/* The garden warms while a session runs, and again while it is all
           there is on screen. */}
-      <CosmicBackground active={isPlaying || stageExpanded} />
+      {!gamer && <CosmicBackground active={isPlaying || stageExpanded} />}
 
       <a
         href="#main"

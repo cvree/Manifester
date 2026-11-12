@@ -15,6 +15,7 @@ import { usePreferences } from '../state/PreferencesProvider'
 import { useTheme } from '../state/ThemeProvider'
 import { FieldLabel } from './Card'
 import { DragBar } from './DragBar'
+import { GamerModeToggle } from './GamerModeToggle'
 import { MoonIcon, SunIcon } from './Icons'
 import { SegmentedControl } from './SegmentedControl'
 
@@ -237,7 +238,7 @@ export function AppearanceSettings() {
         </FieldLabel>
         <SegmentedControl
           label="How much the app moves"
-          value={deviceReduced ? 'still' : preferences.motion}
+          value={deviceReduced || preferences.gamerMode ? 'still' : preferences.motion}
           onChange={(next) => {
             cue('select')
             update({ motion: next })
@@ -249,10 +250,17 @@ export function AppearanceSettings() {
           ]}
         />
         <p className="type-meta mt-3 text-ink-faint">
-          {deviceReduced
+          {preferences.gamerMode
+            ? 'Gamer mode is on, so everything is held still. Turn it off below to choose here.'
+            : deviceReduced
             ? 'Reduce Motion is on in your device settings, so everything is held still. Turn it off there to choose here.'
             : 'Gentle keeps the breath moving at half the swing and holds the room behind it still. Still stops everything that travels; the words and the ring that times each breath stay.'}
         </p>
+      </div>
+
+      <div>
+        <FieldLabel>Performance</FieldLabel>
+        <GamerModeToggle />
       </div>
 
       <div>

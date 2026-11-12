@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router'
 import { Card } from '../components/Card'
+import { draftState } from '../lib/draftStore'
 import { launchDestination } from '../lib/launch'
 import { useLibrary } from '../state/LibraryProvider'
 import { useSession } from '../state/SessionProvider'
@@ -7,17 +8,17 @@ import { useSession } from '../state/SessionProvider'
 /** Wait for local data, then put the returning user's likely next tap on screen. */
 export function LaunchRoute() {
   const { loops, ready: libraryReady } = useLibrary()
-  const { ready: sessionReady } = useSession()
+  const { ready: sessionReady, draft } = useSession()
 
   if (!libraryReady || !sessionReady) {
     return (
       <Card level="panel" className="mx-auto mt-8 max-w-md">
         <p className="type-meta py-7 text-center" role="status">
-          Opening your last loop…
+          Opening your words…
         </p>
       </Card>
     )
   }
 
-  return <Navigate to={launchDestination(loops)} replace />
+  return <Navigate to={launchDestination(loops, draftState(draft, loops) === 'unsaved')} replace />
 }

@@ -442,6 +442,24 @@ export class BrowserKokoroEngine implements TTSEngine {
     this.finishAttempt(false)
   }
 
+  /**
+   * Put the model down without forgetting it.
+   *
+   * Gamer mode's half of the bargain: the worker holds the whole network in
+   * memory and takes a core whenever it speaks, and somebody who has asked the
+   * app to stay out of the way wants both back. The install flag is left
+   * alone, so `resume()` brings the model straight back from the cache when
+   * the mode is switched off. Only a model that is up and idle is touched —
+   * an install somebody is watching is theirs to finish or cancel.
+   */
+  rest(): void {
+    if (this.snapshot.state !== 'ready') return
+    this.abandoning = true
+    this.teardown()
+    this.abandoning = false
+    this.publish({ state: 'available', backend: null, failure: null, message: null })
+  }
+
   /** Forget the model, so the next visit does not try to bring it back. */
   forget(): void {
     this.teardown()

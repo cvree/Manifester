@@ -7159,3 +7159,133 @@ html.tuning {
     animation: none;
   }
 }
+
+/*
+ * Gamer mode (`data-gamer` on `<html>`, see `lib/motion.ts`).
+ *
+ * The script side already holds everything still — gamer mode is Still as far
+ * as every canvas, clock and tween is concerned. This is the stylesheet's
+ * share: the things that cost a GPU something even when nothing moves. A
+ * backdrop blur is re-sampled whenever anything beneath it repaints, large
+ * filtered layers hold video memory, and none of it is worth a frame of
+ * somebody's game. What is left is the same layout on flat, opaque paper.
+ */
+:root[data-gamer] *,
+:root[data-gamer] *::before,
+:root[data-gamer] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+  will-change: auto !important;
+}
+
+/*
+ * A rule of its own, and with the two spellings under different selectors: the
+ * build's minifier folds the pair into the prefixed one when they share a
+ * value in one block, and Chrome then keeps the blur.
+ */
+html[data-gamer] *,
+html[data-gamer] *::before,
+html[data-gamer] *::after {
+  backdrop-filter: none !important;
+}
+
+:root[data-gamer] *,
+:root[data-gamer] *::before,
+:root[data-gamer] *::after {
+  -webkit-backdrop-filter: none !important;
+}
+
+:root[data-gamer] .breath-halo {
+  filter: none;
+}
+
+:root[data-gamer] .surface-panel,
+:root[data-gamer] .surface-stage,
+:root[data-gamer] .surface-sheet {
+  background: var(--panel-solid);
+}
+
+:root[data-gamer] .stage__aura,
+:root[data-gamer] .player-field,
+:root[data-gamer] .page-veil,
+:root[data-gamer] .dock-veil,
+:root[data-gamer] .grain {
+  display: none !important;
+}
+
+:root[data-gamer] .shimmer-ink {
+  background-image: none;
+  color: var(--ink);
+  -webkit-text-fill-color: currentColor;
+}
+
+/*
+ * ── The writing page ──
+ *
+ * The editor on Create. A page rather than a form field: no sunken well, a
+ * serif at reading size that grows a step on a wide screen, and a measure
+ * that the column caps so a line of somebody's own words never runs the width
+ * of a monitor. The border is there for the people who need to see where a
+ * control begins; the focus ring is the app's ordinary one.
+ */
+.writing-page {
+  min-height: 11.5rem;
+  padding: 1.15rem 1.25rem 1.25rem;
+  border-radius: 1.5rem;
+  border-color: var(--panel-border);
+  background: var(--panel);
+  font-size: clamp(1.15rem, 1.05rem + 0.45vw, 1.4rem);
+  line-height: 1.7;
+  box-shadow: inset 0 1px 0 var(--panel-highlight);
+}
+
+.writing-page:focus {
+  background: var(--panel-solid);
+}
+
+@media (min-width: 640px) {
+  .writing-page {
+    min-height: 14rem;
+    padding: 1.5rem 1.75rem 1.6rem;
+  }
+}
+
+/*
+ * ── Read along ──
+ *
+ * The whole text under the player, with the line being spoken marked. The
+ * mark is a rule in the margin and a change of ink — no background block, no
+ * weight change — so nothing reflows as it moves from line to line.
+ */
+.read-along {
+  position: relative;
+  max-height: min(42vh, 22rem);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  line-height: 1.6;
+}
+
+.read-along__line {
+  padding: 0.3rem 0 0.3rem 0.95rem;
+  border-left: 2px solid transparent;
+  color: var(--ink-muted);
+  transition:
+    color 400ms var(--ease-calm),
+    border-color 400ms var(--ease-calm);
+}
+
+.read-along__line--read {
+  color: var(--ink-faint);
+}
+
+.read-along__line--current {
+  border-left-color: var(--rose-deep);
+  color: var(--ink);
+}

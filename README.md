@@ -46,28 +46,62 @@ create an optional calendar event. Listening totals stay on the device and are
 shown without streaks or goals.
 
 
+**Gamer mode**
+
+A switch under *More settings* (and in Appearance on About) for listening while
+something else has the machine. On, Manifester does as little as it can and
+still be heard:
+
+- nothing animates — it is the app's *Still* motion setting, enforced — and the
+  drawn background, the breathing room and every frosted-glass blur are not
+  painted at all;
+- the on-device voice model is put down and its memory released. Lines this
+  device has already heard, and the lines that ship with the app, still play in
+  the same voice from the cache; a line nothing has spoken before is read by the
+  device's own voice, which the operating system runs outside the page;
+- nothing is synthesised or decoded ahead of time, and the screen is not held
+  awake.
+
+Your words, volumes and background sound are untouched. Measured in headless
+Chromium during playback, animation frames fell from about 47 a second to under
+one and main-thread time by roughly two thirds. Desktop browsers keep a
+background tab's audio running; phones usually pause a web page's audio when it
+leaves the screen, and gamer mode cannot change that.
+
+**Player**
+
+- Under the stage, **your whole text stays readable while it is read**, with a
+  thin rule marking the line the voice is on. It follows along inside its own
+  box, so the page never moves under your thumb, and it marks nothing if the
+  words were edited after the session began rather than mark the wrong line.
+
 **Create**
 
-- A **ritual-building workspace**: on a desktop the editor sits on the left and a
-  live preview of the finished ritual on the right; on a phone the same pieces
-  stack into one focused column.
-- The **live preview** breathes with your chosen pattern, cycles your lines the
-  way the loop will read them, takes its colour from the ambience you picked, and
-  states the voice, sound, length, delay and rhythm in one glance. **Start loop**
-  and *Hear a line* sit together underneath it — the same question at two sizes,
-  and on a desktop it puts the button that acts on what you are looking at in the
-  column you are looking at, rather than in the other one.
-- **Every tile in that preview is a shortcut**, not a readout: tapping Voice,
-  Sound, Delay or Rhythm opens the setting it reports, and Length scrolls to the
-  session-length card. The Rhythm tile is shown even when the rhythm is off,
-  reading *Off* — otherwise the one setting you could not reach from the shortcut
-  panel would be the one you had not turned on yet.
-- Only five things stay on screen: title, words, session length, Start and Save.
-  Everything else lives in **Customize your ritual** — a list of rows that each
-  state their own value (*Moon Garden · 40%*, *Calm · 4 in / 6 out*, *3-second
-  delay*) and open in a sheet.
+- **Words first.** The screen opens on a single page for your words, set in the
+  serif they will be read in, with one filled button directly underneath:
+  **Read aloud**. *Save* sits beside it, and a line under the page always says
+  where the words stand — kept on this device, saved to your library, or edited
+  since you saved.
+- **Nothing you type is lost to a refresh.** The page is written to this
+  device a moment after each change and once more as the tab is hidden, and it
+  is put back on the next visit — in the editor, not behind a player showing
+  something else. See `src/lib/draftStore.ts`.
+- **Repeat is a switch, and a blank page starts with it off.** Off, your words
+  are read through once and the session finishes by itself. On, they begin
+  again for the length you choose. Everything saved before the switch existed
+  was a loop and still is; the ready-made sessions and the introduction still
+  build loops.
+- **Voice & sound** is a short list of rows under the words — voice and speed,
+  background sound, and (with Repeat on) length and the pause between passes —
+  each stating its own value (*Ivy · 0.90×*, *3-second delay*) and opening in a
+  sheet. **More settings** holds the rest: breathing, music, recording,
+  downloads, AI help, feedback and gamer mode.
+- On a desktop a quiet preview sits in a second column, cycling your lines the
+  way they will be read, with *Hear one line* for trying the voice. On a phone
+  the page is the preview; a Read aloud bar follows you once the button has
+  scrolled away.
 - A large text box that takes anything from one line to a twenty-minute script.
-- **A writing helper**, under the starter phrases. *Add to my words* reads what
+- **A writing helper**, folded under *Help me write* with the starter phrases. *Add to my words* reads what
   you have written — including the title — works out what it is reaching for,
   and appends lines in the same direction. *Improve my words* rewrites what is
   there into the present tense and the first person, turns an avoided feeling

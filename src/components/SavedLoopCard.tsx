@@ -163,7 +163,7 @@ export function SavedLoopCard({
   const spoken = formatApproxDuration(estimateSpokenSeconds(loop.text, loop.rate))
 
   return (
-    <article className="surface-panel flex flex-col p-5" data-rise>
+    <article className="surface-panel flex min-w-0 flex-col p-5" data-rise>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate font-display text-[1.25rem] text-ink">
@@ -171,7 +171,11 @@ export function SavedLoopCard({
           </h3>
           <p className="mt-0.5 text-[0.8125rem] text-ink-muted">
             {countWords(loop.text)} words · {spoken} per pass ·{' '}
-            {loop.timerMinutes == null ? 'no timer' : `${loop.timerMinutes} min`}
+            {loop.repeat === false
+              ? 'once'
+              : loop.timerMinutes == null
+                ? 'no timer'
+                : `${loop.timerMinutes} min`}
           </p>
         </div>
         <Button
