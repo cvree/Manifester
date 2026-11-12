@@ -24,6 +24,7 @@ import {
   SparkIcon,
   SunIcon,
 } from './Icons'
+import { EscapeSettings } from './EscapeSettings'
 import { InstallPrompt } from './InstallPrompt'
 import { MusicControl } from './MusicControl'
 import { SleepVeil } from './SleepMode'
@@ -428,6 +429,7 @@ export function AppShell() {
       */}
       <SleepVeil />
       {nightLight > 0 && <div aria-hidden="true" className="night-light" />}
+      <EscapeSettings />
     </div>
   )
 }

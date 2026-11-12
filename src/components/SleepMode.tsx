@@ -257,7 +257,11 @@ export function SleepVeil() {
         }
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Escape') setRevealed(false)
+        // Handled here, so the app-wide Escape menu does not open too.
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          setRevealed(false)
+        }
       }}
     >
       {!revealed ? (
