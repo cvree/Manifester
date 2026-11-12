@@ -279,6 +279,12 @@ export function PlayerRoute() {
     )
   }
 
+  const stageTitle =
+    session.title ||
+    draft.title.trim() ||
+    (wordless ? 'Breathwork' : autoTitle(draft.text))
+  const titleIsEcho = !wordless && stageTitle === autoTitle(draft.text)
+
   const passProgress =
     session.chunkTotal > 0
       ? ((session.chunkIndex + 1) / session.chunkTotal) * 100
@@ -479,10 +485,20 @@ export function PlayerRoute() {
                     once={readOnce}
                     override={session.sleep ? 'Drifting off' : null}
                   />
-                  <h1 className="stage__title mt-2 max-w-full truncate text-center font-display text-[1.75rem] leading-tight text-ink sm:text-[2rem]">
-                    {session.title ||
-                      draft.title.trim() ||
-                      (wordless ? 'Breathwork' : autoTitle(draft.text))}
+                  {/*
+                    A title somebody gave their words is shown. One the app
+                    made up out of the first line is not: it would be the
+                    opening words, cut off with an ellipsis, directly above
+                    the same words set whole. It stays in the document for
+                    the heading outline and is simply not painted.
+                  */}
+                  <h1
+                    className={cx(
+                      'stage__title mt-2 max-w-full truncate text-center font-display',
+                      titleIsEcho && 'sr-only',
+                    )}
+                  >
+                    {stageTitle}
                   </h1>
                 </div>
 
@@ -557,11 +573,10 @@ export function PlayerRoute() {
                             ? 'Resume reading'
                             : 'Read aloud'
                     }
+                    data-playing={playing}
                     className={cx(
                       'stage__play interactive relative flex h-[5.5rem] w-[5.5rem] items-center justify-center rounded-full',
-                      'text-[2rem] text-[var(--bg-0)]',
-                      'bg-[linear-gradient(175deg,color-mix(in_oklab,var(--rose-deep)_88%,white)_0%,var(--rose-deep)_64%)]',
-                      'shadow-[inset_0_1px_0_rgb(255_255_255/0.32),0_18px_44px_-16px_var(--glow)]',
+                      'text-[2rem]',
                       'disabled:cursor-not-allowed disabled:opacity-40',
                     )}
                   >
@@ -652,7 +667,7 @@ export function PlayerRoute() {
                       </div>
                     )}
                     <div
-                      className="h-1.5 w-full overflow-hidden rounded-pill bg-[var(--control-sunken)]"
+                      className="stage__thread"
                       role="progressbar"
                       aria-label="Progress through this pass"
                       aria-valuemin={0}
@@ -660,7 +675,7 @@ export function PlayerRoute() {
                       aria-valuenow={Math.round(passProgress)}
                     >
                       <div
-                        className="h-full rounded-pill bg-[var(--rose)] transition-[width] duration-500 ease-[var(--ease-calm)]"
+                        className="stage__thread-fill"
                         style={{ width: `${passProgress}%` }}
                       />
                     </div>

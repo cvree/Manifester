@@ -7,6 +7,10 @@ import { deferReload } from './lib/appUpdate'
 import { installGlobalErrorLog } from './lib/diagnostics'
 // Lenis needs its own reset to take over scrolling on the About screen.
 import 'lenis/dist/lenis.css'
+// The display face, shipped with the app so it is the same soft serif on every
+// device and still there offline. `full` carries the SOFT and WONK axes.
+import '@fontsource-variable/fraunces/full.css'
+import '@fontsource-variable/fraunces/full-italic.css'
 import './styles/theme.css'
 
 // Offline caching. `autoUpdate` means a new version installs quietly — no

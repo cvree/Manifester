@@ -325,7 +325,7 @@
    * the next best things on other systems; Georgia is the floor.
    */
   --font-display:
-    ui-serif, 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua',
+    'Fraunces Variable', ui-serif, 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua',
     Georgia, 'Times New Roman', serif;
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
@@ -375,7 +375,15 @@
     font-size: 16px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /*
+     * The display face is Fraunces, and these are the two of its axes that
+     * decide whether it is soft. `SOFT` rounds every serif and terminal off;
+     * `WONK` off keeps the upright letters calm. Inherited, and ignored by the
+     * sans, which has neither axis.
+     */
+    font-variation-settings: 'SOFT' 100, 'WONK' 0;
     overscroll-behavior-y: none;
   }
 
@@ -550,6 +558,7 @@
      * rather than something the stage could share.
      */
     letter-spacing: 0.004em;
+    font-weight: 350;
     /* The cursor in your own words, in the app's own colour. */
     caret-color: var(--rose-deep);
   }
@@ -2208,13 +2217,20 @@ html:not(.dark) .breath-aurora__veil {
 @keyframes line-in {
   from {
     opacity: 0;
-    transform: translate3d(0, 4px, 0);
-    filter: blur(3px);
+    transform: translate3d(0, 6px, 0);
+    filter: blur(9px);
+  }
+  /*
+   * Readable by a third of the way in — the voice has already begun — and
+   * then the rest of the time is the words coming into focus.
+   */
+  35% {
+    opacity: 1;
   }
   to {
     opacity: 1;
     transform: none;
-    filter: blur(0);
+    filter: none;
   }
 }
 
@@ -2228,7 +2244,7 @@ html:not(.dark) .breath-aurora__veil {
 }
 
 .animate-line-in {
-  animation: line-in 220ms var(--ease-calm) both;
+  animation: line-in 640ms var(--ease-calm) both;
 }
 
 /* Reduced motion keeps the change legible and drops the travel and the blur. */
@@ -2305,8 +2321,8 @@ html:not(.dark) .breath-aurora__veil {
  */
 
 .cinema {
-  --cinema-size: clamp(1.45rem, 8.4vw, 3.1rem);
-  --cinema-track: 0.26em;
+  --cinema-size: clamp(1.3rem, 7.2vw, 3.1rem);
+  --cinema-track: 0.24em;
   /* How much of that tracking the in-breath adds on top. */
   --cinema-swell: 0.16em;
   position: absolute;
@@ -2435,7 +2451,13 @@ html:not(.dark) .breath-aurora__veil {
   max-width: 100%;
   font-family: var(--font-display);
   font-size: var(--cinema-size);
-  font-weight: 400;
+  /*
+   * Capitals this large want the opposite of what body text does: thin, and
+   * from the low-contrast end of the face, so the strokes stay one soft
+   * weight instead of going thick-and-hairline.
+   */
+  font-weight: 260;
+  font-variation-settings: 'SOFT' 100, 'WONK' 0, 'opsz' 48;
   line-height: 1.12;
   text-align: center;
   text-transform: uppercase;
@@ -2443,7 +2465,10 @@ html:not(.dark) .breath-aurora__veil {
   margin-right: calc(-1 * var(--cinema-track));
   color: var(--ink);
   opacity: calc(0.74 + var(--e) * 0.26);
-  text-shadow: 0 0 1.2rem color-mix(in oklab, var(--glow) 52%, transparent);
+  text-shadow:
+    0 0 0.05em color-mix(in oklab, var(--ink) 30%, transparent),
+    0 0 0.45em color-mix(in oklab, var(--rose) 30%, transparent),
+    0 0 1.4em color-mix(in oklab, var(--glow) 62%, transparent);
   will-change: opacity;
 }
 
@@ -4964,10 +4989,10 @@ html:not(.dark) .breath-aurora__veil {
    * makes fitting mathematically impossible. This is the one unit in the file
    * that has to be what it is.
    */
-  --line-size: 1.25rem;
-  --line-leading: 1.38;
+  --line-size: 1.45rem;
+  --line-leading: 1.4;
   --line-lines: 3;
-  --line-width: 22rem;
+  --line-width: 24rem;
   --stage-line: calc(var(--line-lines) * var(--line-leading) * var(--line-size));
 
   /*
@@ -5054,8 +5079,8 @@ html:not(.dark) .breath-aurora__veil {
 /* The card's own type opens a little once there is width for it to open into. */
 @media (min-width: 640px) {
   .stage {
-    --line-size: 1.4rem;
-    --line-width: 23rem;
+    --line-size: 1.7rem;
+    --line-width: 31rem;
   }
 }
 
@@ -5550,8 +5575,53 @@ html:not(.dark) .breath-aurora__veil {
   max-width: min(var(--line-width), 100%);
   font-size: calc(var(--line-size) * var(--line-fit, 1));
   line-height: var(--line-leading);
-  overflow: hidden;
+  /*
+   * Clipped on the block axis only, and with a margin where the browser has
+   * one: the words carry a soft bloom now, and a bloom cut off square at the
+   * edge of its box is the hardest edge on the screen.
+   */
+  overflow-x: visible;
+  overflow-y: clip;
+  overflow-clip-margin: 1.25rem;
   transition-property: font-size, max-width, height, line-height, margin;
+}
+
+/*
+ * ── The words themselves ──
+ *
+ * Light, round and lit from behind. Three things do it, and none of them moves:
+ *
+ *   · the weight comes down and the optical size is pinned low, which is the
+ *     end of this face with the least contrast — no hairlines to go brittle
+ *     against a dark room;
+ *   · the ink takes a few percent of rose, so it is warm rather than white;
+ *   · and a two-layer bloom sits under the glyphs: a tight one that takes the
+ *     pixel edge off, and a wide one that lets the words light the glass.
+ *
+ * The bloom is a static `text-shadow` on one short paragraph. Nothing here is
+ * rewritten by the breath, so it is painted once per line.
+ */
+.stage__line:not(.stage__line--invitation) {
+  font-weight: 330;
+  font-variation-settings: 'SOFT' 100, 'WONK' 0, 'opsz' 30;
+  letter-spacing: 0.004em;
+  color: color-mix(in oklab, var(--ink) 93%, var(--rose));
+  text-shadow:
+    0 0 0.5em color-mix(in oklab, var(--rose) 16%, transparent),
+    0 0 1.5em color-mix(in oklab, var(--glow) 34%, transparent);
+}
+
+.dark .stage__line:not(.stage__line--invitation) {
+  font-weight: 300;
+  text-shadow:
+    0 0 0.07em color-mix(in oklab, var(--ink) 34%, transparent),
+    0 0 0.55em color-mix(in oklab, var(--rose) 34%, transparent),
+    0 0 1.7em color-mix(in oklab, var(--glow) 72%, transparent);
+}
+
+:root[data-gamer] .stage__line,
+:root[data-gamer] .cinema__word {
+  text-shadow: none;
 }
 
 /*
@@ -5590,6 +5660,7 @@ html:not(.dark) .breath-aurora__veil {
 .stage__line--invitation {
   font-size: calc(var(--line-size) * 0.84 * var(--line-fit, 1));
   font-style: italic;
+  font-weight: 320;
   opacity: 0.82;
 }
 
@@ -5925,9 +5996,6 @@ html:not(.dark) .breath-aurora__veil {
    * to its content's *minimum* when there is no room, and for a paragraph
    * that minimum is one word wide and many lines tall.
    */
-  .stage--immersive .stage__title {
-    font-size: clamp(1.25rem, 1rem + 0.7vw, 1.6rem);
-  }
 
   .stage--immersive {
     --line-size: clamp(1.1rem, 0.95rem + 0.5vw, 1.4rem);
@@ -7268,17 +7336,40 @@ html[data-gamer] *::after {
   overscroll-behavior: contain;
   list-style: none;
   font-family: var(--font-display);
-  font-size: 1.12rem;
-  line-height: 1.6;
+  font-size: 1.16rem;
+  font-weight: 340;
+  line-height: 1.62;
 }
 
 .read-along__line {
-  padding: 0.3rem 0 0.3rem 0.95rem;
-  border-left: 2px solid transparent;
+  position: relative;
+  padding: 0.3rem 0 0.3rem 1.05rem;
   color: var(--ink-muted);
   transition:
-    color 400ms var(--ease-calm),
-    border-color 400ms var(--ease-calm);
+    color 600ms var(--ease-calm),
+    text-shadow 600ms var(--ease-calm);
+}
+
+/*
+ * The mark is a short rounded bar of light rather than a border: a border is
+ * square at both ends and switches on, and this one fades in and has no
+ * corners.
+ */
+.read-along__line::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55rem;
+  bottom: 0.55rem;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(to bottom, var(--rose), var(--gold));
+  box-shadow: 0 0 0.7rem var(--glow);
+  opacity: 0;
+  transform: scaleY(0.4);
+  transition:
+    opacity 600ms var(--ease-calm),
+    transform 600ms var(--ease-calm);
 }
 
 .read-along__line--read {
@@ -7286,6 +7377,137 @@ html[data-gamer] *::after {
 }
 
 .read-along__line--current {
-  border-left-color: var(--rose-deep);
   color: var(--ink);
+  text-shadow: 0 0 1.2em color-mix(in oklab, var(--glow) 60%, transparent);
+}
+
+.read-along__line--current::before {
+  opacity: 1;
+  transform: none;
+}
+
+/*
+ * ── The player, lit ──
+ *
+ * Everything below is the stage's finish rather than its structure: what the
+ * title, the play button and the progress line are made of. None of it changes
+ * a size the expanded layout budgets for.
+ */
+
+/*
+ * The title is the name of the thing, not the thing. It used to be the largest
+ * type on the stage, above the words it was naming; now it is a quiet italic
+ * line and the words are what is large.
+ */
+.stage__title {
+  font-size: 1.08rem;
+  font-style: italic;
+  font-weight: 340;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+/* The glass in the card holds some of the orb's light too, not only expanded. */
+.stage:not(.stage--immersive) {
+  --aura: 0.7;
+}
+
+/*
+ * The play button: a lit bead rather than a flat disc. A soft ring of its own
+ * colour sits outside it, and while a session is running that ring breathes on
+ * a slow clock of its own — transform and opacity only.
+ */
+.stage__play {
+  color: var(--bg-0);
+  background:
+    radial-gradient(
+      120% 90% at 50% 0%,
+      color-mix(in oklab, var(--rose-deep) 62%, white) 0%,
+      transparent 58%
+    ),
+    linear-gradient(
+      175deg,
+      color-mix(in oklab, var(--rose-deep) 90%, white) 0%,
+      var(--rose-deep) 70%
+    );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    inset 0 -0.6rem 1.2rem -0.6rem color-mix(in oklab, var(--rose) 60%, transparent),
+    0 0 0 0.5rem color-mix(in oklab, var(--rose) 9%, transparent),
+    0 1.1rem 2.75rem -0.9rem var(--glow),
+    0 0 3.5rem -0.5rem color-mix(in oklab, var(--glow) 70%, transparent);
+}
+
+.stage__play::before {
+  content: '';
+  position: absolute;
+  inset: -0.5rem;
+  border-radius: inherit;
+  border: 1px solid color-mix(in oklab, var(--rose) 46%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.stage__play[data-playing='true']::before {
+  animation: play-halo 4.8s var(--ease-breath) infinite;
+}
+
+@keyframes play-halo {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  30% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.32);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage__play[data-playing='true']::before {
+    animation: none;
+  }
+}
+
+:root[data-gamer] .stage__play::before {
+  display: none;
+}
+
+/* The pass, as a thread of light with a bright leading end. */
+.stage__thread {
+  height: 3px;
+  width: 100%;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--ink) 9%, transparent);
+}
+
+.stage__thread-fill {
+  position: relative;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    to right,
+    color-mix(in oklab, var(--rose) 40%, transparent),
+    var(--rose) 70%,
+    var(--gold)
+  );
+  box-shadow: 0 0 0.75rem var(--glow);
+  transition: width 700ms var(--ease-calm);
+}
+
+.stage__thread-fill::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  translate: 0 -50%;
+  background: var(--gold);
+  box-shadow: 0 0 0.6rem 0.1rem color-mix(in oklab, var(--gold) 70%, transparent);
 }
