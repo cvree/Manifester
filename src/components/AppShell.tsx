@@ -290,7 +290,7 @@ export function AppShell() {
                 if (isPlaying) pause()
                 else resume()
               }}
-              aria-label={isPlaying ? 'Pause the loop' : 'Resume the loop'}
+              aria-label={isPlaying ? 'Pause' : 'Resume'}
               className="interactive flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--rose-deep)] text-[1.1rem] text-[var(--bg-0)]"
             >
               {isPlaying ? <PauseIcon /> : <PlayIcon />}
@@ -304,7 +304,11 @@ export function AppShell() {
                 {session.title}
               </span>
               <span className="block truncate text-[0.82rem] text-ink-muted">
-                {isPlaying ? 'Looping — tap to open the player' : 'Paused'}
+                {isPlaying
+                  ? draft.settings.repeat
+                    ? 'Looping — tap to open the player'
+                    : 'Reading — tap to open the player'
+                  : 'Paused'}
               </span>
             </button>
           </div>

@@ -150,8 +150,18 @@ export function PlayerRoute() {
    * countdowns and two phase words on one screen is not twice the guidance, it
    * is a screen that cannot decide what it is. See `CinematicBreathType`.
    */
+  /*
+   * Not during a single read-through. Somebody who pressed Read aloud came to
+   * hear and see their own words, and "BREATHE IN" set across the stage at
+   * four times their size is the app talking over them. The orb still
+   * breathes, with its small caption; the full-width typography belongs to
+   * the loop, where the words are familiar and the breath is the practice.
+   */
   const cinematic =
-    preferences.cinematicTypography && preferences.breathingEnabled && playing
+    preferences.cinematicTypography &&
+    preferences.breathingEnabled &&
+    playing &&
+    !(!wordless && !draft.settings.repeat)
 
   /** How slow the breath is, said once, quietly, inside the orb. */
   const breathRate = preferences.breathingEnabled
@@ -351,7 +361,7 @@ export function PlayerRoute() {
                     {wordless
                       ? 'That is the practice.'
                       : readOnce
-                        ? 'That is your words, read.'
+                        ? 'Your words, read through.'
                         : 'Your loop is complete.'}
                   </h1>
                   <p className="type-body mt-3 max-w-[34ch] text-center">

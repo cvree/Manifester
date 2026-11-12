@@ -24,7 +24,7 @@ export function DesktopPlayerPanel({
     >
       <h2 className="type-subheading">Adjust while listening</h2>
       <p className="type-meta mt-1 mb-5">
-        Nothing here stops the loop.
+        Nothing here stops the voice.
       </p>
       <PlayerControls
         onOpenPanel={onOpenPanel}
